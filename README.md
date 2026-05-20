@@ -41,22 +41,31 @@ vector/
     └── task/            # Project task tracking
 ```
 
-## Getting started
+## Installation
 
-### Prerequisites
+### MCP server (`mcp-vector`)
 
-- Rust 1.95.0 or later
-- `cargo` in your PATH
-
-### Build
+Install the latest release directly from the repository:
 
 ```sh
-cargo build --release
+cargo install --git https://github.com/UmbrellaCorporationInc/vector mcp-vector
 ```
 
-The main binary is `mcp-vector`, produced from the `mcp/vector` crate.
+To install a specific version:
 
-### Run as an MCP server
+```sh
+cargo install --git https://github.com/UmbrellaCorporationInc/vector --tag v0.1.1 mcp-vector
+```
+
+**Prerequisites:** Rust 1.95.0 or later. Install from [rustup.rs](https://rustup.rs).
+
+### VS Code extension
+
+Install the **Vector** extension from the VS Code marketplace, or search for `vector` in the Extensions panel.
+
+## Configuration
+
+### MCP client
 
 Add the server to your MCP client configuration (e.g., `.mcp.json`):
 
@@ -72,6 +81,16 @@ Add the server to your MCP client configuration (e.g., `.mcp.json`):
 ```
 
 Then start your MCP client. Vector exposes its tools through the MCP protocol over stdio.
+
+## Building from source
+
+```sh
+git clone https://github.com/UmbrellaCorporationInc/vector
+cd vector
+cargo build --release
+```
+
+The `mcp-vector` binary is produced at `target/release/mcp-vector`.
 
 ## Design principles
 
