@@ -2,7 +2,7 @@
   "name": "vector",
   "displayName": "Vector",
   "description": "Governed document sidebar and extension-owned preview for Vector projects.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "fernandojerez",
   "license": "MIT",
   "type": "module",
