@@ -11,9 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  publish-mcp-vector:
-    name: publish-mcp-vector
+  verify-installable:
+    name: verify-installable
     runs-on: ubuntu-latest
+
+    env:
+      CARGO_TARGET_DIR: target
 
     steps:
       - name: Checkout repository
@@ -22,7 +25,7 @@ jobs:
       - name: Extract workspace version
         id: version
         run: |
-          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Check that a matching release tag exists
@@ -30,10 +33,10 @@ jobs:
           TAG="v${{ steps.version.outputs.version }}"
           git fetch --tags
           if ! git tag --list | grep -qx "$TAG"; then
-            echo "No release tag $TAG found — skipping publish."
+            echo "No release tag $TAG found — skipping."
             exit 1
           fi
-          echo "Tag $TAG confirmed. Proceeding with publish."
+          echo "Tag $TAG confirmed."
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -49,8 +52,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Publish mcp-vector to crates.io
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          CARGO_TARGET_DIR: target
-        run: cargo publish -p mcp-vector
+      - name: Verify cargo install --git works
+        run: |
+          cargo install --git https://github.com/${{ github.repository }} \
+            --tag v${{ steps.version.outputs.version }} \
+            mcp-vector
