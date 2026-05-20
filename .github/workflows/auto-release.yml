@@ -70,4 +70,4 @@ jobs:
           gh release create ${{ steps.tag.outputs.tag }} \
             --title "${{ steps.tag.outputs.tag }}" \
             --notes "Release ${{ steps.tag.outputs.tag }} — automated via bump workflow." \
-            --target main
+            --target ${{ github.sha }}
