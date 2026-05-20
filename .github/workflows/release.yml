@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Extract version from tag
         id: version
@@ -36,6 +38,7 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
           branch: release/bump-${{ steps.version.outputs.tag }}
           commit-message: "chore: bump workspace version to ${{ steps.version.outputs.version }}"
           title: "chore: bump workspace version to ${{ steps.version.outputs.version }}"
