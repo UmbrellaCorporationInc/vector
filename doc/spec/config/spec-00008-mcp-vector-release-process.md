@@ -4,10 +4,10 @@ type: spec
 code: "00008"
 slug: mcp-vector-release-process
 title: mcp-vector Release Process
-description: Defines the exact steps to publish a new version of mcp-vector to crates.io via the GitHub Actions release pipeline.
+description: Defines the exact steps to release a new version of mcp-vector via the unified bump workflow and cargo install --git distribution.
 category: config
 created: 2026-05-19
-updated: 2026-05-19
+updated: 2026-05-20
 authors: []
 tags:
   - release
@@ -15,6 +15,7 @@ tags:
   - mcp
 related:
   - "SPEC 00005: mcp-vector Organization and Runtime Adapter Boundary"
+  - "SPEC 00009: VS Code Extension Release Process"
 supersedes: []
 superseded_by: null
 aliases:
@@ -25,99 +26,111 @@ aliases:
 
 ## 1. Purpose
 
-Defines the exact steps an operator must follow to publish a new version of
-`mcp-vector` to crates.io. The process is implemented by two GitHub Actions
-workflows — `release.yml` and `publish.yml` — and is triggered by creating a
-GitHub Release.
+Defines the exact steps to release a new version of `mcp-vector`. The process
+is driven by `bump.yml` (version bump PR) and `auto-release.yml` (automatic
+GitHub Release on merge). Distribution is via `cargo install --git` — the
+crate is not published to crates.io because it depends on internal
+`runtime-*` path crates.
 
 ## 2. Definition
 
 ### 2.1 Preconditions
 
-Before starting a release, all of the following must be true:
-
 - The `main` branch CI is green (both `rust` and `vscode-extension` jobs).
 - All changes intended for the release have been merged to `main`.
-- The `CARGO_REGISTRY_TOKEN` secret is set in the repository's GitHub Actions
-  settings and has publish rights for `mcp-vector` on crates.io.
 
 ### 2.2 Version format
 
 Versions follow [Semantic Versioning](https://semver.org/). The release tag
-must match the pattern `v<MAJOR>.<MINOR>.<PATCH>` (e.g. `v0.2.0`).
+matches the pattern `v<MAJOR>.<MINOR>.<PATCH>` (e.g. `v0.2.0`).
 
-The tag version controls the workspace version: `[workspace.package].version`
-in the root `Cargo.toml` is the single source of truth for all crates,
-including `mcp-vector`.
+`[workspace.package].version` in the root `Cargo.toml` is the single source
+of truth for all crates, including `mcp-vector`.
 
 ### 2.3 Release steps
 
 | Step | Action | Who |
 |------|--------|-----|
 | 1 | Decide the next version (`MAJOR.MINOR.PATCH`). | Operator |
-| 2 | Create and publish a GitHub Release with tag `v<VERSION>`. | Operator |
-| 3 | `release.yml` opens a PR: `chore: bump workspace version to <VERSION>`. | Automated |
+| 2 | Trigger `bump.yml` with `artifact=mcp` and the new version. | Operator |
+| 3 | `bump.yml` updates `Cargo.toml` and opens a PR labeled `release`. | Automated |
 | 4 | Review and merge the bump PR into `main`. | Operator |
-| 5 | `publish.yml` detects the `Cargo.toml` change, confirms the tag exists, and runs `cargo publish -p mcp-vector`. | Automated |
+| 5 | `auto-release.yml` detects the merge and creates the GitHub Release `v<VERSION>`. | Automated |
+| 6 | `publish.yml` verifies `cargo install --git` succeeds at the new tag. | Automated |
 
-### 2.4 Creating the GitHub Release
-
-Using the `gh` CLI:
+### 2.4 Triggering the bump
 
 ```bash
-gh release create v<VERSION> \
-  --title "v<VERSION>" \
-  --notes "<Release notes>"
+gh workflow run bump.yml --field artifact=mcp --field version=0.2.0
 ```
 
-Or via the GitHub web UI: **Releases → Draft a new release → Choose a tag →
-Create new tag → Publish release**.
+Or via the GitHub UI: **Actions → Bump Version → Run workflow**.
+
+`bump.yml` opens a PR on branch `release/mcp-v<VERSION>` with the label
+`release` and the commit `chore: bump mcp version to <VERSION>`.
 
 ### 2.5 Workflow responsibilities
 
-**`release.yml`**
+**`bump.yml`**
 
-- Triggered by: `release: published`
-- Extracts `VERSION` from the tag by stripping the `v` prefix.
-- Updates `version = "..."` under `[workspace.package]` in `Cargo.toml` using
-  `sed`.
-- Opens a pull request on branch `release/bump-v<VERSION>` with the label
-  `release`.
+- Triggered by: `workflow_dispatch` with inputs `artifact=mcp` and `version`.
+- Updates `version = "..."` under `[workspace.package]` in `Cargo.toml`.
+- Opens a pull request labeled `release` on branch `release/mcp-v<VERSION>`.
+
+**`auto-release.yml`**
+
+- Triggered by: `push` to `main`.
+- Finds the merged PR by commit SHA and label `release`.
+- Derives the tag from the branch name: `release/mcp-v0.2.0` → `v0.2.0`.
+- Creates the GitHub Release targeting `main`.
 
 **`publish.yml`**
 
-- Triggered by: `push` to `main` when `Cargo.toml` changes.
-- Guard: fetches all tags and checks that `v<VERSION>` exists. If the tag is
-  absent, the job exits without publishing — this prevents accidental publishes
-  from unrelated `Cargo.toml` edits.
-- Publishes with: `cargo publish -p mcp-vector` and `CARGO_TARGET_DIR: target`
-  to avoid the Windows-path issue in `.cargo/config.toml`.
+- Triggered by: `release: published` for tags matching `v*`.
+- Verifies that `cargo install --git` succeeds at the release tag as a
+  smoke test.
+
+### 2.6 Distribution
+
+`mcp-vector` is distributed via `cargo install --git`:
+
+```bash
+# Latest release
+cargo install --git https://github.com/UmbrellaCorporationInc/vector mcp-vector
+
+# Specific version
+cargo install --git https://github.com/UmbrellaCorporationInc/vector --tag v0.2.0 mcp-vector
+```
+
+The crate is not published to crates.io because the `runtime-*` workspace
+crates are internal path dependencies that cannot be resolved by crates.io.
 
 ## 3. Invariants
 
-- The release tag **must** be created before or as part of the GitHub Release
-  event. `publish.yml` will fail the tag-check guard otherwise.
-- The bump PR **must** be merged before `publish.yml` can run, since the
-  workflow triggers on push to `main`.
-- The version in `Cargo.toml` at the time of publish **must** match the
-  release tag. A mismatch will cause `cargo publish` to fail because crates.io
-  validates the version in the manifest.
-- Only `mcp-vector` is published. The remaining workspace crates
-  (`runtime-*`) are internal and must not be published independently.
+- The bump PR branch **must** follow the pattern `release/mcp-v<VERSION>` and
+  carry the `release` label. `auto-release.yml` relies on both to create the
+  correct tag.
+- The version in `Cargo.toml` at merge time **must** match the intended tag.
+  `auto-release.yml` derives the tag from the branch name, not from
+  `Cargo.toml` — a mismatch would create a misaligned release.
+- Only `mcp-vector` is distributed. The `runtime-*` crates are internal and
+  must never be published or distributed independently.
+- The `v*` tag prefix is reserved for Rust releases. Using it for other
+  artifacts would trigger `publish.yml` incorrectly.
 
 ## 4. Examples
 
 ```bash
-# Step 1 — create and publish the GitHub Release
-gh release create v0.2.0 --title "v0.2.0" --notes "Add YAML tool support."
+# Trigger the bump
+gh workflow run bump.yml --field artifact=mcp --field version=0.2.0
 
-# Step 2 — release.yml opens the bump PR automatically
-# Step 3 — review and merge the PR on GitHub
+# bump.yml opens PR: "chore: bump mcp version to 0.2.0"
+# Merge the PR on GitHub
 
-# After merge, publish.yml runs automatically and publishes mcp-vector 0.2.0
+# auto-release.yml creates release v0.2.0 automatically
+# publish.yml verifies: cargo install --git ... --tag v0.2.0 mcp-vector
 ```
 
 ## 5. Open Questions
 
-- Should the bump PR be auto-merged after CI passes to reduce manual steps?
-- Should `release.yml` also update a `CHANGELOG.md` from the GitHub Release notes?
+- Should the bump PR be auto-merged after CI passes to remove the manual merge step?

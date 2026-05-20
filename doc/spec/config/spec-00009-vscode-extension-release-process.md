@@ -4,10 +4,10 @@ type: spec
 code: "00009"
 slug: vscode-extension-release-process
 title: VS Code Extension Release Process
-description: Defines the exact steps to publish a new version of the Vector VS Code extension to the Marketplace.
+description: Defines the exact steps to publish a new version of the Vector VS Code extension to the VS Code Marketplace, Open VSX Registry, and GitHub Releases.
 category: config
 created: 2026-05-19
-updated: 2026-05-19
+updated: 2026-05-20
 authors: []
 tags:
   - release
@@ -25,19 +25,20 @@ aliases:
 
 ## 1. Purpose
 
-Defines the steps to publish a new version of the Vector VS Code extension
-to the Visual Studio Code Marketplace. The extension is versioned and released
-independently from the Rust workspace (`mcp-vector`).
+Defines the steps to publish a new version of the Vector VS Code extension.
+Each release publishes to three targets simultaneously: the VS Code Marketplace,
+the Open VSX Registry, and GitHub Releases (as a downloadable `.vsix`). The
+extension is versioned and released independently from the Rust workspace.
 
 ## 2. Definition
 
 ### 2.1 Preconditions
 
 - The `main` branch CI is green (`vscode-extension` job passing).
-- `VSCE_PAT` secret is set in the repository's GitHub Actions settings with
-  scope **Marketplace → Manage** under publisher `fernandojerez`.
-- The desired version does not already exist in the Marketplace under
-  `fernandojerez.vector`.
+- `VSCE_PAT` secret is configured with scope **Marketplace → Manage** under
+  publisher `fernandojerez`.
+- `OVSX_PAT` secret is configured for the Open VSX Registry.
+- The desired version does not already exist in either registry.
 
 ### 2.2 Version format
 
@@ -50,47 +51,59 @@ field. It is **independent** from the Rust workspace version in `Cargo.toml`.
 | Step | Action | Who |
 |------|--------|-----|
 | 1 | Decide the next version (`MAJOR.MINOR.PATCH`). | Operator |
-| 2 | Update `"version"` in `frontend/vscode/vector/package.json`. | Operator |
-| 3 | Open a PR with the version bump, merge to `main`. | Operator |
-| 4 | Create and publish a GitHub Release with tag `ext-v<VERSION>`. | Operator |
-| 5 | `publish-extension.yml` packages and publishes to the Marketplace. | Automated |
+| 2 | Trigger `bump.yml` with `artifact=extension` and the new version. | Operator |
+| 3 | `bump.yml` updates `package.json` and opens a PR labeled `release`. | Automated |
+| 4 | Review and merge the bump PR into `main`. | Operator |
+| 5 | `auto-release.yml` detects the merge and creates the GitHub Release `ext-v<VERSION>`. | Automated |
+| 6 | `publish-extension.yml` builds the `.vsix` and publishes to all three targets. | Automated |
 
-### 2.4 Bumping the version
-
-Edit `frontend/vscode/vector/package.json`:
-
-```json
-{
-  "version": "1.4.0"
-}
-```
-
-Commit and merge via PR before creating the release tag.
-
-### 2.5 Creating the GitHub Release
-
-Using the `gh` CLI:
+### 2.4 Triggering the bump
 
 ```bash
-gh release create ext-v<VERSION> \
-  --title "Extension v<VERSION>" \
-  --notes "<Release notes>" \
-  --target main
+gh workflow run bump.yml --field artifact=extension --field version=1.4.2
 ```
 
-The `ext-v` prefix distinguishes extension releases from Rust releases (`v*`),
-allowing independent release cadences.
+Or via the GitHub UI: **Actions → Bump Version → Run workflow**.
 
-### 2.6 Workflow responsibilities
+`bump.yml` opens a PR on branch `release/extension-v<VERSION>` with the label
+`release` and the commit `chore: bump extension version to <VERSION>`.
+
+### 2.5 Workflow responsibilities
+
+**`bump.yml`**
+
+- Triggered by: `workflow_dispatch` with inputs `artifact=extension` and `version`.
+- Updates `"version"` in `frontend/vscode/vector/package.json`.
+- Opens a pull request labeled `release` on branch `release/extension-v<VERSION>`.
+
+**`auto-release.yml`**
+
+- Triggered by: `push` to `main`.
+- Finds the merged PR by commit SHA and label `release`.
+- Derives the tag from the branch name: `release/extension-v1.4.2` → `ext-v1.4.2`.
+- Creates the GitHub Release targeting `main`.
 
 **`publish-extension.yml`**
 
-- Triggered by: `release: published` or `workflow_dispatch`.
-- Checks out `main`.
-- Installs dependencies via `pnpm install --frozen-lockfile`.
-- Runs `vsce publish --no-dependencies` using `VSCE_PAT`.
+- Triggered by: `release: published` for tags starting with `ext-`.
+- Checks out `main` and installs dependencies via `pnpm install --frozen-lockfile`.
+- Builds the package once: `vsce package --out vector.vsix`.
+- Uploads `vector.vsix` as a GitHub Release asset.
+- Publishes to the VS Code Marketplace via `vsce publish --packagePath vector.vsix`.
+- Publishes to Open VSX via `ovsx publish vector.vsix`.
 
-### 2.7 Manual trigger
+### 2.6 Distribution targets
+
+| Target | Tool | Secret |
+|--------|------|--------|
+| VS Code Marketplace | `vsce` | `VSCE_PAT` |
+| Open VSX Registry | `ovsx` | `OVSX_PAT` |
+| GitHub Releases | `gh release upload` | `GITHUB_TOKEN` |
+
+The `.vsix` is built once and reused for all three targets, guaranteeing
+identical artifacts across registries.
+
+### 2.7 Manual re-run
 
 To re-run a failed publish without creating a new release:
 
@@ -102,29 +115,33 @@ Or via the GitHub UI: **Actions → Publish Extension → Run workflow**.
 
 ## 3. Invariants
 
-- The version in `package.json` at the time the release tag is created must
-  match the intended published version. `vsce` reads it directly from
-  `package.json` — there is no override at publish time.
-- The `ext-v` tag prefix must be used for extension releases. Using a bare
-  `v*` tag would also trigger `release.yml` (the Rust bump workflow).
-- Only the `fernandojerez` publisher account can publish. The `VSCE_PAT`
-  must belong to that publisher.
+- The version in `package.json` at merge time **must** match the intended
+  published version. `vsce` reads it directly from `package.json`.
+- `@types/vscode` must not exceed `engines.vscode`. Both are currently set
+  to `^1.90.0`. `vsce` enforces this at package time.
+- The `ext-v` tag prefix is reserved for extension releases. Tags matching
+  `v*` trigger the Rust publish workflow instead.
+- Only the `fernandojerez` publisher account can publish. Both `VSCE_PAT`
+  and `OVSX_PAT` must belong to that account.
 - The extension and Rust workspace are versioned independently. Do not
   conflate their version numbers.
+- The `.vsix` is built once and shared across all publish steps. Never
+  build separately per registry.
 
 ## 4. Examples
 
 ```bash
-# Bump version in package.json, open and merge a PR, then:
-gh release create ext-v1.4.0 \
-  --title "Extension v1.4.0" \
-  --notes "Add dashboard refresh command." \
-  --target main
+# Trigger the bump
+gh workflow run bump.yml --field artifact=extension --field version=1.4.2
 
-# publish-extension.yml runs automatically and publishes fernandojerez.vector@1.4.0
+# bump.yml opens PR: "chore: bump extension version to 1.4.2"
+# Merge the PR on GitHub
+
+# auto-release.yml creates release ext-v1.4.2 automatically
+# publish-extension.yml runs and publishes fernandojerez.vector@1.4.2
+# to VS Code Marketplace, Open VSX, and GitHub Releases
 ```
 
 ## 5. Open Questions
 
-- Should the `publish-extension.yml` trigger be restricted to `ext-v*` tags
-  only, to avoid accidental triggers from Rust releases?
+- Should the bump PR be auto-merged after CI passes to remove the manual merge step?
