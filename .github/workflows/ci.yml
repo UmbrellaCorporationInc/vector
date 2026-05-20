@@ -52,8 +52,8 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --all-features
 
-  frontend:
-    name: frontend
+  vscode-extension:
+    name: vscode-extension
     runs-on: ubuntu-latest
 
     defaults:
@@ -72,6 +72,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
+          version: 10.33.3
           run_install: false
 
       - name: Get pnpm store path
