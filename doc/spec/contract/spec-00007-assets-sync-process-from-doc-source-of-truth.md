@@ -59,6 +59,8 @@ These project-level config files live outside `doc/` but are also mirrored into 
 | `.vector/dashboards/project-status.yaml` | `.vector/dashboards/project-status.yaml` |
 | `.vector/document-types.yaml` | `.vector/document-types.yaml` | Update-only: only types already present in `assets/.vector/document-types.yaml` are synced; new types added to the source are **not** automatically promoted to assets |
 | `.gemini/settings.json` | `.gemini/settings.json` |
+| `.gemini/antigravity-cli/settings.json` | `.gemini/antigravity-cli/settings.json` |
+| `.gemini/antigravity-cli/mcp_config.json` | `.gemini/antigravity-cli/mcp_config.json` |
 | `.codex/config.toml` | `.codex/config.toml` |
 | `.claude/settings.local.json` | `.claude/settings.local.json` |
 | `AGENTS.md` | `AGENTS.md` |

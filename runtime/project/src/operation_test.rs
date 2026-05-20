@@ -69,6 +69,8 @@ async fn test_create_project_provisions_files() {
     assert!(temp_dir.join(".vector/dashboards/project-status.yaml").exists());
     assert!(temp_dir.join(".geminiignore").exists());
     assert!(temp_dir.join(".gemini/settings.json").exists());
+    assert!(temp_dir.join(".gemini/antigravity-cli/settings.json").exists());
+    assert!(temp_dir.join(".gemini/antigravity-cli/mcp_config.json").exists());
     assert!(temp_dir.join("CLAUDE.md").exists());
     assert!(temp_dir.join("opencode.json").exists());
     assert!(temp_dir.join("doc/ai-rule/active/ai-rule-00000-master-dispatcher.md").exists());
