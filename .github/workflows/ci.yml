@@ -20,6 +20,9 @@ jobs:
     name: rust
     runs-on: ubuntu-latest
 
+    env:
+      CARGO_TARGET_DIR: target
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
