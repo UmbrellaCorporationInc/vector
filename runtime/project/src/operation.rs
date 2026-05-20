@@ -89,6 +89,14 @@ const BOOTSTRAP_ASSETS: &[ProjectAsset] = &[
         content: include_bytes!("../assets/.gemini/settings.json"),
     },
     ProjectAsset {
+        path: ".gemini/antigravity-cli/settings.json",
+        content: include_bytes!("../assets/.gemini/antigravity-cli/settings.json"),
+    },
+    ProjectAsset {
+        path: ".gemini/antigravity-cli/mcp_config.json",
+        content: include_bytes!("../assets/.gemini/antigravity-cli/mcp_config.json"),
+    },
+    ProjectAsset {
         path: ".vector/dashboards/project-status.yaml",
         content: include_bytes!("../assets/.vector/dashboards/project-status.yaml"),
     },
