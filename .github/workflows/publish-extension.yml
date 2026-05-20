@@ -4,10 +4,6 @@ on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag (e.g. v1.4.0)"
-        required: true
 
 permissions:
   contents: read
@@ -54,6 +50,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Package and publish extension
-        run: pnpm dlx vsce publish --no-dependencies
+        run: pnpm dlx vsce publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
