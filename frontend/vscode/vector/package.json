@@ -12,7 +12,7 @@
   },
   "packageManager": "pnpm@10.33.3",
   "engines": {
-    "vscode": "^1.120.0",
+    "vscode": "^1.90.0",
     "node": ">=20.0.0"
   },
   "categories": [
@@ -209,7 +209,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.19.41",
-    "@types/vscode": "^1.120.0",
+    "@types/vscode": "^1.90.0",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^10.4.0",
     "glob": "^13.0.6",
