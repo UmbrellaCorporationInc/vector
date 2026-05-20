@@ -50,7 +50,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Package and publish extension
-        run: pnpm dlx vsce publish
+      - name: Package extension
+        run: pnpm dlx vsce package --out vector.vsix
+
+      - name: Publish to VS Code Marketplace
+        run: pnpm dlx vsce publish --packagePath vector.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX Registry
+        run: pnpm dlx ovsx publish vector.vsix --pat ${{ secrets.OVSX_PAT }}
