@@ -1,0 +1,53 @@
+name: Bump Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: "Artifact to bump (mcp or extension)"
+        required: true
+        type: choice
+        options:
+          - mcp
+          - extension
+      version:
+        description: "New version (e.g. 1.4.2 or 0.1.4 — no v prefix)"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: bump
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Bump mcp version
+        if: inputs.artifact == 'mcp'
+        run: sed -i "s/^version = \".*\"/version = \"${{ inputs.version }}\"/" Cargo.toml
+
+      - name: Bump extension version
+        if: inputs.artifact == 'extension'
+        run: |
+          sed -i "s/\"version\": \".*\"/\"version\": \"${{ inputs.version }}\"/" frontend/vscode/vector/package.json
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: release/${{ inputs.artifact }}-v${{ inputs.version }}
+          commit-message: "chore: bump ${{ inputs.artifact }} version to ${{ inputs.version }}"
+          title: "chore: bump ${{ inputs.artifact }} version to ${{ inputs.version }}"
+          body: |
+            Automated version bump for **${{ inputs.artifact }}** to `${{ inputs.version }}`.
+
+            Merging this PR will automatically create the GitHub Release and trigger the publish workflow.
+          labels: release
