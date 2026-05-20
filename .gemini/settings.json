@@ -1,0 +1,12 @@
+{
+  "model": {
+    "name": "flash"
+  },
+  "mcpServers": {
+    "vector": {
+      "command": "mcp-vector",
+      "args": [],
+      "trust": true
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "editor.formatOnSave": true,
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true
+  },
+  "rust-analyzer.rustfmt.extraArgs": ["--config-path", "rustfmt.toml"],
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": "entity.other.attribute-name.meta.heph",
+        "settings": {
+          "fontStyle": "bold"
+        }
+      }
+    ]
+  },
+  "chatgpt.commentCodeLensEnabled": false,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "Cargo.lock": true,
+    ".agents": true,
+    ".cargo": false,
+    ".claude": true,
+    ".codex": true,
+    ".cursor": true,
+    ".gemini": true,
+    ".github": true,
+    ".heph-venv": true,
+    ".pytest_cache": true,
+    "target": true,
+    "**/node_modules": true,
+    "AGENTS.md": true,
+    "CLAUDE.md": true,
+    "GEMINI.md": true,
+    "lcov.info": true
+  },
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false,
+  "files.eol": "\n"
+}

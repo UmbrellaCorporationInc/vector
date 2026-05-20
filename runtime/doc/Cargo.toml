@@ -1,0 +1,23 @@
+[package]
+name = "runtime-doc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[dependencies]
+runtime-core = { workspace = true }
+runtime-io = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+walkdir = { workspace = true }
+regex = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

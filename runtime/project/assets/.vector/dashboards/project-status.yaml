@@ -1,0 +1,21 @@
+label: Project Status
+sections:
+      project:
+            title: Project Definitions
+            doc-type: project
+      todo-tasks:
+            title: TODO tasks
+            doc-type: task
+            statuses: [todo]
+      in-progress-tasks:
+            title: In progress Tasks
+            doc-type: task
+            statuses: [in-progress]
+      pending-rfcs:
+            title: Pending RFCs
+            doc-type: rfc
+            statuses: [draft, review]
+      pending-adrs:
+            title: Pending ADRs
+            doc-type: adr
+            statuses: [proposed]

@@ -1,0 +1,223 @@
+{
+  "name": "vector",
+  "displayName": "Vector",
+  "description": "Governed document sidebar and extension-owned preview for Vector projects.",
+  "version": "1.3.0",
+  "publisher": "vector",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.33.3",
+  "engines": {
+    "vscode": "^1.120.0",
+    "node": ">=20.0.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:.vector/document-types.yaml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "vector.documentPreview",
+        "displayName": "Vector Document Preview",
+        "selector": [{ "filenamePattern": "**/doc/**/[A-Za-z]*-[0-9]*-*.md" }],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "vector.activate",
+        "title": "Vector: Activate"
+      },
+      {
+        "command": "vector.refreshGovernedDocuments",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vector.searchInType",
+        "title": "Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "vector.listByFilter",
+        "title": "List / Filter",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "vector.clearAllFilters",
+        "title": "Clear All Filters",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "vector.openGovernedPreview",
+        "title": "Vector: Open Governed Preview",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "vector.previewRefresh",
+        "title": "Vector: Refresh Preview",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vector.previewToggleToc",
+        "title": "Vector: Toggle Table of Contents",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "vector.previewOpenEditor",
+        "title": "Vector: Open in Editor",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "vector.openDashboard",
+        "title": "Vector: Open Dashboard"
+      },
+      {
+        "command": "vector.dashboardRefresh",
+        "title": "Vector: Refresh Dashboard",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vector.createDocument",
+        "title": "Create Document",
+        "icon": "$(add)"
+      },
+      {
+        "command": "vector.createDocumentType",
+        "title": "Create Document Type",
+        "icon": "$(add)"
+      },
+      {
+        "command": "vector.validateFix",
+        "title": "Validate Fix",
+        "icon": "$(check)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vector-governed-documents",
+          "title": "Governed Documents",
+          "icon": "$(book)"
+        }
+      ]
+    },
+    "views": {
+      "vector-governed-documents": [
+        {
+          "id": "vector.governedDocuments",
+          "name": "Documents",
+          "when": "vector.hasConfig"
+        }
+      ]
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "vector.previewRefresh",
+          "when": "activeCustomEditorId == vector.documentPreview",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vector.previewToggleToc",
+          "when": "activeCustomEditorId == vector.documentPreview",
+          "group": "navigation@2"
+        },
+        {
+          "command": "vector.previewOpenEditor",
+          "when": "activeCustomEditorId == vector.documentPreview",
+          "group": "navigation@3"
+        },
+        {
+          "command": "vector.dashboardRefresh",
+          "when": "activeWebviewPanelId == vectorDashboardViewer",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "vector.createDocument",
+          "when": "view == vector.governedDocuments && viewItem == docTypeFolder",
+          "group": "inline@1"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "vector.searchInType",
+          "when": "view == vector.governedDocuments",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vector.refreshGovernedDocuments",
+          "when": "view == vector.governedDocuments",
+          "group": "navigation@2"
+        },
+        {
+          "command": "vector.clearAllFilters",
+          "when": "view == vector.governedDocuments && vector.hasActiveFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "vector.createDocumentType",
+          "when": "view == vector.governedDocuments && vector.hasCreateDocumentTypeForm",
+          "group": "navigation@4"
+        },
+        {
+          "command": "vector.validateFix",
+          "when": "view == vector.governedDocuments",
+          "group": "navigation@5"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check",
+    "copy-hljs": "node scripts/copy-hljs.mjs",
+    "compile": "tsc -p ./ && pnpm run copy-hljs",
+    "watch": "tsc -watch -p ./",
+    "pretest": "pnpm run compile",
+    "test": "node --experimental-loader ./out/test/loader.js ./out/test/runner.js",
+    "vscode:prepublish": "pnpm check && pnpm compile",
+    "package": "pnpm run vscode:prepublish && pnpm dlx vsce package",
+    "security": "pnpm audit && pnpm audit --audit-level high"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.2",
+    "@codemirror/commands": "^6.10.0",
+    "@codemirror/language": "^6.11.3",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.6",
+    "js-yaml": "^4.1.1",
+    "markdown-it": "^14.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@highlightjs/cdn-assets": "^11.11.1",
+    "@types/js-yaml": "^4.0.9",
+    "@types/markdown-it": "^14.1.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.19.41",
+    "@types/vscode": "^1.120.0",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^10.4.0",
+    "glob": "^13.0.6",
+    "mocha": "^11.7.5",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "serialize-javascript": ">=7.0.3",
+      "diff": ">=8.0.3"
+    }
+  }
+}

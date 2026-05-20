@@ -1,0 +1,34 @@
+# Gemini CLI Ignore File
+# Optimized for performance by short-circuiting heavy directory walks.
+
+# Build artifacts and dependencies
+node_modules/
+target/
+dist/
+out/
+build/
+.next/
+.turbo/
+
+# OS/Editor specific
+.git/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Project specific caches and reports
+.agents/
+.claude/
+.codex/
+.pytest_cache/
+__pycache__/
+lcov.info
+quality-lint-report.txt
+quality-test-report.txt
+
+# Large binary/log files
+*.pdb
+*.vsix
+*.log
+*.lock

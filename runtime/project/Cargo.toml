@@ -1,0 +1,19 @@
+[package]
+name = "runtime-project"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+runtime-core = { workspace = true }
+runtime-doc = { workspace = true }
+runtime-io = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true }

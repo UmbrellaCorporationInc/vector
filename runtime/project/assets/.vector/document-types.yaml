@@ -1,0 +1,74 @@
+doc-type:
+  template: template-00004-doc-type-template
+  prompt-template: template-00005-doc-type-prompt
+  prompt: prompts-00001-create-doc-type
+  prompt-validate-fix: prompts-00007-validate-fix-repository-governance-flow
+  create-document-type-form: form-00002-create-document-type
+document-types:
+  ai-rule:
+    description: Operational rules for AI agents in the project.
+    tags: [governance, ai]
+    layout: status
+    code-width: 5
+    prompt: prompts-00002-create-doc
+    create-document-form: form-00001-create-document
+    initial-status: active
+    statuses:
+      - active
+      - deprecated
+  prompts:
+    description: Use by the mcp to create dynamic prompts for the agent
+    tags:
+      - prompt
+      - ai prompt
+    template: template-00003-prompts
+    create-document-form: form-00001-create-document
+    layout: category
+    code-width: 5
+    prompt: prompts-00002-create-doc
+  rfc:
+    description: Request for Comments - architectural decisions and proposals.
+    tags: [governance, architecture]
+    template: template-00008-rfc
+    layout: status
+    code-width: 5
+    prompt: prompts-00002-create-doc
+    create-document-form: form-00001-create-document
+    initial-status: draft
+    statuses:
+      - draft
+      - review
+      - accepted
+      - rejected
+      - superseded
+      - implemented
+  spec:
+    description: Technical specifications for APIs, data models, and contracts.
+    tags: [spec, tech]
+    template: template-00002-spec
+    layout: category
+    code-width: 5
+    prompt: prompts-00002-create-doc
+    create-document-form: form-00001-create-document
+  task:
+    description: Project task tracking - units of work and planning.
+    tags: [planning, execution]
+    template: template-00007-task
+    layout: status
+    code-width: 5
+    prompt: prompts-00003-create-task
+    create-document-form: form-00001-create-document
+    initial-status: todo
+    statuses:
+      - todo
+      - in-progress
+      - blocked
+      - done
+      - cancelled
+  template:
+    description: Document templates used to initialize new governed documents.
+    tags: [template, governance]
+    layout: category
+    code-width: 5
+    prompt: prompts-00002-create-doc
+    create-document-form: form-00001-create-document

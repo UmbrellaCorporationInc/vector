@@ -1,0 +1,4 @@
+[mcp_servers.vector]
+command = "mcp-vector"
+cwd = "."
+default_tools_approval_mode = "approve"

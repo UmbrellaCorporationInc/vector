@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+*.rs text working-tree-encoding=UTF-8 eol=lf
+*.py text working-tree-encoding=UTF-8 eol=lf
+*.ts text working-tree-encoding=UTF-8 eol=lf
+*.tsx text working-tree-encoding=UTF-8 eol=lf
+*.js text working-tree-encoding=UTF-8 eol=lf
+*.json text working-tree-encoding=UTF-8 eol=lf
+*.toml text working-tree-encoding=UTF-8 eol=lf
+*.yaml text working-tree-encoding=UTF-8 eol=lf
+*.yml text working-tree-encoding=UTF-8 eol=lf
+*.md text working-tree-encoding=UTF-8 eol=lf
+*.hn text working-tree-encoding=UTF-8 eol=lf
+*.bt text working-tree-encoding=UTF-8 eol=lf
+*.bl text working-tree-encoding=UTF-8 eol=lf
+*.bo text working-tree-encoding=UTF-8 eol=lf

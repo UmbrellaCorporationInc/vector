@@ -1,0 +1,16 @@
+agents:
+  claude:
+    type: cli
+    command: claude 'execute the content in the file <file>'
+  gemini:
+    type: cli
+    command: gemini -i 'execute the content in the file <file>'
+  codex:
+    type: cli
+    command: codex 'execute the content in the file <file>'
+  opencode:
+    type: cli
+    command: opencode --prompt 'execute the content in the file <file>'
+profiles:
+  create-doc: [claude, codex]
+  code: [claude, codex, opencode, gemini]

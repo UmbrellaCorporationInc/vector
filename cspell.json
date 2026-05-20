@@ -1,0 +1,33 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "mpsc",
+    "rfc",
+    "waker",
+    "wakers",
+    "impls",
+    "xtask",
+    "thiserror",
+    "tokio",
+    "unpin",
+    "vtable",
+    "deref",
+    "spsc",
+    "cancelable",
+    "cancellable",
+    "recv",
+    "dequeue",
+    "dequeues",
+    "frontmatter",
+    "semver",
+    "substruct",
+    "rmcp",
+    "mcp"
+  ],
+  "ignorePaths": [
+    "target/**",
+    ".git/**",
+    "Cargo.lock"
+  ]
+}
