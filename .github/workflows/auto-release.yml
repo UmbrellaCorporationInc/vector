@@ -1,0 +1,73 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  auto-release:
+    name: auto-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find merged release PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find the PR that was merged by this push
+          PR=$(gh pr list \
+            --state merged \
+            --label release \
+            --base main \
+            --json number,headRefName,mergeCommit \
+            --jq ".[] | select(.mergeCommit.oid == \"${{ github.sha }}\")")
+
+          if [ -z "$PR" ]; then
+            echo "No merged release PR found for this commit — skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          BRANCH=$(echo "$PR" | jq -r '.headRefName')
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Derive tag from branch name
+        id: tag
+        if: steps.pr.outputs.skip == 'false'
+        run: |
+          BRANCH="${{ steps.pr.outputs.branch }}"
+          # branch format: release/mcp-v0.1.4 or release/extension-v1.4.2
+          if [[ "$BRANCH" == release/mcp-* ]]; then
+            VERSION="${BRANCH#release/mcp-v}"
+            TAG="v${VERSION}"
+          elif [[ "$BRANCH" == release/extension-* ]]; then
+            VERSION="${BRANCH#release/extension-v}"
+            TAG="ext-v${VERSION}"
+          else
+            echo "Unknown branch pattern: $BRANCH — skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.pr.outputs.skip == 'false' && steps.tag.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.tag.outputs.tag }} \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes "Release ${{ steps.tag.outputs.tag }} — automated via bump workflow." \
+            --target ${{ github.sha }}
