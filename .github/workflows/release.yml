@@ -17,6 +17,7 @@ jobs:
   bump-version:
     name: bump-version
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.release.tag_name, 'ext-') }}
 
     steps:
       - name: Checkout repository
