@@ -12,6 +12,7 @@ jobs:
   publish-extension:
     name: publish-extension
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'ext-') }}
 
     defaults:
       run:
