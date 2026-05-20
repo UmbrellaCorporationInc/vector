@@ -23,7 +23,9 @@
     "semver",
     "substruct",
     "rmcp",
-    "mcp"
+    "mcp",
+    "vscode",
+    "vsce"
   ],
   "ignorePaths": [
     "target/**",
