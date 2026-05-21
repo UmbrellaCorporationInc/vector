@@ -95,6 +95,7 @@ export {
     loadAgentsConfig,
     resolveProfile,
     extractCommandExecutable,
+    isCommandInPath,
 } from "./document-actions/agentsConfig.js";
 export {
     quoteShellArgument,

@@ -294,7 +294,13 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
             const picked = await vscode.window.showQuickPick(items, {
                 placeHolder: `Select agent for "${msg.label}"`,
             });
-            if (!picked || !picked.agent.available) {
+            if (!picked) {
+                return;
+            }
+            if (!picked.agent.available) {
+                void vscode.window.showErrorMessage(
+                    `Vector: agent '${picked.agent.name}' is not available (not found in PATH)`,
+                );
                 return;
             }
             chosenAgent = picked.agent;

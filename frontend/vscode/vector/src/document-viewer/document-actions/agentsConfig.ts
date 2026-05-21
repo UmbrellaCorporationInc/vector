@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { execSync } from "child_process";
+import { spawnSync } from "child_process";
 import * as yaml from "js-yaml";
 
 export interface AgentDefinition {
@@ -129,13 +129,33 @@ export function resolveProfile(
 }
 
 export function isCommandInPath(command: string): boolean {
-    try {
-        const checker = process.platform === "win32" ? "where" : "which";
-        execSync(`${checker} ${command}`, { stdio: "ignore" });
-        return true;
-    } catch {
-        return false;
+    if (process.platform === "win32") {
+        const result = spawnSync("where.exe", [command], { stdio: "ignore" });
+        if (result.status === 0) {
+            return true;
+        }
+        // where.exe may not be on PATH in all environments; fall back to PowerShell.
+        // Pass the command as a positional argument so it is not interpolated into
+        // the script string and is correctly forwarded to where.exe.
+        const pwshResult = spawnSync("pwsh", ["-Command", "where.exe $args[0]", "--", command], {
+            stdio: "ignore",
+        });
+        if (pwshResult.status === 0) {
+            return true;
+        }
+        const powershellResult = spawnSync(
+            "powershell.exe",
+            ["-Command", "where.exe $args[0]", "--", command],
+            { stdio: "ignore" },
+        );
+        return powershellResult.status === 0;
     }
+    // Login shell (-l) gives the user's full PATH; command is passed as $1,
+    // never interpolated into the script string.
+    const result = spawnSync("sh", ["-lc", 'which "$1"', "--", command], {
+        stdio: "ignore",
+    });
+    return result.status === 0;
 }
 
 export function extractCommandExecutable(commandTemplate: string): string | null {

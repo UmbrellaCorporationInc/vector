@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "vector": {
+      "type": "stdio",
+      "command": "mcp-vector"
+    }
+  }
+}

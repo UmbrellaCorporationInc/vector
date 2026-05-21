@@ -102,6 +102,11 @@ Governed reading flows are extension-owned:
 
 ## 8. Changelog
 
+### 1.4.1
+
+- **Robust Agent Availability Check** — Fixed `isCommandInPath` to spawn a login shell subprocess (`pwsh` on Windows, `sh` otherwise) to check command availability in the user's full shell path, supporting user-scoped package managers.
+- **Improved QuickPick Feedback** — Replaced silent returns with informative error messages when selecting an unavailable agent from the quick pick list.
+
 ### 1.2.22
 
 - **Navigation History Integration** — Replaced custom file-open mechanisms with native VS Code document APIs. Workspace navigation buttons (Go Back / Go Forward) and their associated keybindings now work correctly after clicking links or navigating via the sidebar.
