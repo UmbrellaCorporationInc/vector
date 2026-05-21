@@ -1,4 +1,21 @@
 {
+  "editor.formatOnSave": true,
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true
+  },
+  "rust-analyzer.rustfmt.extraArgs": ["--config-path", "rustfmt.toml"],
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": "entity.other.attribute-name.meta.heph",
+        "settings": {
+          "fontStyle": "bold"
+        }
+      }
+    ]
+  },
+  "chatgpt.commentCodeLensEnabled": false,
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,
@@ -7,7 +24,7 @@
     "**/Thumbs.db": true,
     "Cargo.lock": true,
     ".agents": true,
-    ".cargo": true,
+    ".cargo": false,
     ".claude": true,
     ".codex": true,
     ".cursor": true,
@@ -22,7 +39,6 @@
     "GEMINI.md": true,
     "lcov.info": true
   },
-  "editor.formatOnSave": true,
   "files.encoding": "utf8",
   "files.autoGuessEncoding": false,
   "files.eol": "\n"
