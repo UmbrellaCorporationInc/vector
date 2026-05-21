@@ -113,8 +113,8 @@ const BOOTSTRAP_ASSETS: &[ProjectAsset] = &[
         content: include_bytes!("../assets/.claude/settings.local.json"),
     },
     ProjectAsset {
-        path: ".agents/.gitkeep",
-        content: include_bytes!("../assets/.agents/.gitkeep"),
+        path: ".agents/mcp_config.json",
+        content: include_bytes!("../assets/.agents/mcp_config.json"),
     },
     ProjectAsset {
         path: "doc/ai-rule/active/ai-rule-00000-master-dispatcher.md",

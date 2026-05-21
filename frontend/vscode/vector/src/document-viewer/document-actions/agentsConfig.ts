@@ -130,9 +130,18 @@ export function resolveProfile(
 
 export function isCommandInPath(command: string): boolean {
     try {
-        const checker = process.platform === "win32" ? "where" : "which";
-        execSync(`${checker} ${command}`, { stdio: "ignore" });
-        return true;
+        if (process.platform === "win32") {
+            try {
+                execSync(`pwsh -Command "where.exe ${command}"`, { stdio: "ignore" });
+                return true;
+            } catch {
+                execSync(`powershell -Command "where.exe ${command}"`, { stdio: "ignore" });
+                return true;
+            }
+        } else {
+            execSync(`sh -lc "which ${command}"`, { stdio: "ignore" });
+            return true;
+        }
     } catch {
         return false;
     }

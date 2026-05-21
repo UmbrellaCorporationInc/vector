@@ -47,6 +47,7 @@ import {
     loadAgentsConfig,
     resolveProfile,
     extractCommandExecutable,
+    isCommandInPath,
     resolveAgentCommand,
     quoteShellArgument,
     spawnAgentTerminal,
@@ -3336,6 +3337,15 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
         }
     });
 
+    test("isCommandInPath returns true for a known system command", () => {
+        const cmd = process.platform === "win32" ? "cmd" : "sh";
+        assert.strictEqual(isCommandInPath(cmd), true);
+    });
+
+    test("isCommandInPath returns false for an unknown command", () => {
+        assert.strictEqual(isCommandInPath("nonexistent-command-xyz"), false);
+    });
+
     // ── agent command resolution ─────────────────────────────────────────
 
     test("quoteShellArgument wraps a path in double quotes", () => {
@@ -3558,6 +3568,105 @@ suite("Task 00031 Phase C — Agent Trigger UI Errors", () => {
                 "Vector: no agents in profile 'code' are installed (not in PATH: ghost)",
             ]);
         } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+            vscode.__resetUiState();
+        }
+    });
+
+    test("runAgent shows error when selecting an unavailable agent from the quick pick", async () => {
+        const { dir, docPath } = makePreviewWorkspace();
+        const originalShowQuickPick = vscode.window.showQuickPick;
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(
+                path.join(dir, ".vector", "agents.yaml"),
+                [
+                    "agents:",
+                    "  node-one:",
+                    "    command: node <file>",
+                    "  node-two:",
+                    "    command: node <file>",
+                    "  ghost:",
+                    "    command: missing-agent --prompt <file>",
+                    "profiles:",
+                    "  code: [node-one, node-two, ghost]",
+                ].join("\n"),
+                "utf-8",
+            );
+            vscode.__resetUiState();
+
+            // Mock showQuickPick to return the unavailable agent (ghost)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (vscode.window as any).showQuickPick = (items: any) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const item = items.find((i: any) => i.agent.name === "ghost");
+                return Promise.resolve(item);
+            };
+
+            const { panel } = openProviderForDoc(dir, docPath);
+
+            panel.fireMessage({
+                type: "vector.runAgent",
+                profile: "code",
+                prompt: "prompts-00004-execute-task-phase",
+                label: "Run",
+                staticInput: {},
+                formValues: {},
+            });
+
+            // Wait a small bit for async showQuickPick and message handling to run
+            await new Promise((resolve) => setTimeout(resolve, 50));
+
+            assert.deepStrictEqual(vscode.__getErrorMessages(), [
+                "Vector: agent 'ghost' is not available (not found in PATH)",
+            ]);
+        } finally {
+            vscode.window.showQuickPick = originalShowQuickPick;
+            fs.rmSync(dir, { recursive: true, force: true });
+            vscode.__resetUiState();
+        }
+    });
+
+    test("runAgent returns silently when user cancels the agent quick pick", async () => {
+        const { dir, docPath } = makePreviewWorkspace();
+        const originalShowQuickPick = vscode.window.showQuickPick;
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(
+                path.join(dir, ".vector", "agents.yaml"),
+                [
+                    "agents:",
+                    "  node-one:",
+                    "    command: node <file>",
+                    "  node-two:",
+                    "    command: node <file>",
+                    "profiles:",
+                    "  code: [node-one, node-two]",
+                ].join("\n"),
+                "utf-8",
+            );
+            vscode.__resetUiState();
+
+            // Mock showQuickPick to return undefined (cancel)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (vscode.window as any).showQuickPick = () => Promise.resolve(undefined);
+
+            const { panel } = openProviderForDoc(dir, docPath);
+
+            panel.fireMessage({
+                type: "vector.runAgent",
+                profile: "code",
+                prompt: "prompts-00004-execute-task-phase",
+                label: "Run",
+                staticInput: {},
+                formValues: {},
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 50));
+
+            assert.deepStrictEqual(vscode.__getErrorMessages(), []);
+        } finally {
+            vscode.window.showQuickPick = originalShowQuickPick;
             fs.rmSync(dir, { recursive: true, force: true });
             vscode.__resetUiState();
         }

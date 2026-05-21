@@ -67,6 +67,7 @@ async fn test_create_project_provisions_files() {
     // Verify a subset of critical files
     assert!(temp_dir.join(".vector/document-types.yaml").exists());
     assert!(temp_dir.join(".vector/dashboards/project-status.yaml").exists());
+    assert!(temp_dir.join(".agents/mcp_config.json").exists());
     assert!(temp_dir.join(".geminiignore").exists());
     assert!(temp_dir.join(".gemini/settings.json").exists());
     assert!(temp_dir.join(".gemini/antigravity-cli/settings.json").exists());
