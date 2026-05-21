@@ -104,7 +104,7 @@ Governed reading flows are extension-owned:
 
 ### 1.4.1
 
-- **Robust Agent Availability Check** — Fixed `isCommandInPath` to spawn a login shell subprocess (`pwsh`, `powershell`, or `sh`) to check command availability in the user's full shell path, supporting user-scoped package managers.
+- **Robust Agent Availability Check** — Fixed `isCommandInPath` to spawn a login shell subprocess (`pwsh` on Windows, `sh` otherwise) to check command availability in the user's full shell path, supporting user-scoped package managers.
 - **Improved QuickPick Feedback** — Replaced silent returns with informative error messages when selecting an unavailable agent from the quick pick list.
 
 ### 1.2.22
