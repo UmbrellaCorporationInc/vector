@@ -134,11 +134,21 @@ export function isCommandInPath(command: string): boolean {
         if (result.status === 0) {
             return true;
         }
-        // where.exe may not be on PATH in all environments; fall back to pwsh
-        const pwshResult = spawnSync("pwsh", ["-Command", "where.exe", command], {
+        // where.exe may not be on PATH in all environments; fall back to PowerShell.
+        // Pass the command as a positional argument so it is not interpolated into
+        // the script string and is correctly forwarded to where.exe.
+        const pwshResult = spawnSync("pwsh", ["-Command", "where.exe $args[0]", "--", command], {
             stdio: "ignore",
         });
-        return pwshResult.status === 0;
+        if (pwshResult.status === 0) {
+            return true;
+        }
+        const powershellResult = spawnSync(
+            "powershell.exe",
+            ["-Command", "where.exe $args[0]", "--", command],
+            { stdio: "ignore" },
+        );
+        return powershellResult.status === 0;
     }
     // Login shell (-l) gives the user's full PATH; command is passed as $1,
     // never interpolated into the script string.
