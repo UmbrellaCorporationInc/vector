@@ -50,14 +50,43 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Extract version
+        id: version
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+            VERSION="${TAG#ext-v}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Ensure release tag exists
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          TAG="ext-v${{ steps.version.outputs.version }}"
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes "Release $TAG" \
+              --target main
+          fi
+
       - name: Package extension
         run: pnpm dlx vsce package --out vector.vsix
 
       - name: Upload vsix to GitHub Release
-        if: github.event_name == 'release'
-        run: gh release upload ${{ github.event.release.tag_name }} vector.vsix --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          if [ -z "$TAG" ]; then
+            TAG="ext-v${{ steps.version.outputs.version }}"
+          fi
+          gh release upload "$TAG" vector.vsix --clobber
 
       - name: Publish to VS Code Marketplace
         run: pnpm dlx vsce publish --packagePath vector.vsix
