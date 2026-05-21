@@ -3,6 +3,12 @@ name: Publish Extension
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to upload the vsix to (e.g. ext-v1.4.2)"
+        required: true
+        type: string
   workflow_dispatch:
 
 permissions:
@@ -12,7 +18,10 @@ jobs:
   publish-extension:
     name: publish-extension
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'ext-') }}
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_call' ||
+      startsWith(github.event.release.tag_name, 'ext-')
 
     defaults:
       run:
@@ -81,12 +90,8 @@ jobs:
       - name: Upload vsix to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ github.event.release.tag_name }}"
-          if [ -z "$TAG" ]; then
-            TAG="ext-v${{ steps.version.outputs.version }}"
-          fi
-          gh release upload "$TAG" vector.vsix --clobber
+          TAG: ${{ inputs.tag || github.event.release.tag_name || format('ext-v{0}', steps.version.outputs.version) }}
+        run: gh release upload "$TAG" vector.vsix --clobber
 
       - name: Publish to VS Code Marketplace
         run: pnpm dlx vsce publish --packagePath vector.vsix
