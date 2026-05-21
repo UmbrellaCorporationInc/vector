@@ -3,7 +3,7 @@
   "mcp": {
     "vector": {
       "type": "local",
-      "command": ["mcp-vector.exe"]
+      "command": ["mcp-vector"]
     }
   }
 }

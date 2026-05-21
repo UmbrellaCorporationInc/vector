@@ -1,4 +1,6 @@
 {
+  "editor.formatOnSave": true,
+  "chatgpt.commentCodeLensEnabled": false,
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,
@@ -22,7 +24,6 @@
     "GEMINI.md": true,
     "lcov.info": true
   },
-  "editor.formatOnSave": true,
   "files.encoding": "utf8",
   "files.autoGuessEncoding": false,
   "files.eol": "\n"

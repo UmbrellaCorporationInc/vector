@@ -2,9 +2,9 @@ agents:
   claude:
     type: cli
     command: claude 'execute the content in the file <file>'
-  gemini:
+  antigravity:
     type: cli
-    command: gemini -i 'execute the content in the file <file>'
+    command: agy -i 'execute the content in the file <file>'
   codex:
     type: cli
     command: codex 'execute the content in the file <file>'
@@ -12,5 +12,5 @@ agents:
     type: cli
     command: opencode --prompt 'execute the content in the file <file>'
 profiles:
-  create-doc: [claude, codex]
-  code: [claude, codex, opencode, gemini]
+  create-doc: [antigravity, claude, codex]
+  code: [antigravity, claude, codex, opencode]
