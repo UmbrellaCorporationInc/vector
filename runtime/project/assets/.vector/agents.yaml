@@ -12,5 +12,5 @@ agents:
     type: cli
     command: opencode --prompt 'execute the content in the file <file>'
 profiles:
-  create-doc: [claude, codex]
-  code: [claude, codex, opencode, gemini]
+  create-doc: [antigravity, claude, codex]
+  code: [antigravity, claude, codex, opencode]

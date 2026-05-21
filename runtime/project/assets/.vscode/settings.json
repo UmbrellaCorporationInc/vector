@@ -24,7 +24,7 @@
     "**/Thumbs.db": true,
     "Cargo.lock": true,
     ".agents": true,
-    ".cargo": false,
+    ".cargo": true,
     ".claude": true,
     ".codex": true,
     ".cursor": true,
