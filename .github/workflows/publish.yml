@@ -1,11 +1,9 @@
 name: Publish
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - Cargo.toml
+  release:
+    types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,6 +12,7 @@ jobs:
   verify-installable:
     name: verify-installable
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.release.tag_name, 'ext-') }}
 
     env:
       CARGO_TARGET_DIR: target
@@ -22,21 +21,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract workspace version
+      - name: Extract version from tag
         id: version
         run: |
-          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Check that a matching release tag exists
-        run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          git fetch --tags
-          if ! git tag --list | grep -qx "$TAG"; then
-            echo "No release tag $TAG found — skipping."
-            exit 1
-          fi
-          echo "Tag $TAG confirmed."
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
