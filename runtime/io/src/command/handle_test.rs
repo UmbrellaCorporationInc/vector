@@ -1,6 +1,8 @@
 #![allow(clippy::expect_used)]
 
-use crate::command::{CommandBuilder, CommandExecutor, ProcessCommandExecutor};
+use crate::command::{
+    CommandBuilder, CommandExecutor, CommandExit, MockCommandHandleBuilder, ProcessCommandExecutor,
+};
 use runtime_core::Receiver;
 use std::{
     fs,
@@ -45,6 +47,50 @@ async fn test_stderr_reads_process_output() {
 
     assert!(output.contains("vector-error"));
     assert!(exit.success);
+}
+
+#[tokio::test]
+async fn test_stream_output_forwards_stdout_and_stderr() {
+    let (mut handle, _probe) = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout(b"hello stdout\n".to_vec())
+        .stderr(b"hello stderr\n".to_vec())
+        .build();
+
+    let mut captured_stdout = Vec::new();
+    let mut captured_stderr = Vec::new();
+
+    handle
+        .stream_output(&mut |b: &[u8]| captured_stdout.extend_from_slice(b), &mut |b: &[u8]| {
+            captured_stderr.extend_from_slice(b);
+        })
+        .await;
+
+    let exit = handle.wait().await.expect("wait failed");
+
+    assert!(exit.success);
+    assert_eq!(captured_stdout, b"hello stdout\n");
+    assert_eq!(captured_stderr, b"hello stderr\n");
+}
+
+#[tokio::test]
+async fn test_stream_output_tolerates_empty_streams() {
+    let (mut handle, _probe) =
+        MockCommandHandleBuilder::new(CommandExit::new(true, Some(0))).build();
+
+    let mut captured_stdout = Vec::new();
+    let mut captured_stderr = Vec::new();
+
+    handle
+        .stream_output(&mut |b: &[u8]| captured_stdout.extend_from_slice(b), &mut |b: &[u8]| {
+            captured_stderr.extend_from_slice(b);
+        })
+        .await;
+
+    let exit = handle.wait().await.expect("wait failed");
+
+    assert!(exit.success);
+    assert!(captured_stdout.is_empty());
+    assert!(captured_stderr.is_empty());
 }
 
 #[tokio::test]

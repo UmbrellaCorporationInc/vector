@@ -194,6 +194,36 @@ impl CommandHandle {
         &mut self.stdin
     }
 
+    /// Drains stdout and stderr concurrently, forwarding each chunk to the provided callbacks
+    /// until both streams are exhausted.
+    ///
+    /// Read errors are treated as end-of-stream. Call [`wait`] after this returns to obtain
+    /// the final exit status.
+    pub async fn stream_output<F, G>(&mut self, on_stdout: &mut F, on_stderr: &mut G)
+    where
+        F: FnMut(&[u8]) + Send,
+        G: FnMut(&[u8]) + Send,
+    {
+        let mut stdout_done = false;
+        let mut stderr_done = false;
+        while !stdout_done || !stderr_done {
+            tokio::select! {
+                result = self.stdout.recv(), if !stdout_done => {
+                    match result {
+                        Ok(Some(bytes)) => on_stdout(&bytes),
+                        _ => stdout_done = true,
+                    }
+                }
+                result = self.stderr.recv(), if !stderr_done => {
+                    match result {
+                        Ok(Some(bytes)) => on_stderr(&bytes),
+                        _ => stderr_done = true,
+                    }
+                }
+            }
+        }
+    }
+
     /// Waits for the process to complete.
     ///
     /// # Errors

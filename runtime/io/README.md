@@ -41,9 +41,19 @@ let spec = CommandBuilder::new("git")
 
 let executor = ProcessCommandExecutor;
 let mut handle = executor.spawn(spec).await?;
+
+// Stream stdout and stderr concurrently until both are exhausted.
+handle.stream_output(
+    |bytes| print!("{}", String::from_utf8_lossy(bytes)),
+    |bytes| eprint!("{}", String::from_utf8_lossy(bytes)),
+).await;
+
+let exit = handle.wait().await?;
 ```
 
 `CommandBuilder` performs no process side effects. Execution starts only when one executor spawns a `CommandSpec`.
+
+`CommandHandle::stream_output` drains stdout and stderr concurrently via `tokio::select!`, forwarding each chunk to the provided callbacks until both streams are exhausted. Call `wait` afterwards to obtain the exit status.
 
 For deterministic tests that only need the running-command boundary, `runtime-io` also exposes `MockCommandHandleBuilder`, which builds a mock `CommandHandle` without launching a real process.
 

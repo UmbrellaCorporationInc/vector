@@ -44,7 +44,8 @@ impl From<IoError> for UpdateError {
     }
 }
 
-/// Runs `cargo install --git <REPO_URL> --force <PACKAGE_NAME>`.
+/// Runs `cargo install --git <REPO_URL> --force <PACKAGE_NAME>`, streaming its
+/// stdout and stderr to the provided callbacks as the process runs.
 ///
 /// Always performs a full install from git HEAD. No version comparison is
 /// done in V1 — this avoids the chicken-and-egg problem where a
@@ -56,7 +57,16 @@ impl From<IoError> for UpdateError {
 /// Returns [`UpdateError::Spawn`] when the `cargo` process cannot be started,
 /// [`UpdateError::Wait`] when waiting for it fails, or
 /// [`UpdateError::InstallFailed`] when it exits with a non-zero status.
-pub async fn run<E: CommandExecutor + Sync>(executor: &E) -> Result<UpdateOutcome, UpdateError> {
+pub async fn run<E, Out, Err>(
+    executor: &E,
+    mut on_stdout: Out,
+    mut on_stderr: Err,
+) -> Result<UpdateOutcome, UpdateError>
+where
+    E: CommandExecutor + Sync,
+    Out: FnMut(&[u8]) + Send,
+    Err: FnMut(&[u8]) + Send,
+{
     let spec = CommandBuilder::new("cargo")
         .arg("install")
         .arg("--git")
@@ -66,7 +76,8 @@ pub async fn run<E: CommandExecutor + Sync>(executor: &E) -> Result<UpdateOutcom
         .build()
         .map_err(|e| UpdateError::Spawn(e.to_string()))?;
 
-    let handle = executor.spawn(spec).await?;
+    let mut handle = executor.spawn(spec).await?;
+    handle.stream_output(&mut on_stdout, &mut on_stderr).await;
     let exit = handle.wait().await.map_err(|e| UpdateError::Wait(e.to_string()))?;
 
     if exit.success {
