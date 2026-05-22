@@ -67,12 +67,12 @@ input:
   language: rust
 ```
 
-- [ ] Decide the version introspection contract for both protocol clients and the sibling CLI
-- [ ] Add a read-only `get_version` tool to `mcp/vector` for MCP consumers
-- [ ] Expose a process-level `--version` argument on the `mcp-vector` binary so the sibling CLI can inspect the installed binary by process invocation without starting an MCP session
-- [ ] Return the version from `get_version` and `--version` from the same `mcp/vector` source of truth
-- [ ] Treat the `mcp-vector --version` output format as a stable contract for the sibling CLI
-- [ ] Keep the MCP surface read-only with no installation or update mutation
+- [x] Decide the version introspection contract for both protocol clients and the sibling CLI
+- [x] Add a read-only `get_version` tool to `mcp/vector` for MCP consumers
+- [x] Expose a process-level `--version` argument on the `mcp-vector` binary so the sibling CLI can inspect the installed binary by process invocation without starting an MCP session
+- [x] Return the version from `get_version` and `--version` from the same `mcp/vector` source of truth
+- [x] Treat the `mcp-vector --version` output format as a stable contract for the sibling CLI
+- [x] Keep the MCP surface read-only with no installation or update mutation
 
 ### 4.3. Phase C - CLI package and update command
 

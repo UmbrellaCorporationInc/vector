@@ -18,6 +18,10 @@ pub enum VectorServerError {
     /// The background service task panicked or was aborted.
     #[error("MCP service task failed")]
     TaskFailed,
+
+    /// Writing process-level CLI output failed.
+    #[error("failed to write process output: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 impl From<ServerInitializeError> for VectorServerError {

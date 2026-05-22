@@ -11,7 +11,7 @@
 /// Cargo from `[workspace.package].version`. All release and version surfaces
 /// in this crate derive their value from this function.
 #[must_use]
-pub fn workspace_version() -> &'static str {
+pub const fn workspace_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
