@@ -53,16 +53,17 @@ Introduce two usability surfaces backed by release-aware logic owned by `mcp/vec
 1. Add a `get_version` MCP tool in `mcp/vector` that returns the version declared in the workspace `Cargo.toml`, which is the single source of truth defined by `SPEC 00008`.
 2. Add a sibling CLI crate at `frontend/cli/get-vector/` with a command surface under `frontend/cli/get-vector/commands/`, including an `update-mcp-vector` command.
 
-The `update-mcp-vector` command should:
+The `update-mcp-vector` command V1 behavior:
 
-- detect whether `mcp-vector` is installed locally;
-- resolve the currently installed version by invoking `mcp-vector --version` when present;
-- resolve the latest intended repository version from the release contract in `SPEC 00008`;
-- install when the binary is missing;
-- update when the installed version differs from the latest release;
-- perform no mutation when the local installation is already current.
+- Always run `cargo install --git <repo> --force mcp-vector` to pull and compile the latest HEAD from the repository.
+- No version comparison is performed in V1. The command is always a full reinstall from git.
+- Version-aware reconciliation (detect installed version, compare against latest release, skip when already current) is deferred to a future task once a runtime strategy for resolving the latest published version is defined.
 
-`mcp/vector` is the only owner of the workspace version source of truth (derived from the root `Cargo.toml`). Install-state resolution logic — including the process-execution abstraction (`CommandRunner`), version-output parsing, and the `Missing`/`Outdated`/`Current` states — belongs entirely inside the `get-vector` CLI crate and must not be placed in `mcp/vector`. This RFC does not introduce a shared release crate or a second version-runtime owner elsewhere in the workspace. For installed-version inspection, the CLI must invoke `mcp-vector --version` and treat that process output as the stable contract.
+This approach eliminates the chicken-and-egg problem where a compile-time `INTENDED_VERSION` constant would cause an old CLI binary to always report `mcp-vector` as current even after the workspace has been bumped.
+
+`mcp/vector` is the only owner of the workspace version source of truth (derived from the root `Cargo.toml`). This RFC does not introduce a shared release crate or a second version-runtime owner elsewhere in the workspace.
+
+Process execution in `get-vector` must use the `CommandExecutor` trait, `CommandBuilder`, and `ProcessCommandExecutor` from `runtime-io` rather than defining a custom execution abstraction. `runtime-io` already provides the complete shell command boundary (`CommandExecutor` for the execution contract, `ProcessCommandExecutor` as the OS-backed production implementation, and `MockCommandHandleBuilder` for deterministic test handles). Tests must use `MockCommandHandleBuilder` from `runtime-io`.
 
 This RFC intentionally does not extend the MCP server with self-update behavior. The MCP tool surface should expose metadata, not mutate the host environment.
 
@@ -86,17 +87,13 @@ This RFC intentionally does not extend the MCP server with self-update behavior.
 - [ ] The version returned by `get_version` is derived from the same source of truth used by `SPEC 00008`.
 - [ ] A new CLI crate exists at `frontend/cli/get-vector/`.
 - [ ] The CLI command surface includes `frontend/cli/get-vector/commands/update-mcp-vector`.
-- [ ] `update-mcp-vector` installs `mcp-vector` when the binary is not present locally.
-- [ ] `update-mcp-vector` determines the installed version by invoking `mcp-vector --version`.
-- [ ] `update-mcp-vector` updates the local installation when its version differs from the latest released version.
-- [ ] `update-mcp-vector` exits without reinstalling when the local installation is already current.
-- [ ] Installation and update behavior follow the `cargo install --git` distribution model from `SPEC 00008`.
+- [ ] `update-mcp-vector` always runs `cargo install --git <repo> --force mcp-vector` to install or update the binary from the latest git HEAD.
+- [ ] No version comparison or install-state detection is performed in V1.
+- [ ] Installation behavior follows the `cargo install --git` distribution model from `SPEC 00008`.
 - [ ] No update or installation mutation is added to the MCP protocol surface itself.
 - [ ] No shared release or version crate is introduced for this workflow.
-- [ ] `mcp/vector` owns only the workspace version source of truth; install-state resolution lives in `get-vector`.
-- [ ] `get-vector` defines its own `CommandRunner` abstraction and install-state types internally.
-- [ ] Tests in `get-vector` cover at least the missing-installation, outdated-installation, and already-current cases.
+- [ ] `get-vector` depends on `runtime-io` and uses `CommandExecutor`, `CommandBuilder`, and `ProcessCommandExecutor` for command execution; no custom execution abstraction is introduced.
+- [ ] Tests in `get-vector` use `MockCommandHandleBuilder` from `runtime-io` and cover the success and failure cases of the install command.
 ## 6. Open Questions
 
-- Should `mcp/vector` resolve the latest version from Git tags, GitHub releases, or another repository-controlled metadata source?
-- Should `update-mcp-vector` support explicit version pinning in addition to "latest" reconciliation?
+- How should `update-mcp-vector` resolve the latest published version at runtime (GitHub Releases API, git tags, or another source) to enable version-aware reconciliation in V2? This is the prerequisite for skipping reinstallation when already current.

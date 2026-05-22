@@ -29,7 +29,7 @@ superseded_by: null
 ## 2. Specs
 
 - **Module:** `mcp/vector`, `frontend/cli/get-vector`, `frontend/cli/get-vector/commands/update-mcp-vector`
-- **Dependencies:** root `Cargo.toml` workspace version metadata, `spec-00008-mcp-vector-release-process`, local process execution for `cargo install --git`
+- **Dependencies:** root `Cargo.toml` workspace version metadata, `spec-00008-mcp-vector-release-process`, `runtime-io` (for `CommandExecutor`, `CommandBuilder`, `ProcessCommandExecutor`, `MockCommandHandleBuilder`)
 
 ## 3. Execution Notes
 
@@ -86,14 +86,11 @@ input:
   language: rust
 ```
 
-- [ ] Create the CLI crate at `frontend/cli/get-vector/`
-- [ ] Add the command surface at `frontend/cli/get-vector/commands/update-mcp-vector`
-- [ ] Define a `CommandRunner` trait and a `SystemCommandRunner` production implementation inside the CLI crate to isolate process execution behind a testable interface
-- [ ] Resolve the installed version by executing `mcp-vector --version` via `CommandRunner` instead of linking to a shared release or version library
-- [ ] Define install-state resolution (`Missing`, `Outdated`, `Current`) and its version-parsing logic inside the CLI crate
-- [ ] Install `mcp-vector` when it is missing locally
-- [ ] Update `mcp-vector` when the installed version differs from the latest intended repository version
-- [ ] Exit without mutation when the installed version is already current
+- [x] Create the CLI crate at `frontend/cli/get-vector/`
+- [x] Add the command surface at `frontend/cli/get-vector/commands/update-mcp-vector`
+- [x] Add `runtime-io` as a workspace dependency of `get-vector` to obtain `CommandExecutor`, `CommandBuilder`, `ProcessCommandExecutor`, and `MockCommandHandleBuilder`
+- [x] Use `CommandBuilder` to construct command specs and `CommandExecutor` (with `ProcessCommandExecutor`) as the execution boundary — do not introduce a custom execution abstraction
+- [x] V1: always run `cargo install --git <repo> --force mcp-vector` — no version comparison or install-state detection; version-aware reconciliation is deferred to a future task once runtime version resolution is defined
 
 ### 4.4. Phase D - Quality gates and documentation
 
@@ -107,7 +104,7 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Add tests for missing-installation, outdated-installation, and already-current flows
+- [ ] Add tests using `MockCommandHandleBuilder` from `runtime-io` covering the install success and install failure cases
 - [ ] Verify the CLI behavior remains aligned with `spec-00008-mcp-vector-release-process`
 - [ ] Update package or operator documentation affected by the new CLI surface
 - [ ] Quality gates pass for all modified packages
