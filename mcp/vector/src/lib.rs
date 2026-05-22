@@ -9,6 +9,10 @@
 /// MCP-local error types for the vector server.
 pub mod error;
 
+/// Release and version runtime — canonical owner of workspace version truth
+/// and `mcp-vector` install-state resolution primitives.
+pub mod release;
+
 /// MCP server bootstrap and central handler composition.
 pub mod server;
 
