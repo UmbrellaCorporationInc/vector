@@ -1,9 +1,9 @@
 #![allow(clippy::expect_used)]
 
 use std::{
-    cell::RefCell,
     collections::VecDeque,
     future::{Future, ready},
+    sync::Mutex,
 };
 
 use runtime_io::{
@@ -17,20 +17,17 @@ use super::{UpdateError, UpdateOutcome, run};
 // ---------------------------------------------------------------------------
 
 struct MockExecutor {
-    responses: RefCell<VecDeque<Result<CommandHandle, IoError>>>,
-    recorded: RefCell<Vec<(String, Vec<String>)>>,
+    responses: Mutex<VecDeque<Result<CommandHandle, IoError>>>,
+    recorded: Mutex<Vec<(String, Vec<String>)>>,
 }
 
 impl MockExecutor {
     fn new(responses: Vec<Result<CommandHandle, IoError>>) -> Self {
-        Self {
-            responses: RefCell::new(VecDeque::from(responses)),
-            recorded: RefCell::new(Vec::new()),
-        }
+        Self { responses: Mutex::new(VecDeque::from(responses)), recorded: Mutex::new(Vec::new()) }
     }
 
     fn recorded_commands(&self) -> Vec<(String, Vec<String>)> {
-        self.recorded.borrow().clone()
+        self.recorded.lock().expect("recorded lock").clone()
     }
 }
 
@@ -39,10 +36,14 @@ impl CommandExecutor for MockExecutor {
         &self,
         spec: CommandSpec,
     ) -> impl Future<Output = Result<CommandHandle, IoError>> + Send {
-        self.recorded.borrow_mut().push((spec.command().to_owned(), spec.args().to_vec()));
+        self.recorded
+            .lock()
+            .expect("recorded lock")
+            .push((spec.command().to_owned(), spec.args().to_vec()));
         let result = self
             .responses
-            .borrow_mut()
+            .lock()
+            .expect("responses lock")
             .pop_front()
             .unwrap_or_else(|| Err(IoError::Process("mock executor exhausted".into())));
         ready(result)

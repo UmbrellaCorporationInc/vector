@@ -56,10 +56,7 @@ impl From<IoError> for UpdateError {
 /// Returns [`UpdateError::Spawn`] when the `cargo` process cannot be started,
 /// [`UpdateError::Wait`] when waiting for it fails, or
 /// [`UpdateError::InstallFailed`] when it exits with a non-zero status.
-// The future is only ever driven on a single-threaded CLI runtime; `E` is not
-// required to be `Sync` because the reference is never sent across threads.
-#[allow(clippy::future_not_send)]
-pub async fn run<E: CommandExecutor>(executor: &E) -> Result<UpdateOutcome, UpdateError> {
+pub async fn run<E: CommandExecutor + Sync>(executor: &E) -> Result<UpdateOutcome, UpdateError> {
     let spec = CommandBuilder::new("cargo")
         .arg("install")
         .arg("--git")
