@@ -5,7 +5,7 @@ code: "00026"
 slug: mcp-vector-usability-improvements
 title: MCP Vector Usability Improvements
 description: Proposes an MCP version introspection tool and a sibling CLI command to install or update the local mcp-vector binary.
-status: accepted
+status: implemented
 created: 2026-05-21
 updated: 2026-05-21
 authors: []

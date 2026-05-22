@@ -62,6 +62,10 @@ fn failure_handle(code: i32) -> CommandHandle {
     MockCommandHandleBuilder::new(CommandExit::new(false, Some(code))).build().0
 }
 
+fn wait_error_handle(message: &str) -> CommandHandle {
+    MockCommandHandleBuilder::new(CommandExit::new(true, Some(0))).wait_error(message).build().0
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -107,4 +111,13 @@ async fn non_zero_exit_is_propagated_as_install_failed() {
     let result = run(&executor).await;
 
     assert!(matches!(result, Err(UpdateError::InstallFailed { code: Some(1) })));
+}
+
+#[tokio::test]
+async fn wait_failure_is_propagated_as_wait_error() {
+    let executor = MockExecutor::new(vec![Ok(wait_error_handle("process disconnected"))]);
+
+    let result = run(&executor).await;
+
+    assert!(matches!(result, Err(UpdateError::Wait(_))));
 }

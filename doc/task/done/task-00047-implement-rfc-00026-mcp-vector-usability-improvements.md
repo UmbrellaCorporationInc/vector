@@ -5,7 +5,7 @@ code: "00047"
 slug: implement-rfc-00026-mcp-vector-usability-improvements
 title: Implement RFC 00026 MCP Vector Usability Improvements
 description: Implement MCP version introspection and a CLI-driven install or update workflow for the local mcp-vector binary.
-status: in-progress
+status: done
 created: 2026-05-21
 updated: 2026-05-21
 tags:
@@ -104,7 +104,7 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Add tests using `MockCommandHandleBuilder` from `runtime-io` covering the install success and install failure cases
-- [ ] Verify the CLI behavior remains aligned with `spec-00008-mcp-vector-release-process`
-- [ ] Update package or operator documentation affected by the new CLI surface
-- [ ] Quality gates pass for all modified packages
+- [x] Add tests using `MockCommandHandleBuilder` from `runtime-io` covering the install success and install failure cases
+- [x] Verify the CLI behavior remains aligned with `spec-00008-mcp-vector-release-process`
+- [x] Update package or operator documentation affected by the new CLI surface
+- [x] Quality gates pass for all modified packages
