@@ -19,6 +19,14 @@ pub struct CommandExit {
     pub code: Option<i32>,
 }
 
+impl CommandExit {
+    /// Creates a new `CommandExit` from its component parts.
+    #[must_use]
+    pub const fn new(success: bool, code: Option<i32>) -> Self {
+        Self { success, code }
+    }
+}
+
 /// Reader for process output streams.
 #[derive(Debug)]
 pub struct CommandOutput {

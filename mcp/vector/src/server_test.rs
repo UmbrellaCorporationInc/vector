@@ -7,6 +7,7 @@ use rmcp::{
 use serde_json::{Map, json};
 
 use super::VectorServer;
+use crate::release::version::workspace_version;
 
 #[derive(Debug, Clone, Default)]
 struct DummyClientHandler;
@@ -67,6 +68,17 @@ fn vector_server_exposes_language_quality_gate_tool() {
     assert!(
         tool.is_some(),
         "VectorServer must expose the language-quality-gate tool registered by LanguageTools"
+    );
+}
+
+/// Verifies that `get_tool` resolves the `get_version` tool by name.
+#[test]
+fn vector_server_exposes_get_version_tool() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("get_version");
+    assert!(
+        tool.is_some(),
+        "VectorServer must expose the get_version tool registered by VersionTools"
     );
 }
 
@@ -158,6 +170,29 @@ fn vector_server_language_quality_gate_tool_metadata_is_stable() {
         required.iter().any(|value| value == "languages"),
         "language-quality-gate schema must require languages"
     );
+}
+
+/// Verifies that the `get_version` tool metadata is stable and read-only.
+#[test]
+fn vector_server_get_version_tool_metadata_is_stable() {
+    let server = VectorServer::new();
+    let tool =
+        server.get_tool("get_version").expect("VectorServer must expose the get_version tool");
+    let description = tool.description.as_ref().expect("registered tool must expose a description");
+
+    assert_eq!(tool.name, "get_version");
+    assert!(
+        description.contains("workspace version"),
+        "get_version description must remain aligned with the version introspection contract"
+    );
+    assert_eq!(tool.input_schema["type"], "object", "get_version input schema must be an object");
+    let properties = tool
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    assert!(properties.is_empty(), "get_version must remain a read-only zero-argument tool");
 }
 
 /// Verifies that `get_tool` resolves the `find_doc` tool by name.
@@ -267,6 +302,10 @@ fn vector_server_project_tool_group_remains_intact() {
         server.get_tool("language-quality-gate").is_some(),
         "language tools must coexist alongside the project and document tool groups"
     );
+    assert!(
+        server.get_tool("get_version").is_some(),
+        "version tools must coexist alongside the project, document, and language tool groups"
+    );
 }
 
 #[tokio::test]
@@ -292,6 +331,45 @@ async fn vector_server_lists_tools_from_both_groups_over_transport() {
     assert!(tool_names.contains(&"validate"), "document tools must be listed");
     assert!(tool_names.contains(&"find_doc"), "document lookup tool must be listed");
     assert!(tool_names.contains(&"language-quality-gate"), "language tools must be listed");
+    assert!(tool_names.contains(&"get_version"), "version tools must be listed");
+
+    client.cancel().await.expect("client shutdown must succeed");
+    server_handle.abort();
+}
+
+#[tokio::test]
+async fn vector_server_dispatches_version_tool_calls_over_transport() {
+    let (server_transport, client_transport) = tokio::io::duplex(4096);
+
+    let server_handle = tokio::spawn(async move {
+        VectorServer::new()
+            .serve(server_transport)
+            .await
+            .expect("server must start")
+            .waiting()
+            .await
+            .expect("server task must complete cleanly");
+    });
+
+    let client = DummyClientHandler.serve(client_transport).await.expect("client must connect");
+
+    let result = client
+        .call_tool(CallToolRequestParams::new("get_version").with_arguments(Map::new()))
+        .await
+        .expect("get_version tool call must succeed");
+
+    let text = result
+        .content
+        .first()
+        .and_then(|content| content.raw.as_text())
+        .map(|text| text.text.as_str())
+        .expect("tool result must contain text content");
+
+    assert_eq!(
+        text,
+        workspace_version(),
+        "get_version must return the canonical workspace version string"
+    );
 
     client.cancel().await.expect("client shutdown must succeed");
     server_handle.abort();

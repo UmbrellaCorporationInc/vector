@@ -19,6 +19,7 @@ use crate::error::VectorServerError;
 use crate::tools::document::DocumentTools;
 use crate::tools::language::LanguageTools;
 use crate::tools::project::ProjectTools;
+use crate::tools::version::VersionTools;
 
 /// Central MCP server handler for the vector system.
 ///
@@ -28,6 +29,7 @@ pub struct VectorServer {
     document: DocumentTools,
     language: LanguageTools,
     project: ProjectTools,
+    version: VersionTools,
 }
 
 impl VectorServer {
@@ -38,6 +40,7 @@ impl VectorServer {
             document: DocumentTools::new(),
             language: LanguageTools::new(),
             project: ProjectTools::new(),
+            version: VersionTools::new(),
         }
     }
 
@@ -74,9 +77,11 @@ impl ServerHandler for VectorServer {
     ) -> Result<ListToolsResult, rmcp::ErrorData> {
         let mut doc_result = self.document.list_tools(request.clone(), context.clone()).await?;
         let language_result = self.language.list_tools(request.clone(), context.clone()).await?;
-        let project_result = self.project.list_tools(request, context).await?;
+        let project_result = self.project.list_tools(request.clone(), context.clone()).await?;
+        let version_result = self.version.list_tools(request, context).await?;
         doc_result.tools.extend(language_result.tools);
         doc_result.tools.extend(project_result.tools);
+        doc_result.tools.extend(version_result.tools);
         Ok(ListToolsResult::with_all_items(doc_result.tools))
     }
 
@@ -91,6 +96,9 @@ impl ServerHandler for VectorServer {
         if self.language.get_tool(&request.name).is_some() {
             return self.language.call_tool(request, context).await;
         }
+        if self.version.get_tool(&request.name).is_some() {
+            return self.version.call_tool(request, context).await;
+        }
         self.project.call_tool(request, context).await
     }
 
@@ -98,6 +106,7 @@ impl ServerHandler for VectorServer {
         self.document
             .get_tool(name)
             .or_else(|| self.language.get_tool(name))
+            .or_else(|| self.version.get_tool(name))
             .or_else(|| self.project.get_tool(name))
     }
 }

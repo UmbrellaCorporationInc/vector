@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["runtime/core", "runtime/channel", "runtime/io", "runtime/project", "runtime/doc", "runtime/language", "mcp/vector"]
+members = ["runtime/core", "runtime/channel", "runtime/io", "runtime/project", "runtime/doc", "runtime/language", "mcp/vector", "frontend/cli/get-vector"]
 
 [workspace.dependencies]
 thiserror = "2.0.17"

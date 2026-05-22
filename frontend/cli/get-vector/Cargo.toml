@@ -1,0 +1,22 @@
+[package]
+name = "get-vector"
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "get-vector"
+path = "src/main.rs"
+
+[dependencies]
+runtime-core = { workspace = true }
+runtime-io = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

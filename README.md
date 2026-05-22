@@ -31,6 +31,8 @@ vector/
 │   ├── project/         # Project bootstrap and plugin operations
 │   └── language/        # Language operations and prompt resolution
 ├── frontend/
+│   ├── cli/
+│   │   └── get-vector/  # Operator CLI — install and update mcp-vector
 │   └── vscode/          # VS Code extension
 └── doc/                 # Governed documentation vault
     ├── adr/             # Architecture Decision Records
@@ -58,6 +60,22 @@ cargo install --git https://github.com/UmbrellaCorporationInc/vector --tag v0.1.
 ```
 
 **Prerequisites:** Rust 1.95.0 or later. Install from [rustup.rs](https://rustup.rs).
+
+### Operator CLI (`get-vector`)
+
+`get-vector` is a companion CLI for operators managing a local `mcp-vector` installation. It installs or updates the binary from the repository HEAD via `cargo install --git --force`:
+
+```sh
+cargo install --git https://github.com/UmbrellaCorporationInc/vector get-vector
+```
+
+Once installed, run the update command:
+
+```sh
+get-vector update-mcp-vector
+```
+
+This always installs the latest `mcp-vector` from the repository. Version-aware reconciliation (skip when already current) is planned for a future release.
 
 ### VS Code extension
 
