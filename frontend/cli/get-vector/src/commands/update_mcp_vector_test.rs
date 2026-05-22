@@ -74,7 +74,7 @@ fn wait_error_handle(message: &str) -> CommandHandle {
 async fn successful_install_returns_installed_outcome() {
     let executor = MockExecutor::new(vec![Ok(success_handle())]);
 
-    let outcome = run(&executor).await.expect("should succeed");
+    let outcome = run(&executor, |_| {}, |_| {}).await.expect("should succeed");
 
     assert_eq!(outcome, UpdateOutcome::Installed);
 }
@@ -83,7 +83,7 @@ async fn successful_install_returns_installed_outcome() {
 async fn install_command_uses_force_flag_and_correct_package() {
     let executor = MockExecutor::new(vec![Ok(success_handle())]);
 
-    run(&executor).await.expect("should succeed");
+    run(&executor, |_| {}, |_| {}).await.expect("should succeed");
 
     let commands = executor.recorded_commands();
     assert_eq!(commands.len(), 1);
@@ -99,7 +99,7 @@ async fn install_command_uses_force_flag_and_correct_package() {
 async fn spawn_failure_is_propagated_as_spawn_error() {
     let executor = MockExecutor::new(vec![Err(IoError::Process("cargo not found".into()))]);
 
-    let result = run(&executor).await;
+    let result = run(&executor, |_| {}, |_| {}).await;
 
     assert!(matches!(result, Err(UpdateError::Spawn(_))));
 }
@@ -108,7 +108,7 @@ async fn spawn_failure_is_propagated_as_spawn_error() {
 async fn non_zero_exit_is_propagated_as_install_failed() {
     let executor = MockExecutor::new(vec![Ok(failure_handle(1))]);
 
-    let result = run(&executor).await;
+    let result = run(&executor, |_| {}, |_| {}).await;
 
     assert!(matches!(result, Err(UpdateError::InstallFailed { code: Some(1) })));
 }
@@ -117,7 +117,32 @@ async fn non_zero_exit_is_propagated_as_install_failed() {
 async fn wait_failure_is_propagated_as_wait_error() {
     let executor = MockExecutor::new(vec![Ok(wait_error_handle("process disconnected"))]);
 
-    let result = run(&executor).await;
+    let result = run(&executor, |_| {}, |_| {}).await;
 
     assert!(matches!(result, Err(UpdateError::Wait(_))));
+}
+
+#[tokio::test]
+async fn cargo_output_is_forwarded_to_callbacks() {
+    let handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout(b"installing binary\n".to_vec())
+        .stderr(b"Compiling mcp-vector\n".to_vec())
+        .build()
+        .0;
+    let executor = MockExecutor::new(vec![Ok(handle)]);
+
+    let mut captured_stdout = Vec::new();
+    let mut captured_stderr = Vec::new();
+
+    let outcome = run(
+        &executor,
+        |b| captured_stdout.extend_from_slice(b),
+        |b| captured_stderr.extend_from_slice(b),
+    )
+    .await
+    .expect("should succeed");
+
+    assert_eq!(outcome, UpdateOutcome::Installed);
+    assert_eq!(captured_stdout, b"installing binary\n");
+    assert_eq!(captured_stderr, b"Compiling mcp-vector\n");
 }

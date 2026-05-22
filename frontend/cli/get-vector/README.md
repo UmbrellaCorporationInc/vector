@@ -34,6 +34,8 @@ Runs `cargo install --git <repo> --force mcp-vector` to install or update the lo
 
 V1 always performs a full install. No version comparison is done — this avoids a chicken-and-egg problem where an outdated CLI binary would incorrectly skip reinstallation after a workspace version bump.
 
+Cargo's stdout and stderr are streamed live to the terminal as the install runs, so the command does not appear blocked during the (often lengthy) compilation step.
+
 **Exit behavior:**
 
 | Condition                       | Exit code |
@@ -41,6 +43,12 @@ V1 always performs a full install. No version comparison is done — this avoids
 | Install succeeded               | `0`       |
 | `cargo install` exited non-zero | `1`       |
 | Failed to spawn `cargo`         | `1`       |
+
+**UX limitations (V1):**
+
+- Output is raw Cargo text; no custom progress bar or structured formatting is applied.
+- stdout and stderr from Cargo are interleaved via concurrent polling — their relative order may differ slightly from a sequential terminal session when both streams have data simultaneously.
+- Version-aware skip logic (avoid reinstalling when already up to date) is deferred; the command always performs a full compile-and-install cycle.
 
 ## 4. Usage
 
