@@ -232,10 +232,10 @@ async fn language_best_practices_tool_skips_unconfigured_languages() {
     );
 }
 
-/// Verifies that the MCP-facing tool surfaces runtime failures for configured
-/// languages that have no best-practices mapping.
+/// Verifies that the MCP-facing tool silently skips a configured language
+/// that has no best-practices mapping and returns an empty prompt.
 #[tokio::test]
-async fn language_best_practices_tool_propagates_missing_mapping_errors() {
+async fn language_best_practices_tool_skips_language_without_mapping() {
     use std::fs;
 
     let dir = tempfile::tempdir().expect("temp dir");
@@ -249,24 +249,16 @@ async fn language_best_practices_tool_propagates_missing_mapping_errors() {
             root_dir: dir.path().display().to_string(),
             languages: vec!["rust".to_string()],
         }))
-        .await;
+        .await
+        .expect("tool must succeed when language has no best-practices mapping");
 
-    let error =
-        result.expect_err("tool must return an error for a configured language with no mapping");
-    assert!(
-        error.contains("language_best_practices failed:"),
-        "tool error must preserve the adapter prefix; got: {error:?}"
-    );
-    assert!(
-        error.contains("missing a best-practices mapping"),
-        "tool error must preserve the runtime cause; got: {error:?}"
-    );
+    assert!(result.is_empty(), "tool must return empty prompt when no mapping is configured");
 }
 
-/// Verifies that the MCP-facing tool still surfaces runtime validation failures
-/// for configured languages with invalid quality-gate metadata.
+/// Verifies that the MCP-facing tool silently skips a configured language
+/// that has no quality-gate mapping and returns an empty prompt.
 #[tokio::test]
-async fn language_quality_gate_tool_propagates_missing_mapping_errors() {
+async fn language_quality_gate_tool_skips_language_without_mapping() {
     use std::fs;
 
     let dir = tempfile::tempdir().expect("temp dir");
@@ -280,16 +272,8 @@ async fn language_quality_gate_tool_propagates_missing_mapping_errors() {
             root_dir: dir.path().display().to_string(),
             languages: vec!["rust".to_string()],
         }))
-        .await;
+        .await
+        .expect("tool must succeed when language has no quality-gate mapping");
 
-    let error =
-        result.expect_err("tool must return an error for a configured language with no mapping");
-    assert!(
-        error.contains("language_quality_gate failed:"),
-        "tool error must preserve the adapter prefix; got: {error:?}"
-    );
-    assert!(
-        error.contains("missing a quality-gate mapping"),
-        "tool error must preserve the runtime cause; got: {error:?}"
-    );
+    assert!(result.is_empty(), "tool must return empty prompt when no mapping is configured");
 }

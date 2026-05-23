@@ -178,17 +178,18 @@ async fn resolves_mixed_case_language_names() {
 }
 
 #[tokio::test]
-async fn rejects_language_without_quality_gate_mapping() {
+async fn skips_language_without_quality_gate_mapping() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust: {}\n");
 
     let mut sender = QualityGateMockSender::new();
-    let error = QualityGateOp::new()
+    QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
         .await
-        .expect_err("expected missing quality-gate mapping to fail");
+        .expect("language with no quality-gate mapping must be skipped silently");
 
-    assert!(error.to_string().contains("missing a quality-gate mapping"));
+    let output = sender.output.expect("operation must emit output");
+    assert!(output.prompt.is_empty(), "prompt must be empty when no mapping is configured");
 }
 
 #[tokio::test]
@@ -426,17 +427,18 @@ async fn bp_resolves_mixed_case_language_names() {
 }
 
 #[tokio::test]
-async fn bp_rejects_language_without_best_practices_mapping() {
+async fn bp_skips_language_without_best_practices_mapping() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust: {}\n");
 
     let mut sender = BestPracticesMockSender::new();
-    let error = BestPracticesOp::new()
+    BestPracticesOp::new()
         .run(BestPracticesInput::new(root, vec!["rust".to_string()]), &mut sender)
         .await
-        .expect_err("expected missing best-practices mapping to fail");
+        .expect("language with no best-practices mapping must be skipped silently");
 
-    assert!(error.to_string().contains("missing a best-practices mapping"));
+    let output = sender.output.expect("operation must emit output");
+    assert!(output.prompt.is_empty(), "prompt must be empty when no mapping is configured");
 }
 
 #[tokio::test]

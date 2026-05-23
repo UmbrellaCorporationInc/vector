@@ -97,21 +97,8 @@ enum LanguageRulesError {
 // Operation-specific errors
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Error)]
-enum QualityGateError {
-    #[error(transparent)]
-    Inner(#[from] LanguageRulesError),
-    #[error("language '{0}' is missing a quality-gate mapping")]
-    MissingQualityGate(String),
-}
-
-#[derive(Debug, Error)]
-enum BestPracticesError {
-    #[error(transparent)]
-    Inner(#[from] LanguageRulesError),
-    #[error("language '{0}' is missing a best-practices mapping")]
-    MissingBestPractices(String),
-}
+type QualityGateError = LanguageRulesError;
+type BestPracticesError = LanguageRulesError;
 
 // ---------------------------------------------------------------------------
 // QualityGate operation
@@ -138,11 +125,10 @@ async fn resolve_quality_gate_prompt(input: &QualityGateInput) -> Result<String,
         let Some(entry) = config.get(language) else {
             continue;
         };
-        let prompt_ref = entry
-            .quality_gate
-            .as_deref()
-            .filter(|value| !value.trim().is_empty())
-            .ok_or_else(|| QualityGateError::MissingQualityGate(language.clone()))?;
+        let Some(prompt_ref) = entry.quality_gate.as_deref().filter(|v| !v.trim().is_empty())
+        else {
+            continue;
+        };
         let prompt_path = resolve_prompt_path(&input.root_dir, prompt_ref)?;
         let prompt_text = read_file_text(&IoPath::new(&prompt_path)).await.map_err(|error| {
             LanguageRulesError::PromptRead(prompt_path.display().to_string(), error.to_string())
@@ -183,12 +169,10 @@ async fn resolve_best_practices_prompt(
         let Some(entry) = config.get(language) else {
             continue;
         };
-        let prompt_ref =
-            entry
-                .best_practices
-                .as_deref()
-                .filter(|value| !value.trim().is_empty())
-                .ok_or_else(|| BestPracticesError::MissingBestPractices(language.clone()))?;
+        let Some(prompt_ref) = entry.best_practices.as_deref().filter(|v| !v.trim().is_empty())
+        else {
+            continue;
+        };
         let prompt_path = resolve_prompt_path(&input.root_dir, prompt_ref)?;
         let prompt_text = read_file_text(&IoPath::new(&prompt_path)).await.map_err(|error| {
             LanguageRulesError::PromptRead(prompt_path.display().to_string(), error.to_string())
