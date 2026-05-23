@@ -28,7 +28,7 @@ Use `#{language}` for the implementation and all generated content.
 1. Add or update tests that cover the implemented behavior.
 2. Ensure all relevant tests pass before finishing.
 3. Mark the implemented task items as completed in the task document once the work for `#{phase}` is finished.
-4. Use the vector MCP `language-quality-gate` tool with the language list `#{lang}`.
+4. Use the vector MCP `language_quality_gate` tool with the language list `#{lang}`.
 
 ## Output
 Report the completed changes, the tests that were run, and the result of the language quality gate.

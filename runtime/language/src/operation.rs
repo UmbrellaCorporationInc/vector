@@ -1,4 +1,4 @@
-//! Plugin operation for resolving language quality-gate prompts.
+//! Plugin operations for resolving language-specific governed prompts.
 
 use runtime_core::{RuntimeError, RuntimeResult, declare_plugin_operations, plugin::PluginSender};
 use runtime_io::{path::IoPath, text::read_file_text};
@@ -6,6 +6,10 @@ use serde::Deserialize;
 use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
 use walkdir::WalkDir;
+
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
 
 /// Input for the `QualityGate` operation.
 ///
@@ -29,16 +33,48 @@ pub struct QualityGateOutput {
     pub prompt: String,
 }
 
+/// Input for the `BestPractices` operation.
+///
+/// # DTO(Plugin operation input contracts use public fields for ergonomic data transfer)
+#[non_exhaustive]
+#[derive(Debug, Clone)]
+pub struct BestPracticesInput {
+    /// The root directory of the project.
+    pub root_dir: IoPath,
+    /// The ordered set of language identifiers to resolve.
+    pub languages: Vec<String>,
+}
+
+/// Output for the `BestPractices` operation.
+///
+/// # DTO(Plugin operation output contracts use public fields for ergonomic data transfer)
+#[non_exhaustive]
+#[derive(Debug, Clone)]
+pub struct BestPracticesOutput {
+    /// The concatenated best-practices prompt body for the requested languages.
+    pub prompt: String,
+}
+
+// ---------------------------------------------------------------------------
+// Language rule deserialization
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Deserialize)]
 struct LanguageRuleEntry {
     #[serde(rename = "quality-gate")]
     quality_gate: Option<String>,
+    #[serde(rename = "best-practices")]
+    best_practices: Option<String>,
 }
 
 type LanguageRules = HashMap<String, LanguageRuleEntry>;
 
+// ---------------------------------------------------------------------------
+// Shared internal error (used by helper functions called by both operations)
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Error)]
-enum QualityGateError {
+enum LanguageRulesError {
     #[error("languages input must not be empty")]
     EmptyLanguages,
     #[error("duplicate language '{0}' is not allowed")]
@@ -47,17 +83,26 @@ enum QualityGateError {
     ConfigRead(String),
     #[error("failed to parse .vector/language-rules.yaml: {0}")]
     ConfigParse(String),
-    #[error("language '{0}' is missing a quality-gate mapping")]
-    MissingQualityGate(String),
-    #[error("quality-gate prompt '{0}' did not resolve to any governed prompts document")]
+    #[error("prompt '{0}' did not resolve to any governed prompts document")]
     PromptNotFound(String),
-    #[error("quality-gate prompt '{0}' resolved to multiple governed prompts documents")]
+    #[error("prompt '{0}' resolved to multiple governed prompts documents")]
     PromptAmbiguous(String),
     #[error("failed to read prompt document '{0}': {1}")]
     PromptRead(String, String),
     #[error("prompt document '{0}' is missing YAML frontmatter")]
     MissingFrontmatter(String),
 }
+
+// ---------------------------------------------------------------------------
+// Operation-specific errors
+// ---------------------------------------------------------------------------
+
+type QualityGateError = LanguageRulesError;
+type BestPracticesError = LanguageRulesError;
+
+// ---------------------------------------------------------------------------
+// QualityGate operation
+// ---------------------------------------------------------------------------
 
 async fn quality_gate(
     input: QualityGateInput,
@@ -80,17 +125,19 @@ async fn resolve_quality_gate_prompt(input: &QualityGateInput) -> Result<String,
         let Some(entry) = config.get(language) else {
             continue;
         };
-        let prompt_ref = entry
+        let Some(prompt_ref) = entry
             .quality_gate
             .as_deref()
-            .filter(|value| !value.trim().is_empty())
-            .ok_or_else(|| QualityGateError::MissingQualityGate(language.clone()))?;
+            .filter(|v| !v.trim().is_empty() && !v.trim().eq_ignore_ascii_case("none"))
+        else {
+            continue;
+        };
         let prompt_path = resolve_prompt_path(&input.root_dir, prompt_ref)?;
         let prompt_text = read_file_text(&IoPath::new(&prompt_path)).await.map_err(|error| {
-            QualityGateError::PromptRead(prompt_path.display().to_string(), error.to_string())
+            LanguageRulesError::PromptRead(prompt_path.display().to_string(), error.to_string())
         })?;
         let prompt_body = strip_frontmatter(&prompt_text).ok_or_else(|| {
-            QualityGateError::MissingFrontmatter(prompt_path.display().to_string())
+            LanguageRulesError::MissingFrontmatter(prompt_path.display().to_string())
         })?;
         prompt_bodies.push(prompt_body.to_string());
     }
@@ -98,9 +145,60 @@ async fn resolve_quality_gate_prompt(input: &QualityGateInput) -> Result<String,
     Ok(prompt_bodies.join("\n\n"))
 }
 
-fn normalize_languages(languages: &[String]) -> Result<Vec<String>, QualityGateError> {
+// ---------------------------------------------------------------------------
+// BestPractices operation
+// ---------------------------------------------------------------------------
+
+async fn best_practices(
+    input: BestPracticesInput,
+    output: &mut impl PluginSender<BestPracticesOutput>,
+) -> RuntimeResult<()> {
+    let prompt = resolve_best_practices_prompt(&input).await.map_err(|error| {
+        RuntimeError::operation(format!("language best practices failed: {error}"))
+    })?;
+
+    output.send(BestPracticesOutput { prompt }).await?;
+    Ok(())
+}
+
+async fn resolve_best_practices_prompt(
+    input: &BestPracticesInput,
+) -> Result<String, BestPracticesError> {
+    let normalized_languages = normalize_languages(&input.languages)?;
+    let config = load_language_rules(&input.root_dir).await?;
+    let mut prompt_bodies = Vec::with_capacity(normalized_languages.len());
+
+    for language in &normalized_languages {
+        let Some(entry) = config.get(language) else {
+            continue;
+        };
+        let Some(prompt_ref) = entry
+            .best_practices
+            .as_deref()
+            .filter(|v| !v.trim().is_empty() && !v.trim().eq_ignore_ascii_case("none"))
+        else {
+            continue;
+        };
+        let prompt_path = resolve_prompt_path(&input.root_dir, prompt_ref)?;
+        let prompt_text = read_file_text(&IoPath::new(&prompt_path)).await.map_err(|error| {
+            LanguageRulesError::PromptRead(prompt_path.display().to_string(), error.to_string())
+        })?;
+        let prompt_body = strip_frontmatter(&prompt_text).ok_or_else(|| {
+            LanguageRulesError::MissingFrontmatter(prompt_path.display().to_string())
+        })?;
+        prompt_bodies.push(prompt_body.to_string());
+    }
+
+    Ok(prompt_bodies.join("\n\n"))
+}
+
+// ---------------------------------------------------------------------------
+// Shared helper functions
+// ---------------------------------------------------------------------------
+
+fn normalize_languages(languages: &[String]) -> Result<Vec<String>, LanguageRulesError> {
     if languages.is_empty() {
-        return Err(QualityGateError::EmptyLanguages);
+        return Err(LanguageRulesError::EmptyLanguages);
     }
 
     let mut normalized_languages = Vec::with_capacity(languages.len());
@@ -108,7 +206,7 @@ fn normalize_languages(languages: &[String]) -> Result<Vec<String>, QualityGateE
     for language in languages {
         let normalized = language.to_lowercase();
         if !seen.insert(normalized.clone()) {
-            return Err(QualityGateError::DuplicateLanguage(normalized));
+            return Err(LanguageRulesError::DuplicateLanguage(normalized));
         }
         normalized_languages.push(normalized);
     }
@@ -116,19 +214,19 @@ fn normalize_languages(languages: &[String]) -> Result<Vec<String>, QualityGateE
     Ok(normalized_languages)
 }
 
-async fn load_language_rules(root_dir: &IoPath) -> Result<LanguageRules, QualityGateError> {
+async fn load_language_rules(root_dir: &IoPath) -> Result<LanguageRules, LanguageRulesError> {
     let path = root_dir.join(".vector").join("language-rules.yaml");
     let text = read_file_text(&path)
         .await
-        .map_err(|error| QualityGateError::ConfigRead(error.to_string()))?;
+        .map_err(|error| LanguageRulesError::ConfigRead(error.to_string()))?;
     validate_language_rules_field_names(&text)?;
     serde_yaml::from_str::<LanguageRules>(&text)
-        .map_err(|error| QualityGateError::ConfigParse(error.to_string()))
+        .map_err(|error| LanguageRulesError::ConfigParse(error.to_string()))
 }
 
-fn validate_language_rules_field_names(text: &str) -> Result<(), QualityGateError> {
+fn validate_language_rules_field_names(text: &str) -> Result<(), LanguageRulesError> {
     let yaml = serde_yaml::from_str::<serde_yaml::Value>(text)
-        .map_err(|error| QualityGateError::ConfigParse(error.to_string()))?;
+        .map_err(|error| LanguageRulesError::ConfigParse(error.to_string()))?;
     let serde_yaml::Value::Mapping(root) = yaml else {
         return Ok(());
     };
@@ -146,7 +244,7 @@ fn validate_language_rules_field_names(text: &str) -> Result<(), QualityGateErro
 fn validate_language_rule_value(
     current_path: &str,
     value: &serde_yaml::Value,
-) -> Result<(), QualityGateError> {
+) -> Result<(), LanguageRulesError> {
     let serde_yaml::Value::Mapping(entry) = value else {
         return Ok(());
     };
@@ -157,7 +255,7 @@ fn validate_language_rule_value(
         };
         let field_path = format!("{current_path}.{field_name}");
         if !is_kebab_case_identifier(field_name) {
-            return Err(QualityGateError::ConfigParse(format!(
+            return Err(LanguageRulesError::ConfigParse(format!(
                 "Invalid .vector YAML field name '{field_name}' at '{field_path}'; schema fields must be kebab-case"
             )));
         }
@@ -194,7 +292,7 @@ fn is_kebab_case_identifier(name: &str) -> bool {
     !name.ends_with('-')
 }
 
-fn resolve_prompt_path(root_dir: &IoPath, prompt_ref: &str) -> Result<PathBuf, QualityGateError> {
+fn resolve_prompt_path(root_dir: &IoPath, prompt_ref: &str) -> Result<PathBuf, LanguageRulesError> {
     let prompts_dir = root_dir.as_path().join("doc").join("prompts");
     let mut matches = Vec::new();
 
@@ -215,9 +313,9 @@ fn resolve_prompt_path(root_dir: &IoPath, prompt_ref: &str) -> Result<PathBuf, Q
     }
 
     match matches.len() {
-        0 => Err(QualityGateError::PromptNotFound(prompt_ref.to_string())),
+        0 => Err(LanguageRulesError::PromptNotFound(prompt_ref.to_string())),
         1 => Ok(matches.remove(0)),
-        _ => Err(QualityGateError::PromptAmbiguous(prompt_ref.to_string())),
+        _ => Err(LanguageRulesError::PromptAmbiguous(prompt_ref.to_string())),
     }
 }
 
@@ -241,9 +339,21 @@ fn strip_frontmatter(text: &str) -> Option<&str> {
     None
 }
 
+// ---------------------------------------------------------------------------
+// Plugin operation registrations
+// ---------------------------------------------------------------------------
+
 declare_plugin_operations! {
     QualityGateOp => quality_gate(QualityGateInput, QualityGateOutput)
 }
+
+declare_plugin_operations! {
+    BestPracticesOp => best_practices(BestPracticesInput, BestPracticesOutput)
+}
+
+// ---------------------------------------------------------------------------
+// Constructor impls
+// ---------------------------------------------------------------------------
 
 impl QualityGateInput {
     /// Construct a `QualityGateInput` with explicit fields.
@@ -262,6 +372,28 @@ impl QualityGateOp {
 }
 
 impl Default for QualityGateOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BestPracticesInput {
+    /// Construct a `BestPracticesInput` with explicit fields.
+    #[must_use]
+    pub const fn new(root_dir: IoPath, languages: Vec<String>) -> Self {
+        Self { root_dir, languages }
+    }
+}
+
+impl BestPracticesOp {
+    /// Construct a new `BestPracticesOp`.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for BestPracticesOp {
     fn default() -> Self {
         Self::new()
     }

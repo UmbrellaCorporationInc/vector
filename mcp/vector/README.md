@@ -31,7 +31,7 @@
 | `runtime-core`    | Core plugin and channel contracts used at the dispatcher boundary  |
 | `runtime-channel` | `PluginDispatcher` execution bridge between tools and operations   |
 | `runtime-io`      | `IoPath` type used in MCP-to-runtime input translation             |
-| `runtime-language`| `QualityGateOp` and `QualityGateInput` for language prompt resolution |
+| `runtime-language`| `QualityGateOp`, `BestPracticesOp`, and their inputs for language prompt resolution |
 | `runtime-project` | `ProjectSetupOp` and `ProjectSetupInput` for the project tool path |
 | `serde`           | MCP parameter deserialization                                      |
 | `thiserror`       | MCP-local error enum derivation                                    |
@@ -62,7 +62,8 @@
 | `find_doc`              | Document          | Locate a governed document by type and numeric code                |
 | `create_doc_prompt`     | Document          | Create a governed document and return the resolved authoring prompt |
 | `create_doc_type_prompt`| Document          | Create a governed document type and return the resolved authoring prompt |
-| `language-quality-gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
+| `language_quality_gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
+| `language_best_practices` | Language        | Resolve and concatenate governed best-practices prompt bodies for a language list |
 
 ## 4. Usage Example
 

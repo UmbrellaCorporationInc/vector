@@ -1,4 +1,6 @@
 rust:
   quality-gate: prompts-00008-rust
+  best-practices: none
 typescript:
   quality-gate: prompts-00009-typescript
+  best-practices: none

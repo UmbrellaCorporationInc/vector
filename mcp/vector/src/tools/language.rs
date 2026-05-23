@@ -8,10 +8,10 @@ use rmcp::{
 use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_io::path::IoPath;
-use runtime_language::{QualityGateInput, QualityGateOp};
+use runtime_language::{BestPracticesInput, BestPracticesOp, QualityGateInput, QualityGateOp};
 use serde::Deserialize;
 
-/// MCP-facing parameters for the `language-quality-gate` tool.
+/// MCP-facing parameters for the `language_quality_gate` tool.
 ///
 /// # DTO(MCP protocol input mapped at the adapter boundary; serde deserialization requires public fields)
 #[non_exhaustive]
@@ -20,6 +20,18 @@ pub struct LanguageQualityGateParams {
     /// Absolute or relative path to the root directory of the project.
     pub root_dir: String,
     /// Ordered language identifiers whose quality-gate prompts should be resolved.
+    pub languages: Vec<String>,
+}
+
+/// MCP-facing parameters for the `language_best_practices` tool.
+///
+/// # DTO(MCP protocol input mapped at the adapter boundary; serde deserialization requires public fields)
+#[non_exhaustive]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct LanguageBestPracticesParams {
+    /// Absolute or relative path to the root directory of the project.
+    pub root_dir: String,
+    /// Ordered language identifiers whose best-practices prompts should be resolved.
     pub languages: Vec<String>,
 }
 
@@ -54,7 +66,7 @@ impl LanguageTools {
     /// Prompt lookup, frontmatter stripping, and concatenation remain
     /// inside `runtime-language`; this method only adapts MCP params.
     #[tool(
-        name = "language-quality-gate",
+        name = "language_quality_gate",
         description = "Resolve governed quality-gate prompts for a language list and return the concatenated prompt body"
     )]
     async fn language_quality_gate(
@@ -73,9 +85,41 @@ impl LanguageTools {
         match receiver.recv().await {
             Ok(Some(output)) => Ok(output.prompt),
             Ok(None) => {
-                Err("language-quality-gate failed: operation completed with no output".to_string())
+                Err("language_quality_gate failed: operation completed with no output".to_string())
             }
-            Err(error) => Err(format!("language-quality-gate failed: {error}")),
+            Err(error) => Err(format!("language_quality_gate failed: {error}")),
+        }
+    }
+
+    /// Resolve and concatenate governed language best-practices prompts.
+    ///
+    /// Executes `BestPracticesOp` through the standard dispatcher path.
+    /// Prompt lookup, frontmatter stripping, and concatenation remain
+    /// inside `runtime-language`; this method only adapts MCP params.
+    #[tool(
+        name = "language_best_practices",
+        description = "Resolve governed best-practices prompts for a language list and return the concatenated prompt body"
+    )]
+    async fn language_best_practices(
+        &self,
+        Parameters(LanguageBestPracticesParams { root_dir, languages }): Parameters<
+            LanguageBestPracticesParams,
+        >,
+    ) -> Result<String, String> {
+        let input = BestPracticesInput::new(IoPath::new(root_dir), languages);
+
+        let (_cancel, mut receiver) = PluginDispatcher::new(BestPracticesOp::new())
+            .input(input)
+            .build()
+            .map_err(|error| format!("dispatcher build failed: {error}"))?;
+
+        match receiver.recv().await {
+            Ok(Some(output)) => Ok(output.prompt),
+            Ok(None) => {
+                Err("language_best_practices failed: operation completed with no output"
+                    .to_string())
+            }
+            Err(error) => Err(format!("language_best_practices failed: {error}")),
         }
     }
 }
