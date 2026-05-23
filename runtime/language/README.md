@@ -38,7 +38,7 @@
 - `languages` must be non-empty
 - Duplicate languages are rejected after lowercase normalization
 - Requested languages with no matching `.vector/language-rules.yaml` entry are skipped
-- Languages with a `quality-gate` or `best-practices` field set to `"none"` or empty are skipped
+- Languages with a missing `quality-gate` or `best-practices` field, or with either field set to `"none"` or empty, are skipped
 - Each configured field that is used must resolve to exactly one governed prompt document
 - Returned prompt content must exclude YAML frontmatter
 
