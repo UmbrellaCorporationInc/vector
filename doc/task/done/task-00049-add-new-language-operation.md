@@ -5,7 +5,7 @@ code: "00049"
 slug: add-new-language-operation
 title: Add BestPractices Language Operation
 description: Add a BestPractices operation to the language crate and expose it as an MCP tool, mirroring the existing QualityGate pattern.
-status: todo
+status: done
 created: 2026-05-23
 updated: 2026-05-23
 tags:
@@ -79,4 +79,4 @@ input:
   language: Rust
 ```
 
-- [ ] Update README files on packages modified
+- [x] Update README files on packages modified
