@@ -125,7 +125,10 @@ async fn resolve_quality_gate_prompt(input: &QualityGateInput) -> Result<String,
         let Some(entry) = config.get(language) else {
             continue;
         };
-        let Some(prompt_ref) = entry.quality_gate.as_deref().filter(|v| !v.trim().is_empty())
+        let Some(prompt_ref) = entry
+            .quality_gate
+            .as_deref()
+            .filter(|v| !v.trim().is_empty() && !v.trim().eq_ignore_ascii_case("none"))
         else {
             continue;
         };
@@ -169,7 +172,10 @@ async fn resolve_best_practices_prompt(
         let Some(entry) = config.get(language) else {
             continue;
         };
-        let Some(prompt_ref) = entry.best_practices.as_deref().filter(|v| !v.trim().is_empty())
+        let Some(prompt_ref) = entry
+            .best_practices
+            .as_deref()
+            .filter(|v| !v.trim().is_empty() && !v.trim().eq_ignore_ascii_case("none"))
         else {
             continue;
         };

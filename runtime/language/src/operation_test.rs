@@ -178,6 +178,21 @@ async fn resolves_mixed_case_language_names() {
 }
 
 #[tokio::test]
+async fn skips_quality_gate_when_field_is_none_sentinel() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust:\n  quality-gate: none\n");
+
+    let mut sender = QualityGateMockSender::new();
+    QualityGateOp::new()
+        .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
+        .await
+        .expect("quality-gate: none must be treated as not configured");
+
+    let output = sender.output.expect("operation must emit output");
+    assert!(output.prompt.is_empty(), "prompt must be empty when field is the none sentinel");
+}
+
+#[tokio::test]
 async fn skips_language_without_quality_gate_mapping() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust: {}\n");
@@ -424,6 +439,21 @@ async fn bp_resolves_mixed_case_language_names() {
 
     let output = sender.output.expect("expected output");
     assert_eq!(output.prompt, "\n# Rust Best Practices\n");
+}
+
+#[tokio::test]
+async fn bp_skips_best_practices_when_field_is_none_sentinel() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust:\n  best-practices: none\n");
+
+    let mut sender = BestPracticesMockSender::new();
+    BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, vec!["rust".to_string()]), &mut sender)
+        .await
+        .expect("best-practices: none must be treated as not configured");
+
+    let output = sender.output.expect("operation must emit output");
+    assert!(output.prompt.is_empty(), "prompt must be empty when field is the none sentinel");
 }
 
 #[tokio::test]
