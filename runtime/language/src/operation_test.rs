@@ -5,30 +5,64 @@ use runtime_io::path::IoPath;
 use std::fs;
 use tempfile::TempDir;
 
-use crate::{QualityGateInput, QualityGateOp, QualityGateOutput};
+use crate::{
+    BestPracticesInput, BestPracticesOp, BestPracticesOutput, QualityGateInput, QualityGateOp,
+    QualityGateOutput,
+};
 
-struct MockSender {
+// ---------------------------------------------------------------------------
+// Mock senders
+// ---------------------------------------------------------------------------
+
+struct QualityGateMockSender {
     output: Option<QualityGateOutput>,
 }
 
-impl MockSender {
+impl QualityGateMockSender {
     fn new() -> Self {
         Self { output: None }
     }
 }
 
-impl runtime_core::Sender<QualityGateOutput> for MockSender {
+impl runtime_core::Sender<QualityGateOutput> for QualityGateMockSender {
     async fn send(&mut self, value: QualityGateOutput) -> runtime_core::RuntimeResult<()> {
         self.output = Some(value);
         Ok(())
     }
 }
 
-impl runtime_core::cancel::CancelableSender<QualityGateOutput> for MockSender {
+impl runtime_core::cancel::CancelableSender<QualityGateOutput> for QualityGateMockSender {
     fn is_cancelled(&self) -> bool {
         false
     }
 }
+
+struct BestPracticesMockSender {
+    output: Option<BestPracticesOutput>,
+}
+
+impl BestPracticesMockSender {
+    fn new() -> Self {
+        Self { output: None }
+    }
+}
+
+impl runtime_core::Sender<BestPracticesOutput> for BestPracticesMockSender {
+    async fn send(&mut self, value: BestPracticesOutput) -> runtime_core::RuntimeResult<()> {
+        self.output = Some(value);
+        Ok(())
+    }
+}
+
+impl runtime_core::cancel::CancelableSender<BestPracticesOutput> for BestPracticesMockSender {
+    fn is_cancelled(&self) -> bool {
+        false
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 fn create_test_project() -> (TempDir, IoPath) {
     let temp_dir = tempfile::tempdir().unwrap();
@@ -36,6 +70,7 @@ fn create_test_project() -> (TempDir, IoPath) {
 
     fs::create_dir_all(temp_dir.path().join(".vector")).unwrap();
     fs::create_dir_all(temp_dir.path().join("doc").join("prompts").join("quality-gate")).unwrap();
+    fs::create_dir_all(temp_dir.path().join("doc").join("prompts").join("best-practices")).unwrap();
 
     (temp_dir, root)
 }
@@ -58,6 +93,10 @@ fn governed_prompt(title: &str, body: &str) -> String {
     )
 }
 
+// ---------------------------------------------------------------------------
+// QualityGate tests
+// ---------------------------------------------------------------------------
+
 #[tokio::test]
 async fn loads_language_rules_and_returns_prompt_body() {
     let (temp_dir, root) = create_test_project();
@@ -68,7 +107,7 @@ async fn loads_language_rules_and_returns_prompt_body() {
         &governed_prompt("rust", "# Rust Gate\n"),
     );
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
         .await
@@ -81,7 +120,7 @@ async fn loads_language_rules_and_returns_prompt_body() {
 #[tokio::test]
 async fn rejects_empty_languages_input() {
     let (_temp_dir, root) = create_test_project();
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
 
     let error = QualityGateOp::new()
         .run(QualityGateInput::new(root, Vec::new()), &mut sender)
@@ -96,7 +135,7 @@ async fn rejects_duplicate_languages_after_normalization() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust:\n  quality-gate: prompts-00005-rust\n");
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     let error = QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["Rust".to_string(), "rust".to_string()]), &mut sender)
         .await
@@ -108,7 +147,7 @@ async fn rejects_duplicate_languages_after_normalization() {
 #[tokio::test]
 async fn rejects_missing_language_rules_config() {
     let (_temp_dir, root) = create_test_project();
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
 
     let error = QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
@@ -128,7 +167,7 @@ async fn resolves_mixed_case_language_names() {
         &governed_prompt("rust", "# Rust Gate\n"),
     );
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["Rust".to_string()]), &mut sender)
         .await
@@ -143,7 +182,7 @@ async fn rejects_language_without_quality_gate_mapping() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust: {}\n");
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     let error = QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
         .await
@@ -157,7 +196,7 @@ async fn rejects_unmapped_prompt_reference() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust:\n  quality-gate: prompts-00005-rust\n");
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     let error = QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
         .await
@@ -176,7 +215,7 @@ async fn strips_frontmatter_from_prompt_output() {
         "---\nid: prompts-00005-rust\n---\n\n# Rust Gate\nUse xtask quality-test.\n",
     );
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
         .await
@@ -205,7 +244,7 @@ async fn concatenates_prompt_bodies_in_input_order() {
         &governed_prompt("typescript", "# TypeScript Gate\n"),
     );
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     QualityGateOp::new()
         .run(
             QualityGateInput::new(root, vec!["typescript".to_string(), "rust".to_string()]),
@@ -236,7 +275,7 @@ async fn skips_unconfigured_languages_and_preserves_configured_order() {
         &governed_prompt("typescript", "# TypeScript Gate\n"),
     );
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     QualityGateOp::new()
         .run(
             QualityGateInput::new(
@@ -257,7 +296,7 @@ async fn returns_empty_prompt_when_all_requested_languages_are_unconfigured() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust:\n  quality-gate: prompts-00005-rust\n");
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     QualityGateOp::new()
         .run(
             QualityGateInput::new(root, vec!["Python".to_string(), "Ruby".to_string()]),
@@ -275,7 +314,7 @@ async fn rejects_snake_case_language_rule_field_names() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust:\n  quality_gate: prompts-00005-rust\n");
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     let error = QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
         .await
@@ -289,7 +328,7 @@ async fn rejects_snake_case_nested_language_rule_field_names_with_exact_path() {
     let (temp_dir, root) = create_test_project();
     write_language_rules(&temp_dir, "rust:\n  gates:\n    quality_gate: prompts-00005-rust\n");
 
-    let mut sender = MockSender::new();
+    let mut sender = QualityGateMockSender::new();
     let error = QualityGateOp::new()
         .run(QualityGateInput::new(root, vec!["rust".to_string()]), &mut sender)
         .await
@@ -297,4 +336,246 @@ async fn rejects_snake_case_nested_language_rule_field_names_with_exact_path() {
 
     assert!(error.to_string().contains(".vector/language-rules.yaml"));
     assert!(error.to_string().contains("gates.quality_gate"));
+}
+
+// ---------------------------------------------------------------------------
+// BestPractices tests
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn bp_loads_language_rules_and_returns_prompt_body() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust:\n  best-practices: prompts-00010-rust\n");
+    write_prompt(
+        &temp_dir,
+        "doc/prompts/best-practices/prompts-00010-rust.md",
+        &governed_prompt("rust", "# Rust Best Practices\n"),
+    );
+
+    let mut sender = BestPracticesMockSender::new();
+    BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, vec!["rust".to_string()]), &mut sender)
+        .await
+        .unwrap();
+
+    let output = sender.output.expect("expected output");
+    assert_eq!(output.prompt, "\n# Rust Best Practices\n");
+}
+
+#[tokio::test]
+async fn bp_rejects_empty_languages_input() {
+    let (_temp_dir, root) = create_test_project();
+    let mut sender = BestPracticesMockSender::new();
+
+    let error = BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, Vec::new()), &mut sender)
+        .await
+        .expect_err("expected empty languages to fail");
+
+    assert!(error.to_string().contains("languages input must not be empty"));
+}
+
+#[tokio::test]
+async fn bp_rejects_duplicate_languages_after_normalization() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust:\n  best-practices: prompts-00010-rust\n");
+
+    let mut sender = BestPracticesMockSender::new();
+    let error = BestPracticesOp::new()
+        .run(
+            BestPracticesInput::new(root, vec!["Rust".to_string(), "rust".to_string()]),
+            &mut sender,
+        )
+        .await
+        .expect_err("expected duplicate language to fail");
+
+    assert!(error.to_string().contains("duplicate language 'rust'"));
+}
+
+#[tokio::test]
+async fn bp_rejects_missing_language_rules_config() {
+    let (_temp_dir, root) = create_test_project();
+    let mut sender = BestPracticesMockSender::new();
+
+    let error = BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, vec!["rust".to_string()]), &mut sender)
+        .await
+        .expect_err("expected missing config to fail");
+
+    assert!(error.to_string().contains("failed to read .vector/language-rules.yaml"));
+}
+
+#[tokio::test]
+async fn bp_resolves_mixed_case_language_names() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust:\n  best-practices: prompts-00010-rust\n");
+    write_prompt(
+        &temp_dir,
+        "doc/prompts/best-practices/prompts-00010-rust.md",
+        &governed_prompt("rust", "# Rust Best Practices\n"),
+    );
+
+    let mut sender = BestPracticesMockSender::new();
+    BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, vec!["Rust".to_string()]), &mut sender)
+        .await
+        .unwrap();
+
+    let output = sender.output.expect("expected output");
+    assert_eq!(output.prompt, "\n# Rust Best Practices\n");
+}
+
+#[tokio::test]
+async fn bp_rejects_language_without_best_practices_mapping() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust: {}\n");
+
+    let mut sender = BestPracticesMockSender::new();
+    let error = BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, vec!["rust".to_string()]), &mut sender)
+        .await
+        .expect_err("expected missing best-practices mapping to fail");
+
+    assert!(error.to_string().contains("missing a best-practices mapping"));
+}
+
+#[tokio::test]
+async fn bp_rejects_unmapped_prompt_reference() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust:\n  best-practices: prompts-00010-rust\n");
+
+    let mut sender = BestPracticesMockSender::new();
+    let error = BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, vec!["rust".to_string()]), &mut sender)
+        .await
+        .expect_err("expected missing prompt document to fail");
+
+    assert!(error.to_string().contains("did not resolve to any governed prompts document"));
+}
+
+#[tokio::test]
+async fn bp_strips_frontmatter_from_prompt_output() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust:\n  best-practices: prompts-00010-rust\n");
+    write_prompt(
+        &temp_dir,
+        "doc/prompts/best-practices/prompts-00010-rust.md",
+        "---\nid: prompts-00010-rust\n---\n\n# Rust Best Practices\nFollow idiomatic Rust.\n",
+    );
+
+    let mut sender = BestPracticesMockSender::new();
+    BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, vec!["rust".to_string()]), &mut sender)
+        .await
+        .unwrap();
+
+    let output = sender.output.expect("expected output");
+    assert_eq!(output.prompt, "\n# Rust Best Practices\nFollow idiomatic Rust.\n");
+    assert!(!output.prompt.contains("id: prompts-00010-rust"));
+}
+
+#[tokio::test]
+async fn bp_concatenates_prompt_bodies_in_input_order() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(
+        &temp_dir,
+        "rust:\n  best-practices: prompts-00010-rust\ntypescript:\n  best-practices: prompts-00011-typescript\n",
+    );
+    write_prompt(
+        &temp_dir,
+        "doc/prompts/best-practices/prompts-00010-rust.md",
+        &governed_prompt("rust", "# Rust Best Practices\n"),
+    );
+    write_prompt(
+        &temp_dir,
+        "doc/prompts/best-practices/prompts-00011-typescript.md",
+        &governed_prompt("typescript", "# TypeScript Best Practices\n"),
+    );
+
+    let mut sender = BestPracticesMockSender::new();
+    BestPracticesOp::new()
+        .run(
+            BestPracticesInput::new(root, vec!["typescript".to_string(), "rust".to_string()]),
+            &mut sender,
+        )
+        .await
+        .unwrap();
+
+    let output = sender.output.expect("expected output");
+    assert_eq!(output.prompt, "\n# TypeScript Best Practices\n\n\n\n# Rust Best Practices\n");
+}
+
+#[tokio::test]
+async fn bp_skips_unconfigured_languages_and_preserves_configured_order() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(
+        &temp_dir,
+        "rust:\n  best-practices: prompts-00010-rust\ntypescript:\n  best-practices: prompts-00011-typescript\n",
+    );
+    write_prompt(
+        &temp_dir,
+        "doc/prompts/best-practices/prompts-00010-rust.md",
+        &governed_prompt("rust", "# Rust Best Practices\n"),
+    );
+    write_prompt(
+        &temp_dir,
+        "doc/prompts/best-practices/prompts-00011-typescript.md",
+        &governed_prompt("typescript", "# TypeScript Best Practices\n"),
+    );
+
+    let mut sender = BestPracticesMockSender::new();
+    BestPracticesOp::new()
+        .run(
+            BestPracticesInput::new(
+                root,
+                vec!["TypeScript".to_string(), "Python".to_string(), "Rust".to_string()],
+            ),
+            &mut sender,
+        )
+        .await
+        .unwrap();
+
+    let output = sender.output.expect("expected output");
+    assert_eq!(output.prompt, "\n# TypeScript Best Practices\n\n\n\n# Rust Best Practices\n");
+}
+
+#[tokio::test]
+async fn bp_returns_empty_prompt_when_all_requested_languages_are_unconfigured() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(&temp_dir, "rust:\n  best-practices: prompts-00010-rust\n");
+
+    let mut sender = BestPracticesMockSender::new();
+    BestPracticesOp::new()
+        .run(
+            BestPracticesInput::new(root, vec!["Python".to_string(), "Ruby".to_string()]),
+            &mut sender,
+        )
+        .await
+        .unwrap();
+
+    let output = sender.output.expect("expected output");
+    assert_eq!(output.prompt, "");
+}
+
+#[tokio::test]
+async fn bp_config_with_both_fields_resolves_best_practices_independently() {
+    let (temp_dir, root) = create_test_project();
+    write_language_rules(
+        &temp_dir,
+        "rust:\n  quality-gate: prompts-00005-rust\n  best-practices: prompts-00010-rust\n",
+    );
+    write_prompt(
+        &temp_dir,
+        "doc/prompts/best-practices/prompts-00010-rust.md",
+        &governed_prompt("rust", "# Rust Best Practices\n"),
+    );
+
+    let mut sender = BestPracticesMockSender::new();
+    BestPracticesOp::new()
+        .run(BestPracticesInput::new(root, vec!["rust".to_string()]), &mut sender)
+        .await
+        .unwrap();
+
+    let output = sender.output.expect("expected output");
+    assert_eq!(output.prompt, "\n# Rust Best Practices\n");
 }
