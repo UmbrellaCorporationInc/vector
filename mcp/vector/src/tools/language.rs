@@ -11,7 +11,7 @@ use runtime_io::path::IoPath;
 use runtime_language::{BestPracticesInput, BestPracticesOp, QualityGateInput, QualityGateOp};
 use serde::Deserialize;
 
-/// MCP-facing parameters for the `language-quality-gate` tool.
+/// MCP-facing parameters for the `language_quality_gate` tool.
 ///
 /// # DTO(MCP protocol input mapped at the adapter boundary; serde deserialization requires public fields)
 #[non_exhaustive]
@@ -23,7 +23,7 @@ pub struct LanguageQualityGateParams {
     pub languages: Vec<String>,
 }
 
-/// MCP-facing parameters for the `language-best-practices` tool.
+/// MCP-facing parameters for the `language_best_practices` tool.
 ///
 /// # DTO(MCP protocol input mapped at the adapter boundary; serde deserialization requires public fields)
 #[non_exhaustive]
@@ -66,7 +66,7 @@ impl LanguageTools {
     /// Prompt lookup, frontmatter stripping, and concatenation remain
     /// inside `runtime-language`; this method only adapts MCP params.
     #[tool(
-        name = "language-quality-gate",
+        name = "language_quality_gate",
         description = "Resolve governed quality-gate prompts for a language list and return the concatenated prompt body"
     )]
     async fn language_quality_gate(
@@ -85,9 +85,9 @@ impl LanguageTools {
         match receiver.recv().await {
             Ok(Some(output)) => Ok(output.prompt),
             Ok(None) => {
-                Err("language-quality-gate failed: operation completed with no output".to_string())
+                Err("language_quality_gate failed: operation completed with no output".to_string())
             }
-            Err(error) => Err(format!("language-quality-gate failed: {error}")),
+            Err(error) => Err(format!("language_quality_gate failed: {error}")),
         }
     }
 
@@ -97,7 +97,7 @@ impl LanguageTools {
     /// Prompt lookup, frontmatter stripping, and concatenation remain
     /// inside `runtime-language`; this method only adapts MCP params.
     #[tool(
-        name = "language-best-practices",
+        name = "language_best_practices",
         description = "Resolve governed best-practices prompts for a language list and return the concatenated prompt body"
     )]
     async fn language_best_practices(
@@ -116,10 +116,10 @@ impl LanguageTools {
         match receiver.recv().await {
             Ok(Some(output)) => Ok(output.prompt),
             Ok(None) => {
-                Err("language-best-practices failed: operation completed with no output"
+                Err("language_best_practices failed: operation completed with no output"
                     .to_string())
             }
-            Err(error) => Err(format!("language-best-practices failed: {error}")),
+            Err(error) => Err(format!("language_best_practices failed: {error}")),
         }
     }
 }

@@ -60,14 +60,14 @@ fn vector_server_exposes_validate_tool() {
     );
 }
 
-/// Verifies that `get_tool` resolves the `language-quality-gate` tool by name.
+/// Verifies that `get_tool` resolves the `language_quality_gate` tool by name.
 #[test]
 fn vector_server_exposes_language_quality_gate_tool() {
     let server = VectorServer::new();
-    let tool = server.get_tool("language-quality-gate");
+    let tool = server.get_tool("language_quality_gate");
     assert!(
         tool.is_some(),
-        "VectorServer must expose the language-quality-gate tool registered by LanguageTools"
+        "VectorServer must expose the language_quality_gate tool registered by LanguageTools"
     );
 }
 
@@ -142,33 +142,33 @@ fn vector_server_validate_tool_metadata_is_stable() {
     );
 }
 
-/// Verifies that the `language-quality-gate` tool metadata is stable and correct.
+/// Verifies that the `language_quality_gate` tool metadata is stable and correct.
 #[test]
 fn vector_server_language_quality_gate_tool_metadata_is_stable() {
     let server = VectorServer::new();
     let tool = server
-        .get_tool("language-quality-gate")
-        .expect("VectorServer must expose the language-quality-gate tool");
+        .get_tool("language_quality_gate")
+        .expect("VectorServer must expose the language_quality_gate tool");
     let description = tool.description.as_ref().expect("registered tool must expose a description");
 
-    assert_eq!(tool.name, "language-quality-gate");
+    assert_eq!(tool.name, "language_quality_gate");
     assert!(
         description.contains("quality-gate prompts"),
-        "language-quality-gate description must remain aligned with the prompt resolution contract"
+        "language_quality_gate description must remain aligned with the prompt resolution contract"
     );
     assert_eq!(
         tool.input_schema["type"], "object",
-        "language-quality-gate input schema must be an object"
+        "language_quality_gate input schema must be an object"
     );
     let required =
         tool.input_schema["required"].as_array().expect("required must be an array of field names");
     assert!(
         required.iter().any(|value| value == "root_dir"),
-        "language-quality-gate schema must require root_dir"
+        "language_quality_gate schema must require root_dir"
     );
     assert!(
         required.iter().any(|value| value == "languages"),
-        "language-quality-gate schema must require languages"
+        "language_quality_gate schema must require languages"
     );
 }
 
@@ -299,7 +299,7 @@ fn vector_server_project_tool_group_remains_intact() {
         "both tool groups must coexist: validate must be available alongside create_project"
     );
     assert!(
-        server.get_tool("language-quality-gate").is_some(),
+        server.get_tool("language_quality_gate").is_some(),
         "language tools must coexist alongside the project and document tool groups"
     );
     assert!(
@@ -330,7 +330,7 @@ async fn vector_server_lists_tools_from_both_groups_over_transport() {
     assert!(tool_names.contains(&"create_project"), "project tools must be listed");
     assert!(tool_names.contains(&"validate"), "document tools must be listed");
     assert!(tool_names.contains(&"find_doc"), "document lookup tool must be listed");
-    assert!(tool_names.contains(&"language-quality-gate"), "language tools must be listed");
+    assert!(tool_names.contains(&"language_quality_gate"), "language tools must be listed");
     assert!(tool_names.contains(&"get_version"), "version tools must be listed");
 
     client.cancel().await.expect("client shutdown must succeed");
@@ -408,14 +408,14 @@ async fn vector_server_dispatches_language_tool_calls_over_transport() {
     .expect("write prompt");
 
     let result = client
-        .call_tool(CallToolRequestParams::new("language-quality-gate").with_arguments(json_object(
+        .call_tool(CallToolRequestParams::new("language_quality_gate").with_arguments(json_object(
             &json!({
                 "root_dir": root.path().display().to_string(),
                 "languages": ["rust"]
             }),
         )))
         .await
-        .expect("language-quality-gate tool call must succeed");
+        .expect("language_quality_gate tool call must succeed");
 
     let text = result
         .content

@@ -106,7 +106,7 @@ fn language_tools_constructors_produce_usable_adapter() {
     let _from_default = super::LanguageTools::default();
 }
 
-/// Verifies that the MCP-facing `language-quality-gate` tool executes the real
+/// Verifies that the MCP-facing `language_quality_gate` tool executes the real
 /// `QualityGateOp` path and returns the concatenated prompt body.
 #[tokio::test]
 async fn language_quality_gate_tool_executes_quality_gate_path() {
@@ -186,7 +186,7 @@ fn language_best_practices_params_deserialize_correctly() {
     assert_eq!(params.languages, vec!["rust", "typescript"]);
 }
 
-/// Verifies that the MCP-facing `language-best-practices` tool executes the real
+/// Verifies that the MCP-facing `language_best_practices` tool executes the real
 /// `BestPracticesOp` path and returns the concatenated prompt body.
 #[tokio::test]
 async fn language_best_practices_tool_executes_best_practices_path() {
@@ -254,7 +254,7 @@ async fn language_best_practices_tool_propagates_missing_mapping_errors() {
     let error =
         result.expect_err("tool must return an error for a configured language with no mapping");
     assert!(
-        error.contains("language-best-practices failed:"),
+        error.contains("language_best_practices failed:"),
         "tool error must preserve the adapter prefix; got: {error:?}"
     );
     assert!(
@@ -285,7 +285,7 @@ async fn language_quality_gate_tool_propagates_missing_mapping_errors() {
     let error =
         result.expect_err("tool must return an error for a configured language with no mapping");
     assert!(
-        error.contains("language-quality-gate failed:"),
+        error.contains("language_quality_gate failed:"),
         "tool error must preserve the adapter prefix; got: {error:?}"
     );
     assert!(
