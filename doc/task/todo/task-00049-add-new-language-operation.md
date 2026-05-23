@@ -62,10 +62,10 @@ input:
   language: Rust
 ```
 
-- [ ] Register `language_best_practices` tool in the MCP crate, following the `language_quality_gate` pattern
-- [ ] Wire `BestPractices` operation as the handler for the new tool
-- [ ] Add integration test or manual verification via MCP client
-- [ ] Quality gates pass
+- [x] Register `language_best_practices` tool in the MCP crate, following the `language_quality_gate` pattern
+- [x] Wire `BestPractices` operation as the handler for the new tool
+- [x] Add integration test or manual verification via MCP client
+- [x] Quality gates pass
 
 ### 3.3. Phase Z — Wrap-up
 

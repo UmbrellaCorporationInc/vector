@@ -8,7 +8,7 @@ use rmcp::{
 use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_io::path::IoPath;
-use runtime_language::{QualityGateInput, QualityGateOp};
+use runtime_language::{BestPracticesInput, BestPracticesOp, QualityGateInput, QualityGateOp};
 use serde::Deserialize;
 
 /// MCP-facing parameters for the `language-quality-gate` tool.
@@ -20,6 +20,18 @@ pub struct LanguageQualityGateParams {
     /// Absolute or relative path to the root directory of the project.
     pub root_dir: String,
     /// Ordered language identifiers whose quality-gate prompts should be resolved.
+    pub languages: Vec<String>,
+}
+
+/// MCP-facing parameters for the `language-best-practices` tool.
+///
+/// # DTO(MCP protocol input mapped at the adapter boundary; serde deserialization requires public fields)
+#[non_exhaustive]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct LanguageBestPracticesParams {
+    /// Absolute or relative path to the root directory of the project.
+    pub root_dir: String,
+    /// Ordered language identifiers whose best-practices prompts should be resolved.
     pub languages: Vec<String>,
 }
 
@@ -76,6 +88,38 @@ impl LanguageTools {
                 Err("language-quality-gate failed: operation completed with no output".to_string())
             }
             Err(error) => Err(format!("language-quality-gate failed: {error}")),
+        }
+    }
+
+    /// Resolve and concatenate governed language best-practices prompts.
+    ///
+    /// Executes `BestPracticesOp` through the standard dispatcher path.
+    /// Prompt lookup, frontmatter stripping, and concatenation remain
+    /// inside `runtime-language`; this method only adapts MCP params.
+    #[tool(
+        name = "language-best-practices",
+        description = "Resolve governed best-practices prompts for a language list and return the concatenated prompt body"
+    )]
+    async fn language_best_practices(
+        &self,
+        Parameters(LanguageBestPracticesParams { root_dir, languages }): Parameters<
+            LanguageBestPracticesParams,
+        >,
+    ) -> Result<String, String> {
+        let input = BestPracticesInput::new(IoPath::new(root_dir), languages);
+
+        let (_cancel, mut receiver) = PluginDispatcher::new(BestPracticesOp::new())
+            .input(input)
+            .build()
+            .map_err(|error| format!("dispatcher build failed: {error}"))?;
+
+        match receiver.recv().await {
+            Ok(Some(output)) => Ok(output.prompt),
+            Ok(None) => {
+                Err("language-best-practices failed: operation completed with no output"
+                    .to_string())
+            }
+            Err(error) => Err(format!("language-best-practices failed: {error}")),
         }
     }
 }
