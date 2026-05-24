@@ -56,7 +56,7 @@ async fn test_find_doc_success() {
     assert!(result.is_ok());
     assert_eq!(sender.outputs.len(), 1);
 
-    let expected_path = fs::canonicalize(target_file).unwrap().to_string_lossy().to_string();
+    let expected_path = dunce::canonicalize(target_file).unwrap().to_string_lossy().to_string();
     assert_eq!(sender.outputs[0].path, expected_path);
 }
 
@@ -130,6 +130,6 @@ async fn test_find_doc_directory_based() {
     find_doc(input, &mut sender).await.unwrap();
 
     let output = sender.outputs.first().expect("Output should be sent");
-    // canonicalize on Windows can add \\?\ prefix, so we check if it ends with the expected path
-    assert!(output.path.contains("research-00001-study.md"));
+    let expected_path = dunce::canonicalize(doc_path).unwrap().to_string_lossy().to_string();
+    assert_eq!(output.path, expected_path);
 }

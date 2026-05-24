@@ -279,7 +279,8 @@ async fn find_doc_tool_returns_absolute_path_for_existing_document() {
         .await
         .expect("find_doc must succeed when the document exists");
 
-    let expected = fs::canonicalize(&target).expect("canonicalize").to_string_lossy().to_string();
+    let expected =
+        dunce::canonicalize(&target).expect("canonicalize").to_string_lossy().to_string();
     assert_eq!(result, expected, "tool must return the canonicalized absolute path");
 }
 

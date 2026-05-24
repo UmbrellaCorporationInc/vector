@@ -80,6 +80,18 @@ Tags: #rust #date-time
 Scope: `runtime-doc`
 Description: Date and time crate approved for document metadata handling and date-aware project document workflows in `runtime-doc`.
 
+## 11. serde_json
+
+Tags: #rust #serialization #json
+Scope: test-only in `mcp-vector`
+Description: JSON codec approved for test-only use in `mcp-vector` to deserialize MCP tool parameters in unit tests.
+
+## 12. dunce
+
+Tags: #rust #filesystem #windows
+Scope: `runtime-doc`, test-only in `mcp-vector`
+Description: Windows path normalization crate approved to strip the `\\?\` extended-length path prefix that `std::fs::canonicalize` emits on Windows. Used in `runtime-doc` (production) wherever governed document paths are returned to callers, and in `mcp-vector` tests (dev-only) to produce matching expected paths.
+
 ## Workspace-local dependencies
 
 These workspace crates are used as internal dependencies and are governed by the workspace architecture rather than third-party dependency approval:

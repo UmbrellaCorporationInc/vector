@@ -80,7 +80,7 @@ async fn find_doc(
     if let Some(path) = found_path {
         // We want the absolute path as requested by RFC.
         // canonicalize() returns an absolute, normalized path.
-        let abs_path = std::fs::canonicalize(path).map_err(|e| {
+        let abs_path = dunce::canonicalize(path).map_err(|e| {
             runtime_core::RuntimeError::operation(format!(
                 "failed to canonicalize document path: {e}"
             ))
