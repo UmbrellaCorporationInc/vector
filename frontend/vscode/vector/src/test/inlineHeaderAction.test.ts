@@ -129,4 +129,22 @@ suite("Phase B — inline header action rendering", () => {
             "document-header value must match the heading text",
         );
     });
+
+    test("inline header action emits data-agent-prompt-field defaulting to prompt-message", () => {
+        const html = renderInlineHeaderAction("task-00042-foo");
+        assert.ok(
+            html.includes('data-agent-prompt-field="prompt-message"'),
+            "header action must carry data-agent-prompt-field so the overlay always has an explicit field name",
+        );
+    });
+
+    test("renderGovernedMarkdownAnalysis heading button carries data-agent-prompt-field", () => {
+        const html = renderGovernedMarkdownAnalysis("# Title", {
+            documentStem: "task-00042-foo",
+        }).html;
+        assert.ok(
+            html.includes('data-agent-prompt-field="prompt-message"'),
+            "heading button emitted by the markdown pipeline must carry data-agent-prompt-field",
+        );
+    });
 });
