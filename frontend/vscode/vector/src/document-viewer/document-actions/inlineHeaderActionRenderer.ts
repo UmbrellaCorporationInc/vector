@@ -20,11 +20,12 @@ export function renderInlineHeaderAction(documentStem: string, headingText?: str
     }
     const input = escapeHtml(JSON.stringify(inputObj));
     return (
-        `<button class="vector-agent-inline-action" type="button"` +
+        `<button class="vector-agent-inline-action vector-agent-header-action" type="button"` +
         ` data-agent-profile="${escapeHtml(INLINE_ACTION_PROFILE)}"` +
         ` data-agent-prompt="${escapeHtml(INLINE_ACTION_PROMPT)}"` +
         ` data-agent-label="${escapeHtml(INLINE_ACTION_LABEL)}"` +
         ` data-agent-input="${input}"` +
+        ` data-agent-prompt-field="prompt-message"` +
         ` aria-label="${escapeHtml(INLINE_ACTION_LABEL)}"` +
         `>${INLINE_ACTION_GLYPH}</button>`
     );

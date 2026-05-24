@@ -137,6 +137,10 @@ function fenceRule(tokens: Token[], idx: number): string {
         return renderAgentBlock(token.content, "action");
     }
 
+    if (lang === "vector-agent-inline-action") {
+        return renderAgentBlock(token.content, "inline-action");
+    }
+
     const escapedLang = lang ? escapeHtml(lang) : "";
     const code = escapeHtml(token.content);
     const langAttr = escapedLang ? ` data-lang="${escapedLang}"` : "";

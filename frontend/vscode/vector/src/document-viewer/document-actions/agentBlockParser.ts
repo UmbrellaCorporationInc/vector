@@ -4,6 +4,7 @@ export interface AgentBlock {
     label: string;
     profile: string;
     prompt: string;
+    promptField: string;
     input: Record<string, string>;
 }
 
@@ -69,10 +70,19 @@ export function parseAgentBlock(content: string): AgentBlockParseResult {
         }
     }
 
+    let promptField = "prompt-message";
+    if (map["prompt-field"] !== undefined) {
+        if (typeof map["prompt-field"] !== "string" || !map["prompt-field"].trim()) {
+            return { error: "vector-agent: 'prompt-field' must be a non-empty string" };
+        }
+        promptField = map["prompt-field"].trim();
+    }
+
     return {
         label: map.label.trim(),
         profile: map.profile.trim(),
         prompt: map.prompt.trim(),
+        promptField,
         input,
     };
 }
