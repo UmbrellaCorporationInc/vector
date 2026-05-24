@@ -40,11 +40,15 @@ function makeTempWorkspace(config: string): string {
 // ---------------------------------------------------------------------------
 
 suite("Task 00042 Phase E — RFC 00023 AC: inline action component", () => {
-    test("renderInlineHeaderAction produces a button with vector-agent-inline-action class", () => {
+    test("renderInlineHeaderAction produces a button with vector-agent-inline-action and vector-agent-header-action classes", () => {
         const html = renderInlineHeaderAction("task-00042-foo");
         assert.ok(
-            html.includes('class="vector-agent-inline-action"'),
-            "button must carry vector-agent-inline-action class",
+            html.includes("vector-agent-inline-action"),
+            "button must carry vector-agent-inline-action class for JS overlay detection",
+        );
+        assert.ok(
+            html.includes("vector-agent-header-action"),
+            "button must carry vector-agent-header-action class for pencil styling",
         );
     });
 
