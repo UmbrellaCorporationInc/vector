@@ -39,7 +39,7 @@
 
   var RENDER_FORM_BLOCK_REQUEST_TYPE = "vector.renderFormBlock";
   var RENDER_FORM_BLOCK_RESULT_TYPE = "vector.renderFormBlockResult";
-  var OVERLAY_FORM_CONTENT = 'prompt-message = chat-input("Prompt")';
+  var OVERLAY_FORM_CONTENT_TEMPLATE = ' = chat-input("Prompt")';
 
   function buildInlineActionOverlay() {
     var backdrop = document.createElement("div");
@@ -94,9 +94,10 @@
       var runtime = ensureChatInputRuntime();
       var extra = "";
       var chatInputMentions = {};
+      var promptField = action.promptField || "prompt-message";
       if (runtime) {
         if (typeof runtime.collectFormValues === "function") {
-          extra = (runtime.collectFormValues()["prompt-message"] || "").trim();
+          extra = (runtime.collectFormValues()[promptField] || "").trim();
         }
         if (typeof runtime.collectMentions === "function") {
           chatInputMentions = runtime.collectMentions();
@@ -104,7 +105,7 @@
       }
       var staticInput = Object.assign({}, action.staticInput);
       if (extra) {
-        staticInput["prompt-message"] = extra;
+        staticInput[promptField] = extra;
       }
       closeInlineOverlay();
       vscode.postMessage({
@@ -183,10 +184,11 @@
 
     var requestId = "overlay-form-" + (++overlayFormRequestCounter);
     overlayFormRequestId = requestId;
+    var formContent = (action.promptField || "prompt-message") + OVERLAY_FORM_CONTENT_TEMPLATE;
     vscode.postMessage({
       type: RENDER_FORM_BLOCK_REQUEST_TYPE,
       requestId: requestId,
-      content: OVERLAY_FORM_CONTENT,
+      content: formContent,
     });
   }
 
@@ -213,6 +215,7 @@
   }
 
   function closeInlineOverlay() {
+    var promptField = overlayPendingAction ? (overlayPendingAction.promptField || "prompt-message") : "prompt-message";
     overlayPendingAction = null;
     overlayFormRequestId = null;
     if (overlayEl) {
@@ -224,7 +227,7 @@
       });
       var runtime = ensureChatInputRuntime();
       if (runtime && typeof runtime.clearEditorByName === "function") {
-        runtime.clearEditorByName("prompt-message");
+        runtime.clearEditorByName(promptField);
       }
     }
   }
@@ -277,8 +280,9 @@
         const formValues = typeof window.vectorCollectFormValues === "function"
           ? window.vectorCollectFormValues()
           : {};
+        const promptField = agentTrigger.dataset.agentPromptField || "prompt-message";
         if (profile && prompt) {
-          openInlineOverlay({ profile: profile, prompt: prompt, label: label, staticInput: staticInput, formValues: formValues });
+          openInlineOverlay({ profile: profile, prompt: prompt, label: label, staticInput: staticInput, formValues: formValues, promptField: promptField });
         }
         return;
       }
