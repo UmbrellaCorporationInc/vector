@@ -20,6 +20,7 @@ Exposes governed project documents through a dedicated VS Code sidebar and a Vec
 - `vector-form` blocks: inline forms with `input` (single-line) fields and a document-viewer-scoped `chat-input` editor for multi-line prompts, file mentions, and Markdown-aware authoring cues
 - `vector-open-doc` blocks: open a target document with `#{}` variable substitution (view-only)
 - `vector-agent-button` and `vector-agent-action` blocks: trigger CLI agents via spawned VSCode terminals
+- `vector-agent-inline-action` blocks: trigger CLI agents through an inline overlay that collects extra user context before spawning; supports a configurable `prompt-field` key to control the field name injected into the agent payload (defaults to `prompt-message`)
 
 ### Out of scope
 
@@ -101,6 +102,10 @@ Governed reading flows are extension-owned:
 - `.vector/*.yaml` schema field names are also kebab-case only. Extension-side YAML readers reject invalid schema fields defensively, while repository-wide `runtime-doc validate` remains the authoritative failure path.
 
 ## 8. Changelog
+
+### 1.4.2
+
+- **`vector-agent-inline-action` blocks** — new fence variant that renders an inline overlay collecting extra user context before spawning an agent. An optional `prompt-field` key controls the name of the field injected into the agent payload; omitting it falls back to the existing `prompt-message` default.
 
 ### 1.4.1
 

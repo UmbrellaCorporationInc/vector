@@ -5,7 +5,7 @@ code: "00050"
 slug: custom-prompt-message-field-name
 title: Custom prompt-message field name
 description: Allow inline-action authors to rename the extra-context field via a prompt-field key instead of hard-coding the prompt-message variable name.
-status: in-progress
+status: done
 created: 2026-05-24
 updated: 2026-05-24
 tags: []
@@ -79,4 +79,4 @@ input:
   language: TypeScript
 ```
 
-- [ ] Update README files on packages modified
+- [x] Update README files on packages modified
