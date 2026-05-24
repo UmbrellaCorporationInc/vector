@@ -20,6 +20,7 @@ tempfile = "3"
 walkdir = "2"
 regex = "1"
 chrono = "0.4"
+dunce = "1"
 mcp-vector = { path = "mcp/vector" }
 
 [workspace.package]

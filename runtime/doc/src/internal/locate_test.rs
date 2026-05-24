@@ -59,7 +59,7 @@ async fn test_locate_file_by_stem_success() {
 
     assert!(result.is_ok());
     let found = result.unwrap();
-    let expected = expected_path.canonicalize().unwrap();
+    let expected = dunce::canonicalize(expected_path).unwrap();
     assert_eq!(found, expected);
 }
 

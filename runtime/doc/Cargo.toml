@@ -10,6 +10,7 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
 
 [dependencies]
+dunce = { workspace = true }
 runtime-core = { workspace = true }
 runtime-io = { workspace = true }
 serde = { workspace = true }

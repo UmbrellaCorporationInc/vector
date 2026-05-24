@@ -109,7 +109,7 @@ pub async fn locate_file_by_stem(stem: &str, root_dir: &IoPath) -> Result<PathBu
         let entry_stem = entry_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
         if entry_stem == stem {
-            return entry.path().canonicalize().map_err(|_| LocateError {
+            return dunce::canonicalize(entry.path()).map_err(|_| LocateError {
                 stem: stem.to_string(),
                 reason: "Failed to canonicalize file path".to_string(),
             });
