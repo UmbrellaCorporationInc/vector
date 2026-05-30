@@ -104,6 +104,6 @@ input:
   language: rust, markdown
 ```
 
-- [ ] `xtask quality-lint` passes
-- [ ] `xtask quality-test` passes
-- [ ] Update README files on packages modified
+- [x] `xtask quality-lint` passes
+- [x] `xtask quality-test` passes
+- [x] Update README files on packages modified
