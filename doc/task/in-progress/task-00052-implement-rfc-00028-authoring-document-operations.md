@@ -61,14 +61,14 @@ input:
   language: Rust
 ```
 
-- [ ] Define the operation signature accepting `doc_type`, `code`, and `git_diff`.
-- [ ] Resolve the governed target document from `doc_type` and `code` using existing lookup logic.
-- [ ] Enforce scope: reject any patch that would touch a path outside the repository `doc/` directory.
-- [ ] Normalize agent-produced patch wrappers to raw unified diff before invoking `patcher`.
-- [ ] Reject unsupported patch shapes (non-text, rename-only, delete, or target mismatch).
-- [ ] Apply the normalized unified diff to the resolved document using `patcher`.
-- [ ] Verify the resulting content is UTF-8 without BOM; if BOM is detected, return an explicit remediation error without writing anything.
-- [ ] On success, return the final document content.
+- [x] Define the operation signature accepting `doc_type`, `code`, and `git_diff`.
+- [x] Resolve the governed target document from `doc_type` and `code` using existing lookup logic.
+- [x] Enforce scope: reject any patch that would touch a path outside the repository `doc/` directory.
+- [x] Normalize agent-produced patch wrappers to raw unified diff before invoking `patcher`.
+- [x] Reject unsupported patch shapes (non-text, rename-only, delete, or target mismatch).
+- [x] Apply the normalized unified diff to the resolved document using `patcher`.
+- [x] Verify the resulting content is UTF-8 without BOM; if BOM is detected, return an explicit remediation error without writing anything.
+- [x] On success, return the final document content.
 
 ### 3.3. Phase C — Expose `patch_doc` MCP Tool
 
