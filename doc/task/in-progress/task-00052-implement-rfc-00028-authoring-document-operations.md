@@ -118,5 +118,5 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Update README files for crate doc and crate mcp.
-- [ ] Mark RFC 00028 status as `accepted` once all acceptance criteria are met.
+- [x] Update README files for crate doc and crate mcp.
+- [x] Mark RFC 00028 status as `accepted` once all acceptance criteria are met.

@@ -32,6 +32,7 @@
 | `runtime-channel` | `PluginDispatcher` execution bridge between tools and operations   |
 | `runtime-io`      | `IoPath` type used in MCP-to-runtime input translation             |
 | `runtime-language`| `QualityGateOp`, `BestPracticesOp`, and their inputs for language prompt resolution |
+| `runtime-doc`     | Document capability operations: `ValidateOp`, `FindDocOp`, `CreateDocOp`, `CreateDocTypeOp`, `PatchDocOp`, and their corresponding input/output types |
 | `runtime-project` | `ProjectSetupOp` and `ProjectSetupInput` for the project tool path |
 | `serde`           | MCP parameter deserialization                                      |
 | `thiserror`       | MCP-local error enum derivation                                    |
@@ -62,6 +63,7 @@
 | `find_doc`              | Document          | Locate a governed document by type and numeric code; returns `path`, reserved `package` (always empty), and `content` |
 | `create_doc_prompt`     | Document          | Create a governed document and return the resolved authoring prompt |
 | `create_doc_type_prompt`| Document          | Create a governed document type and return the resolved authoring prompt |
+| `patch_doc`             | Document          | Apply a unified diff to a governed document; enforces doc/ scope, rejects BOM-encoded output, and returns the final patched content |
 | `language_quality_gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
 | `language_best_practices` | Language        | Resolve and concatenate governed best-practices prompt bodies for a language list |
 

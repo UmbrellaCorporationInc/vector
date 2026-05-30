@@ -107,19 +107,19 @@ This operation is intentionally narrow. It does not authorize arbitrary reposito
 
 ## 5. Acceptance Criteria
 
-- [ ] The operation accepts `doc_type`, `code`, and `git_diff`.
-- [ ] The MCP server exposes a tool named `patch_doc` for this capability.
-- [ ] The operation resolves the governed document from `doc_type` and `code`.
-- [ ] The operation refuses to modify any file outside the repository `doc/` directory.
-- [ ] The operation uses `patcher` as the embedded diff engine for unified text patches.
-- [ ] The operation normalizes or rejects agent-produced patch wrappers before patch application.
-- [ ] The operation applies git-diff-based updates only to the resolved governed document flow.
-- [ ] The `patch_doc` tool delegates to the runtime operation rather than reimplementing patching logic in the MCP layer.
-- [ ] The operation verifies that outgoing content is UTF-8 without BOM before writing.
-- [ ] If BOM is detected, the operation performs no write and returns an explicit remediation error.
-- [ ] On success, the operation returns the final document content.
-- [ ] The `patcher` dependency is registered in [project-0003-rust-dependencies.md](C:/Users/ferna/OneDrive/Obsidian/vector/doc/project/project-0003-rust-dependencies.md) before implementation merge.
-- [ ] Tests cover valid patch application, out-of-scope path rejection, missing document handling, malformed diff rejection, and BOM rejection.
+- [x] The operation accepts `doc_type`, `code`, and `git_diff`.
+- [x] The MCP server exposes a tool named `patch_doc` for this capability.
+- [x] The operation resolves the governed document from `doc_type` and `code`.
+- [x] The operation refuses to modify any file outside the repository `doc/` directory.
+- [x] The operation uses `patcher` as the embedded diff engine for unified text patches.
+- [x] The operation normalizes or rejects agent-produced patch wrappers before patch application.
+- [x] The operation applies git-diff-based updates only to the resolved governed document flow.
+- [x] The `patch_doc` tool delegates to the runtime operation rather than reimplementing patching logic in the MCP layer.
+- [x] The operation verifies that outgoing content is UTF-8 without BOM before writing.
+- [x] If BOM is detected, the operation performs no write and returns an explicit remediation error.
+- [x] On success, the operation returns the final document content.
+- [x] The `patcher` dependency is registered in [project-0003-rust-dependencies.md](C:/Users/ferna/OneDrive/Obsidian/vector/doc/project/project-0003-rust-dependencies.md) before implementation merge.
+- [x] Tests cover valid patch application, out-of-scope path rejection, missing document handling, malformed diff rejection, and BOM rejection.
 
 ## 6. Open Questions
 
