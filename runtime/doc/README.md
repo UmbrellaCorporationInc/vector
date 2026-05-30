@@ -18,6 +18,10 @@ This crate provides transport-agnostic documentation governance operations for M
 - **`create_doc`**: Creates a document using a per-type authoring prompt when configured, otherwise falling back to the project default authoring prompt. The resolved prompt contract uses `#{doc-type}`, `#{code}`, `#{slug}`, and `#{file-path}`.
 - **`create_doc_type`**: Creates a new document type with prompt template and governance metadata. The resolved prompt contract uses `#{doc-type}` and `#{layout}`.
 
+### Authoring
+
+- **`patch_doc`**: Applies a unified diff to a governed document identified by `doc_type` and `code`. Resolves the document path, enforces that the target is inside the repository `doc/` directory, normalizes agent-produced patch wrappers (e.g. Markdown code fences, prose preamble) to raw unified diff, rejects unsupported patch shapes (create, delete, rename, or target mismatch), applies the diff using `patcher`, verifies the resulting content is UTF-8 without BOM, writes the file, and returns `path` and `content`. Any BOM in the result aborts the write and returns an explicit remediation error.
+
 ### Discovery
 
 - **`find_doc`**: Locates a document by type and code. Returns `path` (absolute, canonicalized), `package` (always empty — reserved for future package-aware scoping), and `content` (full document text read in the same lookup). The input `package` field is accepted but ignored; lookup remains repository-wide within `root_dir`. See RFC 00027 for the contract rationale and deferred package semantics.
@@ -33,6 +37,7 @@ This crate provides transport-agnostic documentation governance operations for M
 
 - `runtime-core` — plugin primitives
 - `runtime-io` — file and text operations
+- `patcher` — embedded unified-diff engine used by `patch_doc`
 - `serde`, `serde_yaml` — configuration parsing
 - `walkdir` — directory traversal
 - `regex` — pattern matching
