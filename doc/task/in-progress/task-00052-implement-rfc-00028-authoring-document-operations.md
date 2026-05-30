@@ -99,12 +99,12 @@ input:
   language: Rust
 ```
 
-- [ ] Valid patch application on a governed document succeeds and returns final content.
-- [ ] Path outside `doc/` is rejected.
-- [ ] Missing document returns a clear error.
-- [ ] Malformed or unsupported diff shape is rejected before `patcher` is invoked.
-- [ ] Content with BOM is rejected without writing; error instructs the caller to remove the BOM.
-- [ ] Quality gates pass (`cargo test`, `cargo clippy`, `cargo fmt --check`).
+- [x] Valid patch application on a governed document succeeds and returns final content.
+- [x] Path outside `doc/` is rejected.
+- [x] Missing document returns a clear error.
+- [x] Malformed or unsupported diff shape is rejected before `patcher` is invoked.
+- [x] Content with BOM is rejected without writing; error instructs the caller to remove the BOM.
+- [x] Quality gates pass (`cargo test`, `cargo clippy`, `cargo fmt --check`).
 
 ### 3.5. Phase Z — Wrap-up
 
