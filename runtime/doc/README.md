@@ -20,7 +20,7 @@ This crate provides transport-agnostic documentation governance operations for M
 
 ### Discovery
 
-- **`find_doc`**: Locates a document by type and code.
+- **`find_doc`**: Locates a document by type and code. Returns `path` (absolute, canonicalized), `package` (always empty — reserved for future package-aware scoping), and `content` (full document text read in the same lookup). The input `package` field is accepted but ignored; lookup remains repository-wide within `root_dir`. See RFC 00027 for the contract rationale and deferred package semantics.
 - **`get_doc_types_tags`**: Collects and deduplicates tags across all document types.
 
 ## Architecture

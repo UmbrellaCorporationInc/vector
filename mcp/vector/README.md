@@ -59,11 +59,24 @@
 | `update_project`        | Project           | Add missing governed assets to an existing project without overwriting existing files |
 | `validate`              | Document          | Validate governed documentation against `document-types.yaml`      |
 | `validate_fix`          | Document          | Validate governed documentation and apply auto-fixes for correctable issues |
-| `find_doc`              | Document          | Locate a governed document by type and numeric code                |
+| `find_doc`              | Document          | Locate a governed document by type and numeric code; returns `path`, reserved `package` (always empty), and `content` |
 | `create_doc_prompt`     | Document          | Create a governed document and return the resolved authoring prompt |
 | `create_doc_type_prompt`| Document          | Create a governed document type and return the resolved authoring prompt |
 | `language_quality_gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
 | `language_best_practices` | Language        | Resolve and concatenate governed best-practices prompt bodies for a language list |
+
+### `find_doc` response contract
+
+`find_doc` returns a text response with the following structure:
+
+```
+path: <absolute canonicalized path>
+package: <always empty>
+
+<full document content>
+```
+
+The `package` input field is accepted for forward-compatibility with future package-scoped lookup but is ignored by the current implementation. The output `package` field is always empty. Clients must not rely on a non-empty `package` value until a future RFC defines package semantics. Callers that previously assumed the response was a bare path string must be updated to parse the structured response; see RFC 00027 for compatibility guidance.
 
 ## 4. Usage Example
 

@@ -16,6 +16,8 @@ use crate::types::load_document_types_config;
 pub struct FindDocInput {
     /// The root directory of the project.
     pub root_dir: IoPath,
+    /// Reserved package selector for future package-aware lookup.
+    pub package: String,
     /// The document type identifier (e.g. "rfc", "task").
     pub doc_type: String,
     /// The numeric code of the document.
@@ -30,6 +32,10 @@ pub struct FindDocInput {
 pub struct FindDocOutput {
     /// The absolute path of the matching file.
     pub path: String,
+    /// Reserved package output. Always empty for now.
+    pub package: String,
+    /// The current document content.
+    pub content: String,
 }
 
 async fn find_doc(
@@ -85,8 +91,17 @@ async fn find_doc(
                 "failed to canonicalize document path: {e}"
             ))
         })?;
+        let content = std::fs::read_to_string(&abs_path).map_err(|e| {
+            runtime_core::RuntimeError::operation(format!("failed to read document content: {e}"))
+        })?;
 
-        output.send(FindDocOutput { path: abs_path.to_string_lossy().to_string() }).await?;
+        output
+            .send(FindDocOutput {
+                path: abs_path.to_string_lossy().to_string(),
+                package: String::new(),
+                content,
+            })
+            .await?;
         Ok(())
     } else {
         Err(runtime_core::RuntimeError::operation(format!(
@@ -103,8 +118,8 @@ declare_plugin_operations! {
 impl FindDocInput {
     /// Construct a `FindDocInput` with explicit fields.
     #[must_use]
-    pub const fn new(root_dir: IoPath, doc_type: String, code: u32) -> Self {
-        Self { root_dir, doc_type, code }
+    pub const fn new(root_dir: IoPath, package: String, doc_type: String, code: u32) -> Self {
+        Self { root_dir, package, doc_type, code }
     }
 }
 

@@ -228,7 +228,8 @@ fn vector_server_exposes_create_doc_type_prompt_tool() {
     );
 }
 
-/// Verifies that the `find_doc` tool schema requires `root_dir`, `doc_type`, and `code`.
+/// Verifies that the `find_doc` tool schema requires `root_dir`, `doc_type`, and `code`,
+/// exposes `package` as an optional field, and documents the enriched response contract.
 #[test]
 fn vector_server_find_doc_tool_schema_is_correct() {
     let server = VectorServer::new();
@@ -238,6 +239,24 @@ fn vector_server_find_doc_tool_schema_is_correct() {
     assert!(required.iter().any(|v| v == "root_dir"), "find_doc schema must require root_dir");
     assert!(required.iter().any(|v| v == "doc_type"), "find_doc schema must require doc_type");
     assert!(required.iter().any(|v| v == "code"), "find_doc schema must require code");
+    assert!(
+        !required.iter().any(|v| v == "package"),
+        "find_doc schema must not require package — it is a reserved optional field"
+    );
+    let properties = tool
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .expect("find_doc schema must expose input properties");
+    assert!(
+        properties.contains_key("package"),
+        "find_doc schema must expose package as an optional property"
+    );
+    let description = tool.description.as_ref().expect("find_doc tool must expose a description");
+    assert!(
+        description.contains("content"),
+        "find_doc tool description must reference content in the enriched response"
+    );
 }
 
 /// Verifies that the `create_doc_prompt` tool schema requires the mandatory authoring fields.

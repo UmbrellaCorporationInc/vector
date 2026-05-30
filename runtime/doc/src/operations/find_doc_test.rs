@@ -28,19 +28,26 @@ impl runtime_core::cancel::CancelableSender<FindDocOutput> for MockSender {
     }
 }
 
+fn write_runtime_doc_config(temp: &TempDir, doc_type: &str, body: &str) {
+    let vector_dir = temp.path().join(".vector");
+    fs::create_dir_all(&vector_dir).unwrap();
+    fs::write(
+        vector_dir.join("document-types.yaml"),
+        format!("doc-type: {{template: t, prompt-template: pt, prompt: p}}\ndocument-types:\n  {doc_type}:\n{body}"),
+    )
+    .unwrap();
+}
+
 #[tokio::test]
 async fn test_find_doc_success() {
     let temp = TempDir::new().unwrap();
     let root = IoPath::new(temp.path());
 
-    // Setup config
-    let vector_dir = temp.path().join(".vector");
-    fs::create_dir_all(&vector_dir).unwrap();
-    fs::write(
-        vector_dir.join("document-types.yaml"),
-        "doc-type: {template: t, prompt-template: pt, prompt: p}\ndocument-types:\n  rfc:\n    layout: status\n    code-width: 5\n    prompt: prompts-00001-create-rfc\n    statuses: [draft]",
-    )
-    .unwrap();
+    write_runtime_doc_config(
+        &temp,
+        "rfc",
+        "    layout: status\n    code-width: 5\n    prompt: prompts-00001-create-rfc\n    statuses: [draft]",
+    );
 
     // Setup doc folder
     let rfc_dir = temp.path().join("doc").join("rfc").join("draft");
@@ -48,7 +55,12 @@ async fn test_find_doc_success() {
     let target_file = rfc_dir.join("rfc-00013-my-rfc.md");
     fs::write(&target_file, "content").unwrap();
 
-    let input = FindDocInput { root_dir: root, doc_type: "rfc".to_string(), code: 13 };
+    let input = FindDocInput {
+        root_dir: root,
+        package: String::new(),
+        doc_type: "rfc".to_string(),
+        code: 13,
+    };
 
     let mut sender = MockSender::new();
     let result = find_doc(input, &mut sender).await;
@@ -58,6 +70,8 @@ async fn test_find_doc_success() {
 
     let expected_path = dunce::canonicalize(target_file).unwrap().to_string_lossy().to_string();
     assert_eq!(sender.outputs[0].path, expected_path);
+    assert_eq!(sender.outputs[0].package, "");
+    assert_eq!(sender.outputs[0].content, "content");
 }
 
 #[tokio::test]
@@ -65,16 +79,18 @@ async fn test_find_doc_not_found() {
     let temp = TempDir::new().unwrap();
     let root = IoPath::new(temp.path());
 
-    // Setup config
-    let vector_dir = temp.path().join(".vector");
-    fs::create_dir_all(&vector_dir).unwrap();
-    fs::write(
-        vector_dir.join("document-types.yaml"),
-        "doc-type: {template: t, prompt-template: pt, prompt: p}\ndocument-types:\n  rfc:\n    layout: status\n    code-width: 5\n    prompt: prompts-00001-create-rfc\n    statuses: [draft]",
-    )
-    .unwrap();
+    write_runtime_doc_config(
+        &temp,
+        "rfc",
+        "    layout: status\n    code-width: 5\n    prompt: prompts-00001-create-rfc\n    statuses: [draft]",
+    );
 
-    let input = FindDocInput { root_dir: root, doc_type: "rfc".to_string(), code: 99 };
+    let input = FindDocInput {
+        root_dir: root,
+        package: String::new(),
+        doc_type: "rfc".to_string(),
+        code: 99,
+    };
 
     let mut sender = MockSender::new();
     let result = find_doc(input, &mut sender).await;
@@ -87,7 +103,6 @@ async fn test_find_doc_invalid_type() {
     let temp = TempDir::new().unwrap();
     let root = IoPath::new(temp.path());
 
-    // Setup config (empty)
     let vector_dir = temp.path().join(".vector");
     fs::create_dir_all(&vector_dir).unwrap();
     fs::write(
@@ -96,7 +111,12 @@ async fn test_find_doc_invalid_type() {
     )
     .unwrap();
 
-    let input = FindDocInput { root_dir: root, doc_type: "unknown".to_string(), code: 1 };
+    let input = FindDocInput {
+        root_dir: root,
+        package: String::new(),
+        doc_type: "unknown".to_string(),
+        code: 1,
+    };
 
     let mut sender = MockSender::new();
     let result = find_doc(input, &mut sender).await;
@@ -109,14 +129,7 @@ async fn test_find_doc_directory_based() {
     let temp = TempDir::new().unwrap();
     let root = IoPath::new(temp.path());
 
-    // Setup config
-    let vector_dir = temp.path().join(".vector");
-    fs::create_dir_all(&vector_dir).unwrap();
-    fs::write(
-        vector_dir.join("document-types.yaml"),
-        "doc-type: {template: t, prompt-template: pt, prompt: p}\ndocument-types:\n  research:\n    layout: directory\n    code-width: 5",
-    )
-    .unwrap();
+    write_runtime_doc_config(&temp, "research", "    layout: directory\n    code-width: 5");
 
     // Create a research document directly under doc/research/
     let research_dir = temp.path().join("doc").join("research");
@@ -124,7 +137,12 @@ async fn test_find_doc_directory_based() {
     let doc_path = research_dir.join("research-00001-study.md");
     fs::write(&doc_path, "# Study").unwrap();
 
-    let input = FindDocInput { root_dir: root, doc_type: "research".to_string(), code: 1 };
+    let input = FindDocInput {
+        root_dir: root,
+        package: String::new(),
+        doc_type: "research".to_string(),
+        code: 1,
+    };
 
     let mut sender = MockSender::new();
     find_doc(input, &mut sender).await.unwrap();
@@ -132,4 +150,39 @@ async fn test_find_doc_directory_based() {
     let output = sender.outputs.first().expect("Output should be sent");
     let expected_path = dunce::canonicalize(doc_path).unwrap().to_string_lossy().to_string();
     assert_eq!(output.path, expected_path);
+    assert_eq!(output.package, "");
+    assert_eq!(output.content, "# Study");
+}
+
+#[tokio::test]
+async fn test_find_doc_ignores_input_package() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_runtime_doc_config(
+        &temp,
+        "rfc",
+        "    layout: status\n    code-width: 5\n    prompt: prompts-00001-create-rfc\n    statuses: [draft]",
+    );
+
+    let rfc_dir = temp.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&rfc_dir).unwrap();
+    let target_file = rfc_dir.join("rfc-00013-my-rfc.md");
+    fs::write(&target_file, "package is ignored").unwrap();
+
+    let input = FindDocInput {
+        root_dir: root,
+        package: "future-scope".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 13,
+    };
+
+    let mut sender = MockSender::new();
+    find_doc(input, &mut sender).await.unwrap();
+
+    let output = sender.outputs.first().expect("Output should be sent");
+    let expected_path = dunce::canonicalize(target_file).unwrap().to_string_lossy().to_string();
+    assert_eq!(output.path, expected_path);
+    assert_eq!(output.package, "");
+    assert_eq!(output.content, "package is ignored");
 }
