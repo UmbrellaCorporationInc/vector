@@ -916,3 +916,178 @@ async fn test_create_doc_type_directory_based() {
     assert!(config_content.contains("research:"));
     assert!(config_content.contains("layout: directory"));
 }
+
+// ── patch_doc tool helpers ────────────────────────────────────────────────────
+
+fn create_patch_doc_test_project() -> (tempfile::TempDir, std::path::PathBuf) {
+    use std::fs;
+    let dir = tempfile::tempdir().expect("temp dir");
+
+    let vector_dir = dir.path().join(".vector");
+    fs::create_dir_all(&vector_dir).expect("create .vector dir");
+
+    let config = "doc-type: {template: t, prompt-template: pt, prompt: p, create-document-type-form: f}\ndocument-types:\n  rfc:\n    layout: status\n    code-width: 5\n    prompt: prompts-00001-create-rfc\n    create-document-form: form-00001\n    statuses: [draft]";
+    fs::write(vector_dir.join("document-types.yaml"), config).expect("write config");
+
+    let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&rfc_dir).expect("create rfc dir");
+
+    let doc_content = "Original line.\n";
+    fs::write(rfc_dir.join("rfc-00042-my-rfc.md"), doc_content).expect("write doc");
+
+    let root = dir.path().to_path_buf();
+    (dir, root)
+}
+
+/// Verifies that `PatchDocParams` deserializes correctly from JSON input.
+#[test]
+fn patch_doc_params_deserializes_correctly() {
+    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "git_diff": "--- a/x.md\n+++ b/x.md\n"}"#;
+    let params: super::PatchDocParams =
+        serde_json::from_str(raw).expect("must deserialize PatchDocParams");
+    assert_eq!(params.root_dir, "/tmp/p");
+    assert_eq!(params.doc_type, "rfc");
+    assert_eq!(params.code, 42);
+    assert!(!params.git_diff.is_empty(), "git_diff must be deserialized");
+}
+
+/// Verifies that the `patch_doc` tool applies a valid unified diff and returns the patched content.
+#[tokio::test]
+async fn patch_doc_tool_applies_valid_diff_and_returns_content() {
+    let (dir, root) = create_patch_doc_test_project();
+    let rfc_path = dir.path().join("doc").join("rfc").join("draft").join("rfc-00042-my-rfc.md");
+
+    let git_diff =
+        "--- a/rfc-00042-my-rfc.md\n+++ b/rfc-00042-my-rfc.md\n@@ -1,1 +1,1 @@\n-Original line.\n+Updated line.\n".to_string();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            git_diff,
+        }))
+        .await
+        .expect("patch_doc must succeed for a valid diff");
+
+    let expected_path =
+        dunce::canonicalize(&rfc_path).expect("canonicalize").to_string_lossy().to_string();
+    assert!(
+        result.contains(&format!("path: {expected_path}")),
+        "result must contain the canonicalized path; got: {result}"
+    );
+    assert!(
+        result.contains("Updated line."),
+        "result must contain the patched content; got: {result}"
+    );
+    assert!(
+        !result.contains("Original line."),
+        "result must not contain the original content; got: {result}"
+    );
+}
+
+/// Verifies that the `patch_doc` tool returns an error when the document does not exist.
+#[tokio::test]
+async fn patch_doc_tool_returns_error_for_missing_document() {
+    let (_dir, root) = create_patch_doc_test_project();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 999,
+            git_diff: "--- a/rfc-00999-x.md\n+++ b/rfc-00999-x.md\n@@ -1 +1 @@\n-old\n+new\n"
+                .to_string(),
+        }))
+        .await;
+
+    assert!(result.is_err(), "patch_doc must return an error when the document does not exist");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("patch_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+}
+
+/// Verifies that the `patch_doc` tool returns an error for a malformed diff.
+#[tokio::test]
+async fn patch_doc_tool_returns_error_for_malformed_diff() {
+    let (_dir, root) = create_patch_doc_test_project();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            git_diff: "this is not a valid unified diff".to_string(),
+        }))
+        .await;
+
+    assert!(result.is_err(), "patch_doc must return an error for a malformed diff");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("patch_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+}
+
+/// Verifies that the `patch_doc` tool returns an error for a diff that targets a different file.
+#[tokio::test]
+async fn patch_doc_tool_returns_error_for_target_mismatch() {
+    let (_dir, root) = create_patch_doc_test_project();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            git_diff:
+                "--- a/rfc-00001-other.md\n+++ b/rfc-00001-other.md\n@@ -1 +1 @@\n-old\n+new\n"
+                    .to_string(),
+        }))
+        .await;
+
+    assert!(
+        result.is_err(),
+        "patch_doc must return an error when the diff targets a different file"
+    );
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("patch_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+}
+
+/// Verifies that the `patch_doc` tool returns an error when the diff would produce BOM content.
+#[tokio::test]
+async fn patch_doc_tool_returns_error_for_bom_content() {
+    let (_dir, root) = create_patch_doc_test_project();
+
+    // Introduce BOM via the replacement line so the resulting content starts with BOM.
+    let bom_line = "\u{FEFF}Updated line.";
+    let git_diff = format!(
+        "--- a/rfc-00042-my-rfc.md\n+++ b/rfc-00042-my-rfc.md\n@@ -1,1 +1,1 @@\n-Original line.\n+{bom_line}\n"
+    );
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            git_diff,
+        }))
+        .await;
+
+    assert!(result.is_err(), "patch_doc must return an error when resulting content has a BOM");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("patch_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+    assert!(err.contains("BOM"), "error must mention BOM to guide remediation; got: {err:?}");
+}

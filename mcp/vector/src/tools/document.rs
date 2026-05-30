@@ -9,7 +9,7 @@ use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_doc::operations::{
     CreateDocInput, CreateDocOp, CreateDocTypeInput, CreateDocTypeOp, FindDocInput, FindDocOp,
-    ValidateInput, ValidateOp,
+    PatchDocInput, PatchDocOp, ValidateInput, ValidateOp,
 };
 use runtime_io::path::IoPath;
 use serde::Deserialize;
@@ -100,6 +100,22 @@ pub struct CreateDocTypeParams {
     /// Optional template name for this document type.
     #[serde(default)]
     pub template: Option<String>,
+}
+
+/// MCP-facing parameters for the `patch_doc` tool.
+///
+/// # DTO(MCP protocol input mapped at the adapter boundary; serde deserialization requires public fields)
+#[non_exhaustive]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct PatchDocParams {
+    /// Absolute or relative path to the root directory of the project.
+    pub root_dir: String,
+    /// The document type identifier (e.g. "rfc", "task").
+    pub doc_type: String,
+    /// The numeric code of the document to patch.
+    pub code: u32,
+    /// The unified diff to apply to the document.
+    pub git_diff: String,
 }
 
 /// MCP tool group for document operations.
@@ -299,6 +315,34 @@ impl DocumentTools {
                 Err("create_doc_type failed: operation completed with no output".to_string())
             }
             Err(e) => Err(format!("create_doc_type failed: {e}")),
+        }
+    }
+
+    /// Apply a unified diff to a governed document and return the final content.
+    ///
+    /// Executes `PatchDocOp` through the standard dispatcher path.
+    /// All patching logic, path authorization, and encoding enforcement live in `runtime-doc`;
+    /// this method only maps MCP params to the runtime input and returns the patched content.
+    #[tool(
+        description = "Apply a unified diff to a governed document and return the final patched content or a structured validation error"
+    )]
+    async fn patch_doc(
+        &self,
+        Parameters(PatchDocParams { root_dir, doc_type, code, git_diff }): Parameters<
+            PatchDocParams,
+        >,
+    ) -> Result<String, String> {
+        let input = PatchDocInput::new(IoPath::new(root_dir), doc_type, code, git_diff);
+
+        let (_cancel, mut receiver) = PluginDispatcher::new(PatchDocOp::new())
+            .input(input)
+            .build()
+            .map_err(|e| format!("dispatcher build failed: {e}"))?;
+
+        match receiver.recv().await {
+            Ok(Some(output)) => Ok(format!("path: {}\n\n{}", output.path, output.content)),
+            Ok(None) => Err("patch_doc failed: operation completed with no output".to_string()),
+            Err(e) => Err(format!("patch_doc failed: {e}")),
         }
     }
 }

@@ -82,10 +82,10 @@ input:
   language: Rust
 ```
 
-- [ ] Add `patch_doc` tool registration in the MCP server layer.
-- [ ] Accept `doc_type`, `code`, and `git_diff` as MCP input parameters.
-- [ ] Delegate entirely to the crate doc operation; do not reimplement patching, path authorization, or encoding logic in the MCP adapter.
-- [ ] Return the final patched content or a structured validation error.
+- [x] Add `patch_doc` tool registration in the MCP server layer.
+- [x] Accept `doc_type`, `code`, and `git_diff` as MCP input parameters.
+- [x] Delegate entirely to the crate doc operation; do not reimplement patching, path authorization, or encoding logic in the MCP adapter.
+- [x] Return the final patched content or a structured validation error.
 
 ### 3.4. Phase D — Tests
 
