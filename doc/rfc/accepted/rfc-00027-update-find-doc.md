@@ -108,14 +108,14 @@ This RFC does not define package resolution semantics. It only reserves the requ
 
 ## 5. Acceptance Criteria
 
-- [ ] `find_doc` accepts `package`, `doc_type`, `code`, and `root_dir`.
-- [ ] `find_doc` returns `path`, `package`, and `content`.
-- [ ] Any input value provided for `package` is ignored by the implementation.
-- [ ] The returned `package` field is always empty.
-- [ ] Lookup behavior remains compatible with current repository-wide resolution.
-- [ ] `content` is populated from the resolved document file in the same operation.
-- [ ] The returned `package` field is present even when empty.
-- [ ] Existing callers are migrated or compatibility handling is documented before release.
+- [x] `find_doc` accepts `package`, `doc_type`, `code`, and `root_dir`.
+- [x] `find_doc` returns `path`, `package`, and `content`.
+- [x] Any input value provided for `package` is ignored by the implementation.
+- [x] The returned `package` field is always empty.
+- [x] Lookup behavior remains compatible with current repository-wide resolution.
+- [x] `content` is populated from the resolved document file in the same operation.
+- [x] The returned `package` field is present even when empty.
+- [x] Existing callers are migrated or compatibility handling is documented before release.
 
 ## 6. Open Questions
 

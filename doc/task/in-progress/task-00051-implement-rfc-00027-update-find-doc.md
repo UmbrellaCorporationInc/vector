@@ -87,10 +87,10 @@ input:
   language: markdown, rust
 ```
 
-- [ ] Update package documentation that describes `find_doc` behavior and contract
-- [ ] Confirm the implemented behavior satisfies every RFC 00027 acceptance criterion
-- [ ] Capture gaps, flaws, and tradeoffs discovered during implementation, especially payload size and client compatibility
-- [ ] Run task-relevant automated tests and validation commands
+- [x] Update package documentation that describes `find_doc` behavior and contract
+- [x] Confirm the implemented behavior satisfies every RFC 00027 acceptance criterion
+- [x] Capture gaps, flaws, and tradeoffs discovered during implementation, especially payload size and client compatibility
+- [x] Run task-relevant automated tests and validation commands
 
 ### 3.4. Phase Z - Wrap-up
 

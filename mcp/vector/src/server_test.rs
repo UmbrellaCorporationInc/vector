@@ -252,8 +252,7 @@ fn vector_server_find_doc_tool_schema_is_correct() {
         properties.contains_key("package"),
         "find_doc schema must expose package as an optional property"
     );
-    let description =
-        tool.description.as_ref().expect("find_doc tool must expose a description");
+    let description = tool.description.as_ref().expect("find_doc tool must expose a description");
     assert!(
         description.contains("content"),
         "find_doc tool description must reference content in the enriched response"

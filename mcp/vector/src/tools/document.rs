@@ -214,9 +214,10 @@ impl DocumentTools {
             .map_err(|e| format!("dispatcher build failed: {e}"))?;
 
         match receiver.recv().await {
-            Ok(Some(output)) => {
-                Ok(format!("path: {}\npackage: {}\n\n{}", output.path, output.package, output.content))
-            }
+            Ok(Some(output)) => Ok(format!(
+                "path: {}\npackage: {}\n\n{}",
+                output.path, output.package, output.content
+            )),
             Ok(None) => Err("document not found".to_string()),
             Err(e) => Err(format!("find_doc failed: {e}")),
         }
