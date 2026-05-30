@@ -49,12 +49,12 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Add `package` to `FindDocInput` and make the implementation ignore its value
-- [ ] Extend `FindDocOutput` to include `path`, empty `package`, and `content`
-- [ ] Read the resolved document content during the same lookup operation
-- [ ] Preserve existing repository-wide lookup semantics and current not-found behavior
-- [ ] Add or update runtime tests for success, unknown type, not found, directory-based lookup, ignored input package, empty output package, and returned content
-- [ ] Quality gates for runtime changes pass
+- [x] Add `package` to `FindDocInput` and make the implementation ignore its value
+- [x] Extend `FindDocOutput` to include `path`, empty `package`, and `content`
+- [x] Read the resolved document content during the same lookup operation
+- [x] Preserve existing repository-wide lookup semantics and current not-found behavior
+- [x] Add or update runtime tests for success, unknown type, not found, directory-based lookup, ignored input package, empty output package, and returned content
+- [x] Quality gates for runtime changes pass
 
 ### 3.2. Phase B - MCP Adapter and Tool Surface
 
