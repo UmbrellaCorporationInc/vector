@@ -92,6 +92,12 @@ Tags: #rust #filesystem #windows
 Scope: `runtime-doc`, test-only in `mcp-vector`
 Description: Windows path normalization crate approved to strip the `\\?\` extended-length path prefix that `std::fs::canonicalize` emits on Windows. Used in `runtime-doc` (production) wherever governed document paths are returned to callers, and in `mcp-vector` tests (dev-only) to produce matching expected paths.
 
+## 13. patcher
+
+Tags: #rust #diff #patching
+Scope: `runtime-doc`
+Description: Git-style unified diff patch generation and application crate approved for document patching operations in `runtime-doc`. Used by the `patch_doc` authoring operation to apply governed document updates from git diffs. Approved by [[rfc-00028-authoring-document-operations]] and [[task-00052-implement-rfc-00028-authoring-document-operations]].
+
 ## Workspace-local dependencies
 
 These workspace crates are used as internal dependencies and are governed by the workspace architecture rather than third-party dependency approval:

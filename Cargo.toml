@@ -21,6 +21,7 @@ walkdir = "2"
 regex = "1"
 chrono = "0.4"
 dunce = "1"
+patcher = "0.2"
 mcp-vector = { path = "mcp/vector" }
 
 [workspace.package]

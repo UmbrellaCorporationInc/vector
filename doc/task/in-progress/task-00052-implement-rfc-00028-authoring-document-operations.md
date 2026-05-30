@@ -45,9 +45,9 @@ input:
   language: Rust, TOML, Markdown
 ```
 
-- [ ] Add `patcher` to `Cargo.toml` of crate doc (and workspace if needed).
-- [ ] Register `patcher` in `doc/project/project-0003-rust-dependencies.md` with scope limited to crate doc.
-- [ ] Confirm no other crate gains the dependency by accident.
+- [x] Add `patcher` to `Cargo.toml` of crate doc (and workspace if needed).
+- [x] Register `patcher` in `doc/project/project-0003-rust-dependencies.md` with scope limited to crate doc.
+- [x] Confirm no other crate gains the dependency by accident.
 
 ### 3.2. Phase B — Implement `patch_doc` Operation in Crate Doc
 
