@@ -91,12 +91,25 @@ async fn validate_tool_reports_missing_config_as_error_message() {
     );
 }
 
-/// Verifies that `FindDocParams` deserializes correctly from JSON input.
+/// Verifies that `FindDocParams` deserializes correctly from JSON input and that `package` defaults to empty.
 #[test]
 fn find_doc_params_deserializes_correctly() {
     let raw = r#"{"root_dir": "/tmp/project", "doc_type": "rfc", "code": 13}"#;
     let params: super::FindDocParams =
         serde_json::from_str(raw).expect("must deserialize FindDocParams");
+    assert_eq!(params.root_dir, "/tmp/project");
+    assert_eq!(params.doc_type, "rfc");
+    assert_eq!(params.code, 13);
+    assert_eq!(params.package, "", "package must default to empty string when absent from JSON");
+}
+
+/// Verifies that `FindDocParams` deserializes correctly when `package` is explicitly provided.
+#[test]
+fn find_doc_params_accepts_optional_package_field() {
+    let raw = r#"{"package": "my-pkg", "root_dir": "/tmp/project", "doc_type": "rfc", "code": 13}"#;
+    let params: super::FindDocParams =
+        serde_json::from_str(raw).expect("must deserialize FindDocParams with package");
+    assert_eq!(params.package, "my-pkg", "package must deserialize when explicitly provided");
     assert_eq!(params.root_dir, "/tmp/project");
     assert_eq!(params.doc_type, "rfc");
     assert_eq!(params.code, 13);
@@ -254,7 +267,7 @@ related: []
     (dir, root)
 }
 
-/// Verifies that the `find_doc` tool returns the absolute path when the document exists.
+/// Verifies that the `find_doc` tool returns path, empty package, and document content when the document exists.
 #[tokio::test]
 async fn find_doc_tool_returns_absolute_path_for_existing_document() {
     use std::fs;
@@ -267,11 +280,12 @@ async fn find_doc_tool_returns_absolute_path_for_existing_document() {
     let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
     fs::create_dir_all(&rfc_dir).expect("create rfc dir");
     let target = rfc_dir.join("rfc-00013-my-rfc.md");
-    fs::write(&target, "content").expect("write doc");
+    fs::write(&target, "doc content here").expect("write doc");
 
     let tools = super::DocumentTools::new();
     let result = tools
         .find_doc(Parameters(super::FindDocParams {
+            package: String::new(),
             root_dir: dir.path().display().to_string(),
             doc_type: "rfc".to_string(),
             code: 13,
@@ -279,9 +293,83 @@ async fn find_doc_tool_returns_absolute_path_for_existing_document() {
         .await
         .expect("find_doc must succeed when the document exists");
 
-    let expected =
+    let expected_path =
         dunce::canonicalize(&target).expect("canonicalize").to_string_lossy().to_string();
-    assert_eq!(result, expected, "tool must return the canonicalized absolute path");
+    assert!(
+        result.contains(&format!("path: {expected_path}")),
+        "tool result must contain the canonicalized path; got: {result}"
+    );
+    assert!(
+        result.contains("package: "),
+        "tool result must contain a package field; got: {result}"
+    );
+    assert!(
+        result.contains("doc content here"),
+        "tool result must contain the document content; got: {result}"
+    );
+}
+
+/// Verifies that the `find_doc` tool always returns an empty package field in its output.
+#[tokio::test]
+async fn find_doc_tool_returns_empty_package_in_output() {
+    use std::fs;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let vector_dir = dir.path().join(".vector");
+    fs::create_dir_all(&vector_dir).expect("create .vector dir");
+    fs::write(vector_dir.join("document-types.yaml"), MINIMAL_CONFIG).expect("write config");
+
+    let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&rfc_dir).expect("create rfc dir");
+    fs::write(rfc_dir.join("rfc-00013-my-rfc.md"), "body").expect("write doc");
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .find_doc(Parameters(super::FindDocParams {
+            package: "should-be-ignored".to_string(),
+            root_dir: dir.path().display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 13,
+        }))
+        .await
+        .expect("find_doc must succeed when the document exists");
+
+    assert!(
+        result.contains("package: \n"),
+        "package field in output must always be empty regardless of input; got: {result}"
+    );
+}
+
+/// Verifies that the `find_doc` tool includes populated document content in its response.
+#[tokio::test]
+async fn find_doc_tool_returns_populated_content() {
+    use std::fs;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let vector_dir = dir.path().join(".vector");
+    fs::create_dir_all(&vector_dir).expect("create .vector dir");
+    fs::write(vector_dir.join("document-types.yaml"), MINIMAL_CONFIG).expect("write config");
+
+    let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&rfc_dir).expect("create rfc dir");
+    let expected_content = "# My RFC\n\nThis is the body of the document.\n";
+    fs::write(rfc_dir.join("rfc-00013-my-rfc.md"), expected_content).expect("write doc");
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .find_doc(Parameters(super::FindDocParams {
+            package: String::new(),
+            root_dir: dir.path().display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 13,
+        }))
+        .await
+        .expect("find_doc must succeed when the document exists");
+
+    assert!(
+        result.contains(expected_content),
+        "tool result must contain the full document content; got: {result}"
+    );
 }
 
 /// Verifies that the `find_doc` tool returns an error when no matching document exists.
@@ -300,6 +388,7 @@ async fn find_doc_tool_returns_error_when_document_not_found() {
     let tools = super::DocumentTools::new();
     let result = tools
         .find_doc(Parameters(super::FindDocParams {
+            package: String::new(),
             root_dir: dir.path().display().to_string(),
             doc_type: "rfc".to_string(),
             code: 99,
@@ -331,6 +420,7 @@ async fn find_doc_tool_returns_error_for_unknown_doc_type() {
     let tools = super::DocumentTools::new();
     let result = tools
         .find_doc(Parameters(super::FindDocParams {
+            package: String::new(),
             root_dir: dir.path().display().to_string(),
             doc_type: "unknown".to_string(),
             code: 1,

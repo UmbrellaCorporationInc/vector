@@ -43,6 +43,9 @@ pub struct ValidateFixParams {
 #[non_exhaustive]
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct FindDocParams {
+    /// Reserved package selector for future package-aware lookup. Ignored by the implementation.
+    #[serde(default)]
+    pub package: String,
     /// Absolute or relative path to the root directory of the project.
     pub root_dir: String,
     /// The document type identifier (e.g. "rfc", "task").
@@ -195,15 +198,15 @@ impl DocumentTools {
     ///
     /// Executes `FindDocOp` through the standard dispatcher path.
     /// All lookup logic lives in `runtime-doc`; this method only maps
-    /// MCP params to the runtime input and returns the absolute path.
+    /// MCP params to the runtime input and returns path, reserved package field, and document content.
     #[tool(
-        description = "Locate a governed document by type and numeric code, returning its absolute path"
+        description = "Locate a governed document by type and numeric code, returning its path, reserved package field, and document content"
     )]
     async fn find_doc(
         &self,
-        Parameters(FindDocParams { root_dir, doc_type, code }): Parameters<FindDocParams>,
+        Parameters(FindDocParams { root_dir, doc_type, code, package }): Parameters<FindDocParams>,
     ) -> Result<String, String> {
-        let input = FindDocInput::new(IoPath::new(root_dir), doc_type, code);
+        let input = FindDocInput::new(IoPath::new(root_dir), package, doc_type, code);
 
         let (_cancel, mut receiver) = PluginDispatcher::new(FindDocOp::new())
             .input(input)
@@ -211,7 +214,9 @@ impl DocumentTools {
             .map_err(|e| format!("dispatcher build failed: {e}"))?;
 
         match receiver.recv().await {
-            Ok(Some(output)) => Ok(output.path),
+            Ok(Some(output)) => {
+                Ok(format!("path: {}\npackage: {}\n\n{}", output.path, output.package, output.content))
+            }
             Ok(None) => Err("document not found".to_string()),
             Err(e) => Err(format!("find_doc failed: {e}")),
         }

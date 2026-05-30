@@ -68,12 +68,12 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Extend MCP `FindDocParams` to accept `package`, `doc_type`, `code`, and `root_dir`
-- [ ] Update the MCP `find_doc` tool handler to pass the reserved `package` field through and return the enriched response shape
-- [ ] Update schema-oriented tests so the tool contract requires the RFC fields and exposes the new response expectations
-- [ ] Update adapter tests to cover populated content and stable empty package output
-- [ ] Review caller impact and document any compatibility risk if existing consumers assume a path-only string response
-- [ ] Quality gates for MCP changes pass
+- [x] Extend MCP `FindDocParams` to accept `package`, `doc_type`, `code`, and `root_dir`
+- [x] Update the MCP `find_doc` tool handler to pass the reserved `package` field through and return the enriched response shape
+- [x] Update schema-oriented tests so the tool contract requires the RFC fields and exposes the new response expectations
+- [x] Update adapter tests to cover populated content and stable empty package output
+- [x] Review caller impact and document any compatibility risk if existing consumers assume a path-only string response
+- [x] Quality gates for MCP changes pass
 
 ### 3.3. Phase C - Documentation and Validation
 
