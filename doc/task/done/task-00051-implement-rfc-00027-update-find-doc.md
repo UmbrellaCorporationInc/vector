@@ -5,7 +5,7 @@ code: "00051"
 slug: implement-rfc-00027-update-find-doc
 title: "Implement RFC 00027: Expand find-doc to return package and content"
 description: Evolve the runtime and MCP `find_doc` contract so callers receive path, reserved package field, and document content in one lookup.
-status: in-progress
+status: done
 created: 2026-05-30
 updated: 2026-05-30
 tags:

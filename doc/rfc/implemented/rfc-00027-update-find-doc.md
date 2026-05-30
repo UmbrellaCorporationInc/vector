@@ -5,7 +5,7 @@ code: "00027"
 slug: update-find-doc
 title: Expand find-doc to return package and content
 description: Proposes evolving find-doc to return package and content in addition to the resolved document path.
-status: accepted
+status: implemented
 created: 2026-05-30
 updated: 2026-05-30
 authors: []
