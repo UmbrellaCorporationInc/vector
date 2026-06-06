@@ -5,7 +5,7 @@ code: "00028"
 slug: authoring-document-operations
 title: Document-Scoped Authoring Patch Operation
 description: Define a crate doc authoring operation and MCP tool that update governed documents from git diffs using patcher while refusing writes outside the doc tree and rejecting BOM-encoded content.
-status: accepted
+status: implemented
 created: 2026-05-30
 updated: 2026-05-30
 authors:
