@@ -45,13 +45,13 @@ input:
   language: Rust, YAML, Markdown
 ```
 
-- [ ] Create the new `runtime/packages` crate and wire it into the workspace.
-- [ ] Keep `packages.yaml` parsing and validation inside `runtime/packages`; `runtime/doc` and `runtime/project` must not own this responsibility.
-- [ ] Define the `.vector/packages.yaml` manifest contract for named package entries with required `type` and `url` fields.
-- [ ] Accept `git` and `file` as the only supported source types.
-- [ ] Enforce `tag` as required for `git` packages and optional for `file` packages.
-- [ ] Accept `tag: branch:main` and `tag: branch:<name>` as the manifest form for tracking branch HEAD in Git packages.
-- [ ] Add manifest parsing and validation in `runtime/packages` with explicit errors for unsupported source types, missing required fields, and malformed entries.
+- [x] Create the new `runtime/packages` crate and wire it into the workspace.
+- [x] Keep `packages.yaml` parsing and validation inside `runtime/packages`; `runtime/doc` and `runtime/project` must not own this responsibility.
+- [x] Define the `.vector/packages.yaml` manifest contract for named package entries with required `type` and `url` fields.
+- [x] Accept `git` and `file` as the only supported source types.
+- [x] Enforce `tag` as required for `git` packages and optional for `file` packages.
+- [x] Accept `tag: branch:main` and `tag: branch:<name>` as the manifest form for tracking branch HEAD in Git packages.
+- [x] Add manifest parsing and validation in `runtime/packages` with explicit errors for unsupported source types, missing required fields, and malformed entries.
 
 ### 3.2. Phase B - Implement `sync-packages`
 
