@@ -43,8 +43,8 @@ input:
   language: markdown
 ```
 
-- [ ] Add `terminal_size` as approved dependency in [project-0003-rust-dependencies.md](file:///C:/Users/ferna/OneDrive/Obsidian/vector/doc/project/project-0003-rust-dependencies.md).
-- [ ] Specify that the scope of `terminal_size` is restricted to the `get-vector` package.
+- [x] Add `terminal_size` as approved dependency in [project-0003-rust-dependencies.md](file:///C:/Users/ferna/OneDrive/Obsidian/vector/doc/project/project-0003-rust-dependencies.md).
+- [x] Specify that the scope of `terminal_size` is restricted to the `get-vector` package.
 
 ### 3.2. Phase B — Crate Integration and Implementation
 

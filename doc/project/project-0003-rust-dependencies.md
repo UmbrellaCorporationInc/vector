@@ -6,7 +6,7 @@ slug: rust-dependencies
 title: Rust Dependencies
 description: Defines the approved Rust dependencies for VECTOR project crates.
 created: 2026-05-02
-updated: 2026-06-06
+updated: 2026-06-07
 tags:
   - project
   - rust
@@ -97,6 +97,12 @@ Description: Windows path normalization crate approved to strip the `\\?\` exten
 Tags: #rust #diff #patching
 Scope: `runtime-doc`
 Description: Git-style unified diff patch generation and application crate approved for document patching operations in `runtime-doc`. Used by the `patch_doc` authoring operation to apply governed document updates from git diffs. Approved by [[rfc-00028-authoring-document-operations]] and [[task-00052-implement-rfc-00028-authoring-document-operations]].
+
+## 14. terminal_size
+
+Tags: #rust #cli #terminal
+Scope: `get-vector`
+Description: Retrieve terminal size dynamically. Approved for use in `get-vector` to dynamically format outputs based on the active terminal columns. Approved by [[task-00056-update-get-vector-to-calculate-the-terminal-size]].
 
 ## Workspace-local dependencies
 
