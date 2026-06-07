@@ -169,6 +169,19 @@ where
             }
             _ => return Err("unsupported sync command type".to_string()),
         }
+
+        // Validate minimum repository contract
+        let doc_dir = target_dir.join("doc");
+        let vector_dir = target_dir.join(".vector");
+        if !doc_dir.is_dir() || !vector_dir.is_dir() {
+            if target_dir.exists() {
+                let _ = std::fs::remove_dir_all(&target_dir);
+            }
+            return Err(format!(
+                "package '{}' does not satisfy the minimum repository contract: missing 'doc/' or '.vector/' directory",
+                action.name
+            ));
+        }
     }
 
     Ok(())

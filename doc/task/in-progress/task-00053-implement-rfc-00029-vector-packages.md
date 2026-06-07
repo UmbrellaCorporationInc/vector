@@ -125,10 +125,10 @@ input:
   language: Rust
 ```
 
-- [ ] Validate that synchronized packages are vector repositories containing both `doc/` and `.vector/`.
-- [ ] Reject packages that resolve but do not satisfy the minimum repository contract.
-- [ ] Define how the consuming workspace accesses governed documentation from downloaded packages without weakening existing repository boundaries.
-- [ ] Keep package access behavior scoped to documentation reuse; do not invent package publishing, transitive dependency resolution, or cross-package indexing semantics in this task.
+- [x] Validate that synchronized packages are vector repositories containing both `doc/` and `.vector/`.
+- [x] Reject packages that resolve but do not satisfy the minimum repository contract.
+- [x] Define how the consuming workspace accesses governed documentation from downloaded packages without weakening existing repository boundaries.
+- [x] Keep package access behavior scoped to documentation reuse; do not invent package publishing, transitive dependency resolution, or cross-package indexing semantics in this task.
 
 ### 3.6. Phase F - Bootstrap and Ignore Guarantees
 

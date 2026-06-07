@@ -309,24 +309,25 @@ async fn find_doc_tool_returns_absolute_path_for_existing_document() {
     );
 }
 
-/// Verifies that the `find_doc` tool always returns an empty package field in its output.
+/// Verifies that the `find_doc` tool returns the correct package field in its output.
 #[tokio::test]
-async fn find_doc_tool_returns_empty_package_in_output() {
+async fn find_doc_tool_returns_package_in_output() {
     use std::fs;
 
     let dir = tempfile::tempdir().expect("temp dir");
-    let vector_dir = dir.path().join(".vector");
+    let package_dir = dir.path().join(".vector-database").join("packages").join("my-package");
+    let vector_dir = package_dir.join(".vector");
     fs::create_dir_all(&vector_dir).expect("create .vector dir");
     fs::write(vector_dir.join("document-types.yaml"), MINIMAL_CONFIG).expect("write config");
 
-    let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
+    let rfc_dir = package_dir.join("doc").join("rfc").join("draft");
     fs::create_dir_all(&rfc_dir).expect("create rfc dir");
     fs::write(rfc_dir.join("rfc-00013-my-rfc.md"), "body").expect("write doc");
 
     let tools = super::DocumentTools::new();
     let result = tools
         .find_doc(Parameters(super::FindDocParams {
-            package: "should-be-ignored".to_string(),
+            package: "my-package".to_string(),
             root_dir: dir.path().display().to_string(),
             doc_type: "rfc".to_string(),
             code: 13,
@@ -335,8 +336,8 @@ async fn find_doc_tool_returns_empty_package_in_output() {
         .expect("find_doc must succeed when the document exists");
 
     assert!(
-        result.contains("package: \n"),
-        "package field in output must always be empty regardless of input; got: {result}"
+        result.contains("package: my-package\n"),
+        "package field in output must match the requested package; got: {result}"
     );
 }
 
