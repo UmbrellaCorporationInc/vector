@@ -42,8 +42,27 @@ async fn find_doc(
     input: FindDocInput,
     output: &mut impl PluginSender<FindDocOutput>,
 ) -> RuntimeResult<()> {
+    let base_dir = if input.package.is_empty() {
+        input.root_dir.clone()
+    } else {
+        let p_dir = input.root_dir.join(".vector-database").join("packages").join(&input.package);
+        if !p_dir.as_path().exists() {
+            return Err(runtime_core::RuntimeError::operation(format!(
+                "package '{}' is not synchronized or does not exist",
+                input.package
+            )));
+        }
+        if !p_dir.as_path().join("doc").is_dir() || !p_dir.as_path().join(".vector").is_dir() {
+            return Err(runtime_core::RuntimeError::operation(format!(
+                "package '{}' does not satisfy the minimum repository contract: missing 'doc/' or '.vector/' directory",
+                input.package
+            )));
+        }
+        p_dir
+    };
+
     // Load config to verify the document type exists.
-    let config = load_document_types_config(&input.root_dir).await?;
+    let config = load_document_types_config(&base_dir).await?;
 
     if !config.document_types.contains_key(&input.doc_type) {
         return Err(runtime_core::RuntimeError::operation(format!(
@@ -52,7 +71,7 @@ async fn find_doc(
         )));
     }
 
-    let search_base = input.root_dir.as_path().join("doc").join(&input.doc_type);
+    let search_base = base_dir.as_path().join("doc").join(&input.doc_type);
 
     if !search_base.exists() {
         return Err(runtime_core::RuntimeError::operation(format!(
@@ -98,7 +117,7 @@ async fn find_doc(
         output
             .send(FindDocOutput {
                 path: abs_path.to_string_lossy().to_string(),
-                package: String::new(),
+                package: input.package.clone(),
                 content,
             })
             .await?;

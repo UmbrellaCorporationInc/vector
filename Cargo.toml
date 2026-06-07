@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["runtime/core", "runtime/channel", "runtime/io", "runtime/project", "runtime/doc", "runtime/language", "mcp/vector", "frontend/cli/get-vector"]
+members = ["runtime/core", "runtime/channel", "runtime/io", "runtime/project", "runtime/doc", "runtime/language", "runtime/packages", "mcp/vector", "frontend/cli/get-vector", "frontend/cli/vector-database"]
 
 [workspace.dependencies]
 thiserror = "2.0.17"
@@ -13,6 +13,7 @@ runtime-doc = { path = "runtime/doc" }
 runtime-io = { path = "runtime/io" }
 runtime-language = { path = "runtime/language" }
 runtime-project = { path = "runtime/project" }
+runtime-packages = { path = "runtime/packages" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

@@ -72,7 +72,7 @@ fn wait_error_handle(message: &str) -> CommandHandle {
 
 #[tokio::test]
 async fn successful_install_returns_installed_outcome() {
-    let executor = MockExecutor::new(vec![Ok(success_handle())]);
+    let executor = MockExecutor::new(vec![Ok(success_handle()), Ok(success_handle())]);
 
     let outcome = run(&executor, |_| {}, |_| {}).await.expect("should succeed");
 
@@ -81,18 +81,26 @@ async fn successful_install_returns_installed_outcome() {
 
 #[tokio::test]
 async fn install_command_uses_force_flag_and_correct_package() {
-    let executor = MockExecutor::new(vec![Ok(success_handle())]);
+    let executor = MockExecutor::new(vec![Ok(success_handle()), Ok(success_handle())]);
 
     run(&executor, |_| {}, |_| {}).await.expect("should succeed");
 
     let commands = executor.recorded_commands();
-    assert_eq!(commands.len(), 1);
-    let (cmd, args) = &commands[0];
-    assert_eq!(cmd, "cargo");
-    assert!(args.contains(&"install".to_owned()));
-    assert!(args.contains(&"--force".to_owned()));
-    assert!(args.contains(&"mcp-vector".to_owned()));
-    assert!(args.contains(&"--git".to_owned()));
+    assert_eq!(commands.len(), 2);
+
+    let (cmd1, args1) = &commands[0];
+    assert_eq!(cmd1, "cargo");
+    assert!(args1.contains(&"install".to_owned()));
+    assert!(args1.contains(&"--force".to_owned()));
+    assert!(args1.contains(&"mcp-vector".to_owned()));
+    assert!(args1.contains(&"--git".to_owned()));
+
+    let (cmd2, args2) = &commands[1];
+    assert_eq!(cmd2, "cargo");
+    assert!(args2.contains(&"install".to_owned()));
+    assert!(args2.contains(&"--force".to_owned()));
+    assert!(args2.contains(&"vector-database".to_owned()));
+    assert!(args2.contains(&"--git".to_owned()));
 }
 
 #[tokio::test]
@@ -124,12 +132,17 @@ async fn wait_failure_is_propagated_as_wait_error() {
 
 #[tokio::test]
 async fn cargo_output_is_forwarded_to_callbacks() {
-    let handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+    let handle1 = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
         .stdout(b"installing binary\n".to_vec())
         .stderr(b"Compiling mcp-vector\n".to_vec())
         .build()
         .0;
-    let executor = MockExecutor::new(vec![Ok(handle)]);
+    let handle2 = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout(b"installing cli\n".to_vec())
+        .stderr(b"Compiling vector-database\n".to_vec())
+        .build()
+        .0;
+    let executor = MockExecutor::new(vec![Ok(handle1), Ok(handle2)]);
 
     let mut captured_stdout = Vec::new();
     let mut captured_stderr = Vec::new();
@@ -143,6 +156,6 @@ async fn cargo_output_is_forwarded_to_callbacks() {
     .expect("should succeed");
 
     assert_eq!(outcome, UpdateOutcome::Installed);
-    assert_eq!(captured_stdout, b"installing binary\n");
-    assert_eq!(captured_stderr, b"Compiling mcp-vector\n");
+    assert_eq!(captured_stdout, b"installing binary\ninstalling cli\n");
+    assert_eq!(captured_stderr, b"Compiling mcp-vector\nCompiling vector-database\n");
 }

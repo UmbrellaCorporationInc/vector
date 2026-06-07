@@ -5,7 +5,7 @@ code: "00052"
 slug: implement-rfc-00028-authoring-document-operations
 title: Implement RFC 00028 — Authoring Document Operations
 description: Add a document-scoped patch operation in crate doc and expose it as an MCP tool so agents can update governed documents from git diffs without gaining broader filesystem write access.
-status: in-progress
+status: done
 created: 2026-05-30
 updated: 2026-05-30
 tags:

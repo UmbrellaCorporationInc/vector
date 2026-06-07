@@ -1,0 +1,24 @@
+[package]
+name = "vector-database"
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vector-database"
+path = "src/main.rs"
+
+[dependencies]
+runtime-core = { workspace = true }
+runtime-io = { workspace = true }
+runtime-packages = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

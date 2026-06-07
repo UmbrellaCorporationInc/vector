@@ -29,3 +29,6 @@ __pycache__/
 requirements.lock
 
 test_project_dir/
+
+# Local package cache
+.vector-database/
