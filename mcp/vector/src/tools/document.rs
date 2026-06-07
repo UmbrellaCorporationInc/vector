@@ -12,7 +12,7 @@ use runtime_doc::operations::{
     PatchDocInput, PatchDocOp, ValidateInput, ValidateOp,
 };
 use runtime_io::path::IoPath;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// MCP-facing parameters for the `validate` tool.
 ///
@@ -60,6 +60,20 @@ pub struct FindDocParams {
     pub doc_type: String,
     /// The numeric code of the document to locate.
     pub code: u32,
+}
+
+/// Response returned by the `find_doc` tool.
+///
+/// # DTO(MCP protocol output serialized at the adapter boundary; serde serialization requires public fields)
+#[non_exhaustive]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FindDocResponse {
+    /// The absolute path to the located document.
+    pub path: String,
+    /// The synchronized package name, or empty string.
+    pub package: String,
+    /// The document content.
+    pub content: String,
 }
 
 /// MCP-facing parameters for the `create_doc` tool.
@@ -245,10 +259,15 @@ impl DocumentTools {
             .map_err(|e| format!("dispatcher build failed: {e}"))?;
 
         match receiver.recv().await {
-            Ok(Some(output)) => Ok(format!(
-                "path: {}\npackage: {}\n\n{}",
-                output.path, output.package, output.content
-            )),
+            Ok(Some(output)) => {
+                let response = FindDocResponse {
+                    path: output.path,
+                    package: output.package,
+                    content: output.content,
+                };
+                serde_json::to_string(&response)
+                    .map_err(|e| format!("failed to serialize find_doc response: {e}"))
+            }
             Ok(None) => Err("document not found".to_string()),
             Err(e) => Err(format!("find_doc failed: {e}")),
         }

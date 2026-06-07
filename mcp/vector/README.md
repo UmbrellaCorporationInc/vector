@@ -69,13 +69,19 @@
 
 ### `find_doc` response contract
 
-`find_doc` returns a text response with the following structure:
+`find_doc` returns a JSON string response representing a serialized `FindDocResponse` object with the following fields:
 
-```
-path: <absolute canonicalized path>
-package: <package name, or empty for workspace-local>
+- `path` (string): The absolute canonicalized path to the located document.
+- `package` (string): The synchronized package name, or an empty string for workspace-local documents.
+- `content` (string): The full raw content of the document.
 
-<full document content>
+Example JSON response:
+```json
+{
+  "path": "/absolute/path/to/doc.md",
+  "package": "",
+  "content": "--- \nmetadata...\n---\n..."
+}
 ```
 
 The `package` input parameter is used for package-qualified document lookup. When set to a package name (e.g., `"my-pkg"`), the document is resolved against the synchronized package at `.vector-database/packages/{package}/` instead of the active workspace. If the package is resolved from a synchronized package location, the output `package` field echoes the package name; otherwise, it is empty. Callers must handle both workspace-local and package-qualified lookup results; see RFC 00030.

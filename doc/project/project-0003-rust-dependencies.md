@@ -83,8 +83,8 @@ Description: Date and time crate approved for document metadata handling and dat
 ## 11. serde_json
 
 Tags: #rust #serialization #json
-Scope: test-only in `mcp-vector`
-Description: JSON codec approved for test-only use in `mcp-vector` to deserialize MCP tool parameters in unit tests.
+Scope: `mcp-vector`
+Description: JSON codec approved for use in `mcp-vector` to serialize and deserialize MCP tool inputs, outputs, and parameters.
 
 ## 12. dunce
 
