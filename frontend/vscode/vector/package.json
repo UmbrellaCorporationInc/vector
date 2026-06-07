@@ -2,7 +2,7 @@
   "name": "vector",
   "displayName": "Vector",
   "description": "Governed document sidebar and extension-owned preview for Vector projects.",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "publisher": "fernandojerez",
   "license": "MIT",
   "type": "module",
@@ -99,6 +99,11 @@
         "command": "vector.validateFix",
         "title": "Validate Fix",
         "icon": "$(check)"
+      },
+      {
+        "command": "vector.packageSync",
+        "title": "Sync Packages",
+        "icon": "$(sync)"
       }
     ],
     "viewsContainers": {
@@ -174,6 +179,11 @@
           "command": "vector.validateFix",
           "when": "view == vector.governedDocuments",
           "group": "navigation@5"
+        },
+        {
+          "command": "vector.packageSync",
+          "when": "view == vector.governedDocuments",
+          "group": "navigation@6"
         }
       ]
     }

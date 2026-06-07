@@ -3,6 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { resolveDocumentByCode } from "../governedDocumentProvider.js";
 import { parseGovernedStem } from "./wikilinkNavigation.js";
+import { parseDocIdentifier } from "../docIdentifier.js";
 import type { GovernedDocument } from "../documentDiscovery.js";
 import type { PreviewAssetUris } from "./previewHtml.js";
 
@@ -47,6 +48,92 @@ export function resolveGovernedPreviewSource(
         return null;
     }
     return { doc, content };
+}
+
+/**
+ * Resolves a governed document by a stem that may be unqualified (`type-code-slug`) or
+ * package-qualified (`package/type-code-slug`).
+ *
+ * - Unqualified stems are resolved within the active workspace using `resolveGovernedPreviewSource`.
+ * - Package-qualified stems are resolved against `.vector-database/packages/<package>/`.
+ *
+ * Returns null when the identifier is invalid, the package is unknown, or no document matches.
+ */
+export function resolveGovernedPreviewSourceByIdentifier(
+    workspaceRoot: string,
+    stem: string,
+): GovernedPreviewSource | null {
+    const id = parseDocIdentifier(stem);
+    if (!id) {
+        return null;
+    }
+    if (id.package === null) {
+        return resolveGovernedPreviewSource(workspaceRoot, stem);
+    }
+    return resolvePackageGovernedDocument(workspaceRoot, id.package, id.docType, id.code);
+}
+
+function resolvePackageGovernedDocument(
+    workspaceRoot: string,
+    pkgName: string,
+    docType: string,
+    code: string,
+): GovernedPreviewSource | null {
+    const pkgDir = path.join(workspaceRoot, ".vector-database", "packages", pkgName);
+    if (!fs.existsSync(pkgDir)) {
+        return null;
+    }
+    const docDir = path.join(pkgDir, "doc", docType);
+    if (!fs.existsSync(docDir)) {
+        return null;
+    }
+    const filePath = findFileByCode(docDir, docType, code);
+    if (!filePath) {
+        return null;
+    }
+    const content = readGovernedDocumentContent(filePath);
+    if (content === null) {
+        return null;
+    }
+    const fileStem = path.basename(filePath, ".md");
+    const parsed = parseGovernedStem(fileStem);
+    const doc: GovernedDocument = {
+        type: parsed?.type ?? docType,
+        code: parsed?.code ?? code,
+        slug: parsed?.slug ?? fileStem,
+        title: parsed ? `${parsed.type.toUpperCase()} ${parsed.code}` : fileStem,
+        filePath,
+    };
+    return { doc, content };
+}
+
+function findFileByCode(docDir: string, docType: string, code: string): string | null {
+    const codeNum = Number.parseInt(code, 10);
+    if (Number.isNaN(codeNum)) {
+        return null;
+    }
+    let entries: fs.Dirent[];
+    try {
+        entries = fs.readdirSync(docDir, { withFileTypes: true });
+    } catch {
+        return null;
+    }
+    for (const entry of entries) {
+        const entryPath = path.join(docDir, entry.name);
+        if (entry.isDirectory()) {
+            const result = findFileByCode(entryPath, docType, code);
+            if (result) {
+                return result;
+            }
+        } else if (entry.isFile() && entry.name.endsWith(".md")) {
+            const stem = path.basename(entry.name, ".md");
+            const parsed = parseGovernedStem(stem);
+            if (parsed && parsed.type === docType && Number.parseInt(parsed.code, 10) === codeNum) {
+                return entryPath;
+            }
+        }
+    }
+    return null;
 }
 
 /**

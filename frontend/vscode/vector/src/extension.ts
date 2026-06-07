@@ -13,6 +13,7 @@ import {
     GovernedDocumentEditorProvider,
     GOVERNED_DOCUMENT_VIEW_TYPE,
     resolveGovernedPreviewSource,
+    resolveGovernedPreviewSourceByIdentifier,
 } from "./document-viewer/index.js";
 import {
     cleanupAllTempFiles,
@@ -75,7 +76,7 @@ export function activate(context: vscode.ExtensionContext): void {
     );
 
     const openStemCmd = vscode.commands.registerCommand("vector.openStem", async (stem: string) => {
-        const source = resolveGovernedPreviewSource(workspaceRoot, stem);
+        const source = resolveGovernedPreviewSourceByIdentifier(workspaceRoot, stem);
         if (!source) {
             void vscode.window.showErrorMessage(
                 `Vector: cannot resolve governed document: ${stem}`,
@@ -290,6 +291,13 @@ export function activate(context: vscode.ExtensionContext): void {
             );
         },
     );
+    // --- Package Sync (RFC 00030 Phase B) ---
+    const packageSyncCmd = vscode.commands.registerCommand("vector.packageSync", () => {
+        const terminal = vscode.window.createTerminal("vector sync");
+        terminal.sendText("vector-database package sync");
+        terminal.show();
+    });
+
     // --- Validate Fix (RFC 00024 Phase C) ---
     const validateFixCmd = vscode.commands.registerCommand("vector.validateFix", async () => {
         const config = loadDocumentTypes(workspaceRoot);
@@ -350,6 +358,7 @@ export function activate(context: vscode.ExtensionContext): void {
         dashboardRefreshCmd,
         createDocumentCmd,
         createDocumentTypeCmd,
+        packageSyncCmd,
         validateFixCmd,
     );
 }

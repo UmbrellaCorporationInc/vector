@@ -1,6 +1,5 @@
 //! Internal utility functions for runtime-doc.
 
-pub mod identifier;
 pub mod locate;
 pub mod naming;
 pub mod next_code;

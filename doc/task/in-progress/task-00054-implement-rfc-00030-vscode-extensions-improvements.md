@@ -63,12 +63,12 @@ input:
   language: TypeScript
 ```
 
-- [ ] Support `[[doc-id]]` and `[[package/doc-id]]` wikilink activation in the VS Code extension.
-- [ ] Resolve package-qualified wikilinks against synchronized package locations under the packages folder.
-- [ ] Reuse the existing open-document behavior after resolution rather than creating a second navigation path.
-- [ ] Add a `Sync` action to the tree view near the existing validate, search, refresh, and create doc type actions.
-- [ ] Make the `Sync` action open a terminal and execute `vector-database package sync`.
-- [ ] Add tests for local wikilinks, package-qualified wikilinks, and sync command invocation.
+- [x] Support `[[doc-id]]` and `[[package/doc-id]]` wikilink activation in the VS Code extension.
+- [x] Resolve package-qualified wikilinks against synchronized package locations under the packages folder.
+- [x] Reuse the existing open-document behavior after resolution rather than creating a second navigation path.
+- [x] Add a `Sync` action to the tree view near the existing validate, search, refresh, and create doc type actions.
+- [x] Make the `Sync` action open a terminal and execute `vector-database package sync`.
+- [x] Add tests for local wikilinks, package-qualified wikilinks, and sync command invocation.
 
 ### 3.3. Phase Z - Wrap-up
 
