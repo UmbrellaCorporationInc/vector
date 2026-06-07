@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 runtime-core = { workspace = true }
 runtime-io = { workspace = true }
+terminal_size = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 

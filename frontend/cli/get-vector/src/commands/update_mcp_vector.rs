@@ -66,10 +66,8 @@ where
     Out: FnMut(&[u8]) + Send,
     Err: FnMut(&[u8]) + Send,
 {
-    let width_str = std::env::var("COLUMNS")
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(80)
+    let width_str = terminal_size::terminal_size()
+        .map_or(80, |(terminal_size::Width(w), _)| usize::from(w))
         .to_string();
 
     // 1. Install mcp-vector

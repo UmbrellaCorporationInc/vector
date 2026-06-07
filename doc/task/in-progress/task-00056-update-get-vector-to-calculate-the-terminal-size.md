@@ -58,9 +58,9 @@ input:
   language: rust
 ```
 
-- [ ] Add `terminal_size` dependency to `get-vector/Cargo.toml`.
-- [ ] Implement the `terminal_size` detection logic in `get-vector` to replace the hardcoded fallback values.
-- [ ] Verify functionality via manual execution or cargo tests.
+- [x] Add `terminal_size` dependency to `get-vector/Cargo.toml`.
+- [x] Implement the `terminal_size` detection logic in `get-vector` to replace the hardcoded fallback values.
+- [x] Verify functionality via manual execution or cargo tests.
 
 ### 3.3. Phase Z — Wrap-up
 

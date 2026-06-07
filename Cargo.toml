@@ -24,6 +24,7 @@ chrono = "0.4"
 dunce = "1"
 patcher = "0.2"
 mcp-vector = { path = "mcp/vector" }
+terminal_size = "0.4"
 
 [workspace.package]
 edition = "2024"
