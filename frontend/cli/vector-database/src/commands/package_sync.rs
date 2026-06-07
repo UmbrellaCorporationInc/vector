@@ -58,17 +58,25 @@ where
             .ok_or_else(|| format!("package '{}' not found in manifest", action.name))?;
 
         // Print pre-message before each command execution
-        match action.command_type {
+        let msg = match action.command_type {
             SyncCommandType::Clone => {
-                println!("cloning package {} from url {}", action.name, entry.url);
+                format!("cloning package {} from url {}", action.name, entry.url)
             }
             SyncCommandType::Fetch => {
-                println!("fetching package {} from url {}", action.name, entry.url);
+                format!("fetching package {} from url {}", action.name, entry.url)
             }
             SyncCommandType::Copy => {
-                println!("copying package {} from url {}", action.name, entry.url);
+                format!("copying package {} from url {}", action.name, entry.url)
             }
-            _ => {}
+            _ => String::new(),
+        };
+
+        if !msg.is_empty() {
+            let border = format!("+---{}---+", "-".repeat(msg.len()));
+            println!();
+            println!("{}", border);
+            println!("|   {}   |", msg);
+            println!("{}", border);
         }
 
         let target_dir = packages_dir.join(&action.name);
