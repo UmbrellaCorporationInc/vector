@@ -142,10 +142,10 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Update bootstrap assets so newly created projects ignore `.vector-database/packages` in the generated `.gitignore`.
-- [ ] Ensure this repository also ignores `.vector-database/packages`.
-- [ ] Keep cache storage separate from governed configuration under `.vector/`.
-- [ ] Add regression coverage proving repeated bootstrap or setup flows preserve the ignore contract.
+- [x] Update bootstrap assets so newly created projects ignore `.vector-database/packages` in the generated `.gitignore`.
+- [x] Ensure this repository also ignores `.vector-database/packages`.
+- [x] Keep cache storage separate from governed configuration under `.vector/`.
+- [x] Add regression coverage proving repeated bootstrap or setup flows preserve the ignore contract.
 
 ### 3.7. Phase G - Tests and Documentation
 

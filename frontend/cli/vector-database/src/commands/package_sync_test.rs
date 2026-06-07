@@ -16,7 +16,11 @@ struct MockExecutor {
 
 impl MockExecutor {
     fn new(responses: Vec<Result<CommandHandle, IoError>>, create_dirs: bool) -> Self {
-        Self { responses: Mutex::new(VecDeque::from(responses)), recorded: Mutex::new(Vec::new()), create_dirs }
+        Self {
+            responses: Mutex::new(VecDeque::from(responses)),
+            recorded: Mutex::new(Vec::new()),
+            create_dirs,
+        }
     }
 
     fn recorded_commands(&self) -> Vec<(String, Vec<String>, Option<std::path::PathBuf>)> {
@@ -90,8 +94,10 @@ pkg_file:
     let manifest = PackageManifest::parse(manifest_yaml).unwrap();
     save_manifest(&IoPath::new(root), &manifest).await.unwrap();
 
-    let executor =
-        MockExecutor::new(vec![Ok(success_handle()), Ok(success_handle()), Ok(success_handle())], true);
+    let executor = MockExecutor::new(
+        vec![Ok(success_handle()), Ok(success_handle()), Ok(success_handle())],
+        true,
+    );
 
     run(&executor, root).await.expect("sync should succeed");
 

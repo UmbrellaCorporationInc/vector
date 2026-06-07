@@ -42,8 +42,9 @@ async fn find_doc(
     input: FindDocInput,
     output: &mut impl PluginSender<FindDocOutput>,
 ) -> RuntimeResult<()> {
-    // If package is not empty, use the package subdirectory inside .vector-database/packages/
-    let base_dir = if !input.package.is_empty() {
+    let base_dir = if input.package.is_empty() {
+        input.root_dir.clone()
+    } else {
         let p_dir = input.root_dir.join(".vector-database").join("packages").join(&input.package);
         if !p_dir.as_path().exists() {
             return Err(runtime_core::RuntimeError::operation(format!(
@@ -58,8 +59,6 @@ async fn find_doc(
             )));
         }
         p_dir
-    } else {
-        input.root_dir.clone()
     };
 
     // Load config to verify the document type exists.

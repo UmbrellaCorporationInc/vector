@@ -116,6 +116,14 @@ async fn test_create_project_provisions_files() {
         include_str!("../assets/opencode.json")
     );
 
+    let gitignore_path = temp_dir.join(".gitignore");
+    assert!(gitignore_path.exists());
+    let gitignore_content = std::fs::read_to_string(&gitignore_path).unwrap();
+    assert!(
+        gitignore_content.contains(".vector-database/"),
+        "gitignore must exclude .vector-database/"
+    );
+
     // Cleanup
     let _ = std::fs::remove_dir_all(temp_dir);
 }
@@ -145,6 +153,45 @@ async fn test_create_project_skip_existing_policy() {
     let output = &sender.outputs[0];
     assert!(output.skipped_files.contains(&"CLAUDE.md".to_string()));
     assert_eq!(std::fs::read_to_string(&conflict_file).unwrap(), "Original content");
+
+    // Cleanup
+    let _ = std::fs::remove_dir_all(temp_dir);
+}
+
+#[tokio::test]
+async fn test_create_project_repeated_preserves_gitignore() {
+    let now =
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let temp_dir = std::env::temp_dir().join(format!("vector_test_repeat_{now}"));
+    let target_dir = IoPath::new(&temp_dir);
+
+    let input = CreateProjectInput {
+        target_dir: target_dir.clone(),
+        project_name: "test_repeat".to_string(),
+        force: false,
+    };
+
+    let mut sender = MockSender::new();
+    let op = CreateProjectOp;
+
+    // Run first time
+    op.run(input.clone(), &mut sender).await.unwrap();
+
+    let gitignore_path = temp_dir.join(".gitignore");
+    assert!(gitignore_path.exists());
+    let content_first = std::fs::read_to_string(&gitignore_path).unwrap();
+    assert!(content_first.contains(".vector-database/"));
+
+    // Run second time (repeated bootstrap/setup flow)
+    let mut sender2 = MockSender::new();
+    op.run(input, &mut sender2).await.unwrap();
+
+    let content_second = std::fs::read_to_string(&gitignore_path).unwrap();
+    assert!(content_second.contains(".vector-database/"));
+    assert_eq!(
+        content_first, content_second,
+        "repeated run should not mutate gitignore if skipped"
+    );
 
     // Cleanup
     let _ = std::fs::remove_dir_all(temp_dir);
