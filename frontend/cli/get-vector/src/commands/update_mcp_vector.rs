@@ -12,11 +12,14 @@ const REPO_URL: &str = "https://github.com/UmbrellaCorporationInc/vector";
 /// The binary package name passed to `cargo install`.
 const PACKAGE_NAME: &str = "mcp-vector";
 
+/// The CLI package name passed to `cargo install`.
+const CLI_PACKAGE_NAME: &str = "vector-database";
+
 /// Outcome produced by [`run`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UpdateOutcome {
-    /// `mcp-vector` was installed or updated from git HEAD.
+    /// `mcp-vector` and `vector-database` were installed or updated from git HEAD.
     Installed,
 }
 
@@ -44,19 +47,15 @@ impl From<IoError> for UpdateError {
     }
 }
 
-/// Runs `cargo install --git <REPO_URL> --force <PACKAGE_NAME>`, streaming its
-/// stdout and stderr to the provided callbacks as the process runs.
-///
-/// Always performs a full install from git HEAD. No version comparison is
-/// done in V1 — this avoids the chicken-and-egg problem where a
-/// compile-time version constant would cause an outdated CLI binary to
-/// incorrectly skip reinstallation after a workspace version bump.
+/// Runs `cargo install --git <REPO_URL> --force <PACKAGE_NAME>` for both packages,
+/// streaming their stdout and stderr to the provided callbacks as they run.
 ///
 /// # Errors
 ///
 /// Returns [`UpdateError::Spawn`] when the `cargo` process cannot be started,
 /// [`UpdateError::Wait`] when waiting for it fails, or
 /// [`UpdateError::InstallFailed`] when it exits with a non-zero status.
+#[allow(clippy::print_stderr)]
 pub async fn run<E, Out, Err>(
     executor: &E,
     mut on_stdout: Out,
@@ -67,24 +66,49 @@ where
     Out: FnMut(&[u8]) + Send,
     Err: FnMut(&[u8]) + Send,
 {
-    let spec = CommandBuilder::new("cargo")
+    // 1. Install mcp-vector
+    eprintln!("Downloading mcp...");
+    let spec1 = CommandBuilder::new("cargo")
         .arg("install")
         .arg("--git")
         .arg(REPO_URL)
         .arg("--force")
         .arg(PACKAGE_NAME)
+        .arg("--color=always")
+        .env("CARGO_TERM_PROGRESS_WHEN", "always")
         .build()
         .map_err(|e| UpdateError::Spawn(e.to_string()))?;
 
-    let mut handle = executor.spawn(spec).await?;
-    handle.stream_output(&mut on_stdout, &mut on_stderr).await;
-    let exit = handle.wait().await.map_err(|e| UpdateError::Wait(e.to_string()))?;
+    let mut handle1 = executor.spawn(spec1).await?;
+    handle1.stream_output(&mut on_stdout, &mut on_stderr).await;
+    let exit1 = handle1.wait().await.map_err(|e| UpdateError::Wait(e.to_string()))?;
 
-    if exit.success {
-        Ok(UpdateOutcome::Installed)
-    } else {
-        Err(UpdateError::InstallFailed { code: exit.code })
+    if !exit1.success {
+        return Err(UpdateError::InstallFailed { code: exit1.code });
     }
+
+    // 2. Install vector-database
+    eprintln!("Downloading vector-database cli...");
+    let spec2 = CommandBuilder::new("cargo")
+        .arg("install")
+        .arg("--git")
+        .arg(REPO_URL)
+        .arg("--force")
+        .arg(CLI_PACKAGE_NAME)
+        .arg("--color=always")
+        .env("CARGO_TERM_PROGRESS_WHEN", "always")
+        .build()
+        .map_err(|e| UpdateError::Spawn(e.to_string()))?;
+
+    let mut handle2 = executor.spawn(spec2).await?;
+    handle2.stream_output(&mut on_stdout, &mut on_stderr).await;
+    let exit2 = handle2.wait().await.map_err(|e| UpdateError::Wait(e.to_string()))?;
+
+    if !exit2.success {
+        return Err(UpdateError::InstallFailed { code: exit2.code });
+    }
+
+    Ok(UpdateOutcome::Installed)
 }
 
 #[cfg(test)]

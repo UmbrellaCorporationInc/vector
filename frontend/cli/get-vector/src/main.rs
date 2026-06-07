@@ -7,7 +7,7 @@ use runtime_io::ProcessCommandExecutor;
 #[tokio::main]
 async fn main() {
     let executor = ProcessCommandExecutor::default();
-    eprintln!("Updating mcp-vector from git...");
+    eprintln!("Updating tools from git...");
     match run(
         &executor,
         |b| print!("{}", String::from_utf8_lossy(b)),
@@ -16,7 +16,7 @@ async fn main() {
     .await
     {
         Ok(UpdateOutcome::Installed) => {
-            println!("mcp-vector installed successfully.");
+            println!("Tools installed successfully.");
         }
         Ok(_) => {}
         Err(error) => {
