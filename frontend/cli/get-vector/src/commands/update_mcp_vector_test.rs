@@ -18,7 +18,7 @@ use super::{UpdateError, UpdateOutcome, run};
 
 struct MockExecutor {
     responses: Mutex<VecDeque<Result<CommandHandle, IoError>>>,
-    recorded: Mutex<Vec<(String, Vec<String>)>>,
+    recorded: Mutex<Vec<CommandSpec>>,
 }
 
 impl MockExecutor {
@@ -27,6 +27,15 @@ impl MockExecutor {
     }
 
     fn recorded_commands(&self) -> Vec<(String, Vec<String>)> {
+        self.recorded
+            .lock()
+            .expect("recorded lock")
+            .iter()
+            .map(|spec| (spec.command().to_owned(), spec.args().to_vec()))
+            .collect()
+    }
+
+    fn recorded_specs(&self) -> Vec<CommandSpec> {
         self.recorded.lock().expect("recorded lock").clone()
     }
 }
@@ -36,10 +45,7 @@ impl CommandExecutor for MockExecutor {
         &self,
         spec: CommandSpec,
     ) -> impl Future<Output = Result<CommandHandle, IoError>> + Send {
-        self.recorded
-            .lock()
-            .expect("recorded lock")
-            .push((spec.command().to_owned(), spec.args().to_vec()));
+        self.recorded.lock().expect("recorded lock").push(spec);
         let result = self
             .responses
             .lock()
@@ -158,4 +164,29 @@ async fn cargo_output_is_forwarded_to_callbacks() {
     assert_eq!(outcome, UpdateOutcome::Installed);
     assert_eq!(captured_stdout, b"installing binary\ninstalling cli\n");
     assert_eq!(captured_stderr, b"Compiling mcp-vector\nCompiling vector-database\n");
+}
+
+#[tokio::test]
+async fn install_command_sets_cargo_term_progress_width_env() {
+    let executor = MockExecutor::new(vec![Ok(success_handle()), Ok(success_handle())]);
+
+    run(&executor, |_| {}, |_| {}).await.expect("should succeed");
+
+    let specs = executor.recorded_specs();
+    assert_eq!(specs.len(), 2);
+
+    for spec in &specs {
+        let envs = spec.env();
+        let width_env = envs.iter().find(|(k, _)| k == "CARGO_TERM_PROGRESS_WIDTH").map(|(_, v)| v);
+
+        assert!(
+            width_env.is_some(),
+            "CARGO_TERM_PROGRESS_WIDTH environment variable should be set"
+        );
+        let width_val = width_env.expect("checked is_some");
+        assert!(
+            width_val.parse::<usize>().is_ok(),
+            "width value should be a valid integer, got: {width_val}"
+        );
+    }
 }
