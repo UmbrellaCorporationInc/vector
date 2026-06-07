@@ -43,7 +43,15 @@ pub struct ValidateFixParams {
 #[non_exhaustive]
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct FindDocParams {
-    /// Reserved package selector for future package-aware lookup. Ignored by the implementation.
+    /// Optional synchronized package name for package-qualified lookup.
+    ///
+    /// When empty, the document is resolved within the active workspace at `root_dir`.
+    /// When set to a package name (e.g. `"my-pkg"`), the document is resolved inside
+    /// `.vector-database/packages/{package}/`.  Returns an actionable error when the
+    /// package is unknown or has not been synchronized.
+    ///
+    /// Wikilinks in governed documents use the format `[[package/doc-id]]`; when you
+    /// encounter one, split on the first `/` and pass the left side here.
     #[serde(default)]
     pub package: String,
     /// Absolute or relative path to the root directory of the project.
@@ -214,9 +222,16 @@ impl DocumentTools {
     ///
     /// Executes `FindDocOp` through the standard dispatcher path.
     /// All lookup logic lives in `runtime-doc`; this method only maps
-    /// MCP params to the runtime input and returns path, reserved package field, and document content.
+    /// MCP params to the runtime input and returns the absolute path, package name, and document content.
+    ///
+    /// Governed documents use the identifier format `{doc_type}-{code}-{slug}` (e.g. `rfc-00013-my-rfc`).
+    /// Wikilinks in governed documents may carry a package-qualified form `{package}/{doc_type}-{code}-{slug}`
+    /// (e.g. `my-pkg/rfc-00013-my-rfc`).  To resolve a package-qualified wikilink, split on the first `/`,
+    /// use the left side as `package`, and parse the right side to extract `doc_type` and `code`.
+    /// When `package` is set, the document is resolved against the synchronized package at
+    /// `.vector-database/packages/{package}/` instead of the active workspace.
     #[tool(
-        description = "Locate a governed document by type and numeric code, returning its path, reserved package field, and document content"
+        description = "Locate a governed document by type and numeric code, returning its absolute path, package name, and content. Identifiers follow the form `{doc_type}-{code}-{slug}` (e.g. `rfc-00013-my-rfc`); package-qualified wikilinks use `{package}/{doc_type}-{code}-{slug}` — split on `/` and pass the left side as `package`. Leave `package` empty to resolve from the active workspace."
     )]
     async fn find_doc(
         &self,

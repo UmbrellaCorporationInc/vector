@@ -8,9 +8,6 @@ agents:
   codex:
     type: cli
     command: codex 'execute the content in the file <file>'
-  opencode:
-    type: cli
-    command: opencode --prompt 'execute the content in the file <file>'
 profiles:
   create-doc: [antigravity, claude, codex]
-  code: [antigravity, claude, codex, opencode]
+  code: [antigravity, claude, codex]

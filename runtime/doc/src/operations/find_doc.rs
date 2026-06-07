@@ -16,7 +16,10 @@ use crate::types::load_document_types_config;
 pub struct FindDocInput {
     /// The root directory of the project.
     pub root_dir: IoPath,
-    /// Reserved package selector for future package-aware lookup.
+    /// Optional synchronized package name for package-qualified lookup.
+    ///
+    /// When empty, the document is resolved within `root_dir`.
+    /// When set, the document is resolved inside `.vector-database/packages/{package}/`.
     pub package: String,
     /// The document type identifier (e.g. "rfc", "task").
     pub doc_type: String,
@@ -32,7 +35,7 @@ pub struct FindDocInput {
 pub struct FindDocOutput {
     /// The absolute path of the matching file.
     pub path: String,
-    /// Reserved package output. Always empty for now.
+    /// The package name used for the lookup, echoed from the input.  Empty for workspace-local lookups.
     pub package: String,
     /// The current document content.
     pub content: String,

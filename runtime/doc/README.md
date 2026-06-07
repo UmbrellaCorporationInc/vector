@@ -24,7 +24,7 @@ This crate provides transport-agnostic documentation governance operations for M
 
 ### Discovery
 
-- **`find_doc`**: Locates a document by type and code. Returns `path` (absolute, canonicalized), `package` (always empty — reserved for future package-aware scoping), and `content` (full document text read in the same lookup). The input `package` field is accepted but ignored; lookup remains repository-wide within `root_dir`. See RFC 00027 for the contract rationale and deferred package semantics.
+- **`find_doc`**: Locates a document by type and code. Returns `path` (absolute, canonicalized), `package` (the package name, or empty for workspace-local lookup), and `content` (full document text read in the same lookup). The optional input `package` field allows resolving against the synchronized package location under `.vector-database/packages/{package}/` when set, rather than performing a workspace-local lookup. See RFC 00030 for package-qualified lookup semantics.
 - **`get_doc_types_tags`**: Collects and deduplicates tags across all document types.
 
 ## Architecture

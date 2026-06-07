@@ -14,7 +14,7 @@ Exposes governed project documents through a dedicated VS Code sidebar and a Vec
 - Per-type `Search` and `Refresh` view actions, plus native `Collapse All`
 - Command-driven filter/list flows without a dedicated toolbar button
 - Opening governed documents in a reusable Vector-owned `WebviewPanel`
-- Governed wikilink and frontmatter-link navigation inside the same preview panel
+- Governed wikilink (both workspace-local `[[doc-id]]` and package-qualified `[[package/doc-id]]`) and frontmatter-link navigation inside the same preview panel
 - Governed Markdown rendering with `markdown-it`, callouts, tables, and code presentation
 - Syntax highlighting for fenced code blocks via `highlight.js`
 - `vector-form` blocks: inline forms with `input` (single-line) fields and a document-viewer-scoped `chat-input` editor for multi-line prompts, file mentions, and Markdown-aware authoring cues
@@ -102,6 +102,12 @@ Governed reading flows are extension-owned:
 - `.vector/*.yaml` schema field names are also kebab-case only. Extension-side YAML readers reject invalid schema fields defensively, while repository-wide `runtime-doc validate` remains the authoritative failure path.
 
 ## 8. Changelog
+
+### 1.4.5
+
+- **Package-Qualified Wikilinks (`[[package/doc-id]]`)** — Resolve and open governed documents from synchronized package locations under `.vector-database/packages/`.
+- **Sync Packages Command** — Adds a "Sync Packages" action in the tree view title menu that executes `vector-database package sync` in a VS Code terminal.
+- **Identifier Parsing** — Centralized document identifier parsing supporting both workspace-local (`doc-id`) and package-qualified (`package/doc-id`) forms.
 
 ### 1.4.2
 

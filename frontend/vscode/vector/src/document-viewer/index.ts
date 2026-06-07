@@ -2,6 +2,7 @@ export type { GovernedPreviewSource } from "./previewAssets.js";
 export {
     readGovernedDocumentContent,
     resolveGovernedPreviewSource,
+    resolveGovernedPreviewSourceByIdentifier,
     buildPreviewAssets,
 } from "./previewAssets.js";
 export {

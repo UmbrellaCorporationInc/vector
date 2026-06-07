@@ -1,6 +1,7 @@
 import type MarkdownIt from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
 import { escapeHtml } from "./previewHtml.js";
+import { parseDocIdentifier } from "../docIdentifier.js";
 
 /**
  * Governed file name stem pattern: <type>-<code>-<slug>
@@ -66,8 +67,9 @@ export function governedWikilinkPreviewPlugin(md: MarkdownIt): void {
                         newChildren.push(pre);
                     }
 
-                    const parsed = parseGovernedStem(stem);
-                    if (parsed) {
+                    const isGoverned =
+                        parseGovernedStem(stem) !== null || parseDocIdentifier(stem) !== null;
+                    if (isGoverned) {
                         const htmlToken = new state.Token("html_inline", "", 0);
                         htmlToken.content = buildWikilinkAnchor(stem, label);
                         newChildren.push(htmlToken);
