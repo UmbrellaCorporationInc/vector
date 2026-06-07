@@ -159,11 +159,11 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Add tests for manifest validation, deterministic sync planning, missing `tag` on `git`, `branch:<name>` parsing, duplicate package names, invalid repository structure, and refresh behavior.
-- [ ] Add tests for both `git` and `file` package sources using stable fixtures.
-- [ ] Add CLI tests proving `package sync` executes `clone`, `fetch`, and `copy` plans with the expected pre-messages.
-- [ ] Document failure behavior for unsupported source types, missing repositories or files, invalid package structure, missing required tags, duplicate package names, and cache refreshes.
-- [ ] Run and pass the relevant Rust quality gates for the touched crates and CLI package.
+- [x] Add tests for manifest validation, deterministic sync planning, missing `tag` on `git`, `branch:<name>` parsing, duplicate package names, invalid repository structure, and refresh behavior.
+- [x] Add tests for both `git` and `file` package sources using stable fixtures.
+- [x] Add CLI tests proving `package sync` executes `clone`, `fetch`, and `copy` plans with the expected pre-messages.
+- [x] Document failure behavior for unsupported source types, missing repositories or files, invalid package structure, missing required tags, duplicate package names, and cache refreshes.
+- [x] Run and pass the relevant Rust quality gates for the touched crates and CLI package.
 
 ### 3.8. Phase Z - Wrap-up
 

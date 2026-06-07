@@ -8,7 +8,7 @@ use runtime_io::{CommandBuilder, CommandExecutor, CommandSpec};
 use runtime_packages::operations::sync_packages::{
     SyncCommandType, SyncPackagesInput, SyncPackagesOp, SyncPackagesOutput,
 };
-use runtime_packages::types::load_manifest;
+use runtime_packages::types::{PackageEntry, load_manifest};
 
 #[derive(Default)]
 struct CollectSyncSender {
@@ -33,7 +33,6 @@ impl runtime_core::cancel::CancelableSender<SyncPackagesOutput> for CollectSyncS
 /// # Errors
 ///
 /// Returns an error message if any part of the synchronization planning or execution fails.
-#[allow(clippy::too_many_lines)]
 pub async fn run<E>(executor: &E, root_dir: &std::path::Path) -> Result<(), String>
 where
     E: CommandExecutor + Sync,
@@ -75,97 +74,13 @@ where
         let target_dir = packages_dir.join(&action.name);
         match action.command_type {
             SyncCommandType::Clone => {
-                if let Some(parent) = target_dir.parent() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|e| format!("failed to create packages directory: {e}"))?;
-                }
-
-                let spec = CommandBuilder::new("git")
-                    .arg("clone")
-                    .arg(&entry.url)
-                    .arg(target_dir.to_string_lossy().to_string())
-                    .build()
-                    .map_err(|e| format!("failed to build git clone spec: {e}"))?;
-                execute_command(executor, spec).await?;
-
-                let target = entry.tag.as_ref().map_or("main", |tag_val| {
-                    tag_val.strip_prefix("branch:").map_or(tag_val.as_str(), |branch| branch.trim())
-                });
-
-                let spec = CommandBuilder::new("git")
-                    .arg("checkout")
-                    .arg(target)
-                    .current_dir(&target_dir)
-                    .build()
-                    .map_err(|e| format!("failed to build git checkout spec: {e}"))?;
-                execute_command(executor, spec).await?;
+                handle_git_clone(executor, entry, &target_dir).await?;
             }
             SyncCommandType::Fetch => {
-                let spec = CommandBuilder::new("git")
-                    .arg("fetch")
-                    .current_dir(&target_dir)
-                    .build()
-                    .map_err(|e| format!("failed to build git fetch spec: {e}"))?;
-                execute_command(executor, spec).await?;
-
-                let target = entry.tag.as_ref().map_or("main", |tag_val| {
-                    tag_val.strip_prefix("branch:").map_or(tag_val.as_str(), |branch| branch.trim())
-                });
-
-                let spec = CommandBuilder::new("git")
-                    .arg("checkout")
-                    .arg(target)
-                    .current_dir(&target_dir)
-                    .build()
-                    .map_err(|e| format!("failed to build git checkout spec: {e}"))?;
-                execute_command(executor, spec).await?;
-
-                if entry.tag.as_ref().is_some_and(|tag_val| tag_val.starts_with("branch:")) {
-                    let remote_ref = format!("origin/{target}");
-                    let spec = CommandBuilder::new("git")
-                        .arg("reset")
-                        .arg("--hard")
-                        .arg(&remote_ref)
-                        .current_dir(&target_dir)
-                        .build()
-                        .map_err(|e| format!("failed to build git reset spec: {e}"))?;
-                    execute_command(executor, spec).await?;
-                }
+                handle_git_fetch(executor, entry, &target_dir).await?;
             }
             SyncCommandType::Copy => {
-                let src_path = if std::path::Path::new(&entry.url).is_absolute() {
-                    std::path::PathBuf::from(&entry.url)
-                } else {
-                    root_dir.join(&entry.url)
-                };
-
-                if target_dir.exists() {
-                    std::fs::remove_dir_all(&target_dir)
-                        .map_err(|e| format!("failed to clear target directory: {e}"))?;
-                }
-
-                let spec = if cfg!(windows) {
-                    CommandBuilder::new("xcopy")
-                        .arg(src_path.to_string_lossy().to_string())
-                        .arg(target_dir.to_string_lossy().to_string())
-                        .arg("/E")
-                        .arg("/Y")
-                        .arg("/I")
-                        .build()
-                        .map_err(|e| format!("failed to build xcopy spec: {e}"))?
-                } else {
-                    if let Some(parent) = target_dir.parent() {
-                        std::fs::create_dir_all(parent)
-                            .map_err(|e| format!("failed to create packages directory: {e}"))?;
-                    }
-                    CommandBuilder::new("cp")
-                        .arg("-R")
-                        .arg(src_path.to_string_lossy().to_string())
-                        .arg(target_dir.to_string_lossy().to_string())
-                        .build()
-                        .map_err(|e| format!("failed to build cp spec: {e}"))?
-                };
-                execute_command(executor, spec).await?;
+                handle_file_copy(executor, entry, &target_dir, root_dir).await?;
             }
             _ => return Err("unsupported sync command type".to_string()),
         }
@@ -183,6 +98,137 @@ where
             ));
         }
     }
+
+    Ok(())
+}
+
+async fn handle_git_clone<E>(
+    executor: &E,
+    entry: &PackageEntry,
+    target_dir: &std::path::Path,
+) -> Result<(), String>
+where
+    E: CommandExecutor + Sync,
+{
+    if let Some(parent) = target_dir.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("failed to create packages directory: {e}"))?;
+    }
+
+    let spec = CommandBuilder::new("git")
+        .arg("clone")
+        .arg(&entry.url)
+        .arg(target_dir.to_string_lossy().to_string())
+        .build()
+        .map_err(|e| format!("failed to build git clone spec: {e}"))?;
+    execute_command(executor, spec).await?;
+
+    let target = entry.tag.as_ref().map_or("main", |tag_val| {
+        tag_val.strip_prefix("branch:").map_or(tag_val.as_str(), |branch| branch.trim())
+    });
+
+    let spec = CommandBuilder::new("git")
+        .arg("checkout")
+        .arg(target)
+        .current_dir(target_dir)
+        .build()
+        .map_err(|e| format!("failed to build git checkout spec: {e}"))?;
+    execute_command(executor, spec).await?;
+
+    Ok(())
+}
+
+async fn handle_git_fetch<E>(
+    executor: &E,
+    entry: &PackageEntry,
+    target_dir: &std::path::Path,
+) -> Result<(), String>
+where
+    E: CommandExecutor + Sync,
+{
+    let spec = CommandBuilder::new("git")
+        .arg("fetch")
+        .current_dir(target_dir)
+        .build()
+        .map_err(|e| format!("failed to build git fetch spec: {e}"))?;
+    execute_command(executor, spec).await?;
+
+    let target = entry.tag.as_ref().map_or("main", |tag_val| {
+        tag_val.strip_prefix("branch:").map_or(tag_val.as_str(), |branch| branch.trim())
+    });
+
+    let spec = CommandBuilder::new("git")
+        .arg("checkout")
+        .arg(target)
+        .current_dir(target_dir)
+        .build()
+        .map_err(|e| format!("failed to build git checkout spec: {e}"))?;
+    execute_command(executor, spec).await?;
+
+    if entry.tag.as_ref().is_some_and(|tag_val| tag_val.starts_with("branch:")) {
+        let remote_ref = format!("origin/{target}");
+        let spec = CommandBuilder::new("git")
+            .arg("reset")
+            .arg("--hard")
+            .arg(&remote_ref)
+            .current_dir(target_dir)
+            .build()
+            .map_err(|e| format!("failed to build git reset spec: {e}"))?;
+        execute_command(executor, spec).await?;
+    }
+
+    Ok(())
+}
+
+async fn handle_file_copy<E>(
+    executor: &E,
+    entry: &PackageEntry,
+    target_dir: &std::path::Path,
+    root_dir: &std::path::Path,
+) -> Result<(), String>
+where
+    E: CommandExecutor + Sync,
+{
+    let src_path = if std::path::Path::new(&entry.url).is_absolute() {
+        std::path::PathBuf::from(&entry.url)
+    } else {
+        root_dir.join(&entry.url)
+    };
+
+    if target_dir.exists() {
+        std::fs::remove_dir_all(target_dir)
+            .map_err(|e| format!("failed to clear target directory: {e}"))?;
+    }
+
+    if let Some(parent) = target_dir.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("failed to create packages directory: {e}"))?;
+    }
+
+    let spec = if cfg!(windows) {
+        let src_win = src_path.to_string_lossy().replace('/', "\\");
+        let dst_win = target_dir.to_string_lossy().replace('/', "\\");
+        CommandBuilder::new("xcopy")
+            .arg(src_win)
+            .arg(dst_win)
+            .arg("/E")
+            .arg("/Y")
+            .arg("/I")
+            .build()
+            .map_err(|e| format!("failed to build xcopy spec: {e}"))?
+    } else {
+        if let Some(parent) = target_dir.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("failed to create packages directory: {e}"))?;
+        }
+        CommandBuilder::new("cp")
+            .arg("-R")
+            .arg(src_path.to_string_lossy().to_string())
+            .arg(target_dir.to_string_lossy().to_string())
+            .build()
+            .map_err(|e| format!("failed to build cp spec: {e}"))?
+    };
+    execute_command(executor, spec).await?;
 
     Ok(())
 }
