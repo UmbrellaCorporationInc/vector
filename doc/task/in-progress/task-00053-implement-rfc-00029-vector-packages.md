@@ -86,12 +86,12 @@ input:
   language: Rust, YAML
 ```
 
-- [ ] Implement the `add-package` operation in `runtime/packages`.
-- [ ] Accept package name, type, URL, and tag input according to the manifest contract.
-- [ ] Reject any package name that is already present in `.vector/packages.yaml`.
-- [ ] Require `tag` for `git` packages and keep it optional for `file` packages.
-- [ ] Update `.vector/packages.yaml` in governed YAML form after validation succeeds.
-- [ ] Return a clear validation error before any write when a duplicate package name is requested.
+- [x] Implement the `add-package` operation in `runtime/packages`.
+- [x] Accept package name, type, URL, and tag input according to the manifest contract.
+- [x] Reject any package name that is already present in `.vector/packages.yaml`.
+- [x] Require `tag` for `git` packages and keep it optional for `file` packages.
+- [x] Update `.vector/packages.yaml` in governed YAML form after validation succeeds.
+- [x] Return a clear validation error before any write when a duplicate package name is requested.
 
 ### 3.4. Phase D - CLI Execution Surface
 
