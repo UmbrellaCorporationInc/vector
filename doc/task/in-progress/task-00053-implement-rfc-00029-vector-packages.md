@@ -5,7 +5,7 @@ code: "00053"
 slug: implement-rfc-00029-vector-packages
 title: Implement RFC 00029 - Vector Packages
 description: Add the new runtime packages crate, manifest mutation and sync-planning operations, package execution CLI, repository structure validation, and ignore rules required to consume vector repository packages locally.
-status: todo
+status: in-progress
 created: 2026-06-06
 updated: 2026-06-06
 tags:
@@ -65,14 +65,14 @@ input:
   language: Rust
 ```
 
-- [ ] Implement the `sync-packages` operation in `runtime/packages`.
-- [ ] Make `sync-packages` evaluate the manifest and the current state of `.vector-database/packages`.
-- [ ] Return one list entry per package containing package name, command type, and execution description.
-- [ ] Return `clone` when a Git package does not yet exist in `.vector-database/packages/<package-name>`.
-- [ ] Return `fetch` when a Git package already exists in `.vector-database/packages/<package-name>`.
-- [ ] Return `copy` for `file` packages targeting `.vector-database/packages/<package-name>`.
-- [ ] Use the required `fetch` description contract: `haz un git fetch y actualiza el package que esta en .vector-database/packages/<package-name>`.
-- [ ] Make the sync plan deterministic for repeated runs against the same manifest and package state.
+- [x] Implement the `sync-packages` operation in `runtime/packages`.
+- [x] Make `sync-packages` evaluate the manifest and the current state of `.vector-database/packages`.
+- [x] Return one list entry per package containing package name, command type, and execution description.
+- [x] Return `clone` when a Git package does not yet exist in `.vector-database/packages/<package-name>`.
+- [x] Return `fetch` when a Git package already exists in `.vector-database/packages/<package-name>`.
+- [x] Return `copy` for `file` packages targeting `.vector-database/packages/<package-name>`.
+- [x] Use the required `fetch` description contract: `haz un git fetch y actualiza el package que esta en .vector-database/packages/<package-name>`.
+- [x] Make the sync plan deterministic for repeated runs against the same manifest and package state.
 
 ### 3.3. Phase C - Implement `add-package`
 
