@@ -5,7 +5,7 @@ code: "00057"
 slug: fix-find-doc-mcp-tool
 title: Fix find_doc mcp tool
 description: Transition the find_doc MCP tool to return a structured JSON response instead of a plain-text formatted response with prepended metadata lines, preventing patch generation issues.
-status: in-progress
+status: done
 created: 2026-06-07
 updated: 2026-06-07
 tags: []
@@ -57,4 +57,4 @@ input:
   language: rust
 ```
 
-- [ ] Update README files on packages modified
+- [x] Update README files on packages modified
