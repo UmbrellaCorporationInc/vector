@@ -24,6 +24,7 @@
 | `runtime-io`   | `CommandBuilder`, `CommandExecutor`, `ProcessCommandExecutor` for shell execution |
 | `runtime-core` | Core async primitives                                       |
 | `tokio`        | Async runtime                                               |
+| `terminal_size`| Dynamic terminal size querying for output formatting        |
 | `thiserror`    | Error enum derivation                                       |
 
 ## 3. Commands

@@ -5,7 +5,7 @@ code: "00056"
 slug: update-get-vector-to-calculate-the-terminal-size
 title: Update get-vector to calculate the terminal size
 description: Retrieve the terminal width dynamically using the terminal_size crate, falling back to 80, and register the dependency in project-0003-rust-dependencies.md.
-status: in-progress
+status: done
 created: 2026-06-07
 updated: 2026-06-07
 tags:
@@ -74,5 +74,5 @@ input:
   language: markdown
 ```
 
-- [ ] Update README files on packages modified.
-- [ ] Run `validate_fix` to ensure all vector documentation constraints are met.
+- [x] Update README files on packages modified.
+- [x] Run `validate_fix` to ensure all vector documentation constraints are met.
