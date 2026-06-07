@@ -105,12 +105,13 @@ input:
   language: Rust
 ```
 
-- [ ] Create the package execution CLI as `frontend/cli/vector-database`.
-- [ ] Add the `vector-database package sync` subcommand.
-- [ ] Make `vector-database package sync` call `sync-packages`, execute each returned action in the terminal, and stream command output.
-- [ ] Print a pre-message before each command, such as cloning, fetching, or copying package `<name>` from URL `<url>`.
-- [ ] Add the `vector-database package add` subcommand.
-- [ ] Make `vector-database package add` delegate manifest mutation to `add-package` and accept package type, URL, and tag input.
+- [x] Create the package execution CLI as `frontend/cli/vector-database`.
+- [x] Organize the CLI structure so that each subcommand is implemented in its own Rust file under a `commands/` directory, matching the `get-vector` CLI organization.
+- [x] Add the `vector-database package sync` subcommand (e.g. `commands/package_sync.rs` or similar).
+- [x] Make `vector-database package sync` call `sync-packages`, execute each returned action in the terminal, and stream command output.
+- [x] Print a pre-message before each command, such as cloning, fetching, or copying package `<name>` from URL `<url>`.
+- [x] Add the `vector-database package add` subcommand (e.g. `commands/package_add.rs` or similar).
+- [x] Make `vector-database package add` delegate manifest mutation to `add-package` and accept package type, URL, and tag input.
 
 ### 3.5. Phase E - Package Validation and Repository Contract
 

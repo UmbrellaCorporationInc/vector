@@ -6,7 +6,7 @@ slug: rust-dependencies
 title: Rust Dependencies
 description: Defines the approved Rust dependencies for VECTOR project crates.
 created: 2026-05-02
-updated: 2026-05-06
+updated: 2026-06-06
 tags:
   - project
   - rust
@@ -23,14 +23,14 @@ related:
 ## 1. thiserror
 
 Tags: #rust #error-handling
-Scope: `runtime-core`, `runtime-channel`, `runtime-io`, `runtime-project`, `mcp-vector`
-Description: Standard typed error derivation crate approved for library-style crates that expose stable error boundaries.
+Scope: `runtime-core`, `runtime-channel`, `runtime-io`, `runtime-project`, `runtime-doc`, `runtime-language`, `runtime-packages`, `mcp-vector`, `get-vector`, `vector-database`
+Description: Standard typed error derivation crate approved for crates that expose stable error boundaries.
 
 ## 2. tokio
 
 Tags: #rust #async #runtime
-Scope: `runtime-channel`, `runtime-io`, test-only in `runtime-core`, `runtime-doc`, and `runtime-project`
-Description: Tokio async runtime approved as the executor and async I/O backend where required. `runtime-channel` uses Tokio for channel transport. `runtime-io` uses Tokio directly for filesystem and process-backed I/O. Additional test-only Tokio usage is approved in crates that need async test execution.
+Scope: `runtime-channel`, `runtime-io`, `mcp-vector`, `get-vector`, `vector-database`, test-only in `runtime-core`, `runtime-doc`, `runtime-project`, `runtime-language`, and `runtime-packages`
+Description: Tokio async runtime approved as the executor and async I/O backend where required. `runtime-channel` uses Tokio for channel transport. `runtime-io` uses Tokio directly for filesystem and process-backed I/O. `mcp-vector` uses Tokio at the MCP facade boundary. CLI crates may use Tokio when they own the concrete async entrypoint. Additional test-only Tokio usage is approved in crates that need async test execution.
 
 ## 3. paste
 
@@ -47,26 +47,26 @@ Description: Official Rust MCP SDK approved as the server integration dependency
 ## 5. serde
 
 Tags: #rust #serialization
-Scope: `runtime-doc`
-Description: Serialization framework approved for structured document metadata and frontmatter decoding in `runtime-doc`.
+Scope: `runtime-doc`, `runtime-language`, `runtime-packages`, `mcp-vector`
+Description: Serialization framework approved for structured document metadata, package and language metadata decoding, and MCP-facing DTO handling.
 
 ## 6. serde_yaml
 
 Tags: #rust #serialization #yaml
-Scope: `runtime-doc`
-Description: YAML codec approved for parsing governed Markdown frontmatter and related project document metadata in `runtime-doc`.
+Scope: `runtime-doc`, `runtime-language`, `runtime-packages`
+Description: YAML codec approved for parsing governed Markdown frontmatter and related project, language, and package metadata.
 
 ## 7. tempfile
 
 Tags: #rust #testing #filesystem
-Scope: test-only in `runtime-doc`
+Scope: test-only in `runtime-doc`, `runtime-project`, `runtime-language`, `runtime-packages`, `mcp-vector`, and `vector-database`
 Description: Temporary filesystem fixture crate approved for isolated tests that need ephemeral files or directories.
 
 ## 8. walkdir
 
 Tags: #rust #filesystem
-Scope: `runtime-doc`
-Description: Recursive directory traversal crate approved for project document discovery and vault scanning in `runtime-doc`.
+Scope: `runtime-doc`, `runtime-language`
+Description: Recursive directory traversal crate approved for project document discovery, vault scanning, and language asset discovery.
 
 ## 9. regex
 
@@ -78,7 +78,7 @@ Description: Regular expression crate approved for governed document parsing and
 
 Tags: #rust #date-time
 Scope: `runtime-doc`
-Description: Date and time crate approved for document metadata handling and date-aware project document workflows in `runtime-doc`.
+Description: Date and time crate approved for document metadata handling and date-aware governed document workflows in `runtime-doc`.
 
 ## 11. serde_json
 
@@ -103,11 +103,17 @@ Description: Git-style unified diff patch generation and application crate appro
 These workspace crates are used as internal dependencies and are governed by the workspace architecture rather than third-party dependency approval:
 
 - `runtime-core`
+- `runtime-channel`
 - `runtime-io`
 - `runtime-doc`
+- `runtime-language`
+- `runtime-packages`
+- `runtime-project`
 - `mcp-vector`
 
-### Approved inter-crate dependency: `runtime-project` → `runtime-doc`
+Workspace members `get-vector` and `vector-database` are application crates, not shared library dependencies. They may depend on approved runtime crates without needing separate third-party approval entries.
+
+### Approved inter-crate dependency: `runtime-project` -> `runtime-doc`
 
 `runtime-project` is approved to depend on `runtime-doc` for the sole purpose of project setup composition. `ProjectSetupOp` in `runtime-project` invokes `ProjectExtensionSetupOp` from `runtime-doc` to complete the documentation-owned extension setup step as part of the composed project setup chain. This dependency is strictly one-directional: `runtime-doc` must not depend on `runtime-project`. Approved by [[task-00011-bootstrap-mcp-vector-crate-and-approve-rmcp-dependency]] Phase D.
 
@@ -120,5 +126,7 @@ These workspace crates are used as internal dependencies and are governed by the
 - Any additional Tokio-adjacent dependency beyond `tokio` itself must be justified separately in a future task or RFC if it is not strictly required by the current async runtime and I/O boundaries.
 - `rmcp` is **not** approved for `runtime/*` crates or plugin crates. Only `mcp-vector` may take a direct dependency on `rmcp`. Runtime and plugin crates must remain MCP-SDK-agnostic so they stay reusable from CLI or future non-MCP frontends.
 - `rmcp` types must not leak into runtime contracts. The MCP facade boundary stops at `mcp-vector`; all protocol types stay inside that crate.
-- `runtime-doc` is currently the main consumer of document-processing dependencies (`serde`, `serde_yaml`, `walkdir`, `regex`, `chrono`). New document-stack crates should reuse that boundary instead of spreading parsing dependencies across the workspace without explicit justification.
-- `runtime-project` depends on `runtime-doc` only for project setup composition through `ProjectExtensionSetupOp`. This is the only approved inter-crate dependency between these two runtime crates; all other cross-crate composition must be justified separately.
+- `runtime-doc` remains the main consumer of document-processing dependencies (`serde`, `serde_yaml`, `walkdir`, `regex`, `chrono`, `patcher`, `dunce`). New crates should reuse existing runtime boundaries instead of spreading parsing or patching dependencies across the workspace without explicit justification.
+- `runtime-language` and `runtime-packages` are approved to use `serde`, `serde_yaml`, and adjacent filesystem helpers only for their own metadata-loading boundaries. They must not duplicate governed document parsing responsibilities that belong in `runtime-doc` without explicit justification.
+- `runtime-project` depends on `runtime-doc` only for project setup composition through `ProjectExtensionSetupOp`. This is the only approved dependency from `runtime-project` to `runtime-doc`; any broader cross-crate composition must be justified separately.
+- CLI crates (`get-vector`, `vector-database`) may depend on `runtime-io`, Tokio, and approved runtime crates because they own the executable boundary. They should remain thin entrypoints and must not become the primary home of reusable domain logic.
