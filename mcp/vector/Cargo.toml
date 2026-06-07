@@ -14,13 +14,13 @@ runtime-doc = { workspace = true }
 runtime-language = { workspace = true }
 runtime-project = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
 dunce = { workspace = true }
 rmcp = { workspace = true, features = ["client"] }
-serde_json = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

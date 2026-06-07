@@ -295,18 +295,11 @@ async fn find_doc_tool_returns_absolute_path_for_existing_document() {
 
     let expected_path =
         dunce::canonicalize(&target).expect("canonicalize").to_string_lossy().to_string();
-    assert!(
-        result.contains(&format!("path: {expected_path}")),
-        "tool result must contain the canonicalized path; got: {result}"
-    );
-    assert!(
-        result.contains("package: "),
-        "tool result must contain a package field; got: {result}"
-    );
-    assert!(
-        result.contains("doc content here"),
-        "tool result must contain the document content; got: {result}"
-    );
+    let response: super::FindDocResponse =
+        serde_json::from_str(&result).expect("must deserialize FindDocResponse");
+    assert_eq!(response.path, expected_path);
+    assert_eq!(response.package, "");
+    assert_eq!(response.content, "doc content here");
 }
 
 /// Verifies that the `find_doc` tool returns the correct package field in its output.
@@ -335,10 +328,9 @@ async fn find_doc_tool_returns_package_in_output() {
         .await
         .expect("find_doc must succeed when the document exists");
 
-    assert!(
-        result.contains("package: my-package\n"),
-        "package field in output must match the requested package; got: {result}"
-    );
+    let response: super::FindDocResponse =
+        serde_json::from_str(&result).expect("must deserialize FindDocResponse");
+    assert_eq!(response.package, "my-package");
 }
 
 /// Verifies that the `find_doc` tool includes populated document content in its response.
@@ -367,10 +359,9 @@ async fn find_doc_tool_returns_populated_content() {
         .await
         .expect("find_doc must succeed when the document exists");
 
-    assert!(
-        result.contains(expected_content),
-        "tool result must contain the full document content; got: {result}"
-    );
+    let response: super::FindDocResponse =
+        serde_json::from_str(&result).expect("must deserialize FindDocResponse");
+    assert_eq!(response.content, expected_content);
 }
 
 /// Verifies that the `find_doc` tool returns an error when no matching document exists.

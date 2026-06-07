@@ -40,10 +40,10 @@ input:
   language: rust
 ```
 
-- [ ] Define a serializable `FindDocResponse` struct in `mcp/vector/src/tools/document.rs` containing `path`, `package`, and `content`.
-- [ ] Modify the `find_doc` tool implementation to serialize `FindDocResponse` into a JSON string and return it.
-- [ ] Update the integration and unit tests in `mcp/vector/src/tools/document_test.rs` to deserialize and validate the JSON fields rather than checking substring contains on raw text.
-- [ ] Ensure all tests compile and pass successfully.
+- [x] Define a serializable `FindDocResponse` struct in `mcp/vector/src/tools/document.rs` containing `path`, `package`, and `content`.
+- [x] Modify the `find_doc` tool implementation to serialize `FindDocResponse` into a JSON string and return it.
+- [x] Update the integration and unit tests in `mcp/vector/src/tools/document_test.rs` to deserialize and validate the JSON fields rather than checking substring contains on raw text.
+- [x] Ensure all tests compile and pass successfully.
 
 ### 3.2. Phase Z — Wrap-up
 
