@@ -23,3 +23,17 @@ fn empty_arguments_start_the_mcp_server() {
     let mode = process_mode(Vec::<OsString>::new());
     assert!(matches!(mode, ProcessMode::ServeMcp));
 }
+
+#[test]
+fn create_project_with_no_name_selects_create_project_mode() {
+    let mode = process_mode([OsString::from("create-project")]);
+    assert!(matches!(mode, ProcessMode::CreateProject { project_name: None }));
+}
+
+#[test]
+fn create_project_with_name_selects_create_project_mode_with_name() {
+    let mode = process_mode([OsString::from("create-project"), OsString::from("my-project")]);
+    assert!(
+        matches!(mode, ProcessMode::CreateProject { project_name: Some(ref name) } if name == "my-project")
+    );
+}

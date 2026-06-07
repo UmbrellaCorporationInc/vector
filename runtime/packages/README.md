@@ -30,6 +30,10 @@ my_file_package:
 - `url` must specify the local file path.
 - `tag` is **optional**.
 
+### Missing Manifest Behavior
+
+If `.vector/packages.yaml` is missing, manifest loading (`load_manifest`) gracefully returns an empty `PackageManifest::default()` rather than failing with a `RuntimeError`. This supports bootstrapping and running operations in empty or fresh workspace contexts where no packages have been defined.
+
 ## Public Interface
 
 ### Types
