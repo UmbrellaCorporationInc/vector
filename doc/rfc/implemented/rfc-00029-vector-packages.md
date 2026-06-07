@@ -5,7 +5,7 @@ code: "00029"
 slug: vector-packages
 title: Vector Packages
 description: Define vector packages as governed vector repositories, including manifest operations, sync planning, CLI execution, local storage, and bootstrap ignore guarantees.
-status: accepted
+status: implemented
 created: 2026-06-06
 updated: 2026-06-06
 authors:
@@ -168,6 +168,7 @@ After this RFC is accepted:
 - Package download behavior must be deterministic for a given manifest.
 - Project bootstrap logic must ensure `.vector-database/packages` is excluded from Git through the bootstrap `.gitignore` template.
 - This workspace must also ensure `.vector-database/packages` is ignored so local package material is never tracked by accident.
+- The implementation documents failure behavior for unsupported source types, missing repositories or files, invalid package structure, missing required tags, duplicate package names, and local cache refreshes.
 
 This RFC intentionally defines the package declaration, planning operations, and local storage contract first. It does not define package publishing, dependency graphs between packages, cross-package indexing semantics, or the full validation matrix for every remote transport.
 
@@ -194,26 +195,26 @@ This RFC intentionally defines the package declaration, planning operations, and
 
 ## 5. Acceptance Criteria
 
-- [ ] The repository defines the vector package manifest as `.vector/packages.yaml`.
-- [ ] The RFC defines a vector package as a vector repository containing `doc/` and `.vector/`.
-- [ ] The implementation introduces a dedicated `runtime/packages` crate.
-- [ ] The manifest schema supports named package entries with required `type` and `url` fields.
-- [ ] The manifest accepts `type: git` and `type: file` only.
-- [ ] The manifest requires `tag` for `git` packages.
-- [ ] The manifest accepts `tag: branch:<name>` for `git` packages to mean branch HEAD resolution.
-- [ ] The manifest treats `tag` as optional for `file` packages.
-- [ ] `sync-packages` evaluates `.vector/packages.yaml` without delegating manifest parsing to `runtime/doc` or `runtime/project`.
-- [ ] `sync-packages` returns one planned action per package with package name, command type, and execution description.
-- [ ] `sync-packages` returns `clone` for missing Git packages, `fetch` for existing Git packages, and `copy` for file packages.
-- [ ] `add-package` validates duplicate names and updates `.vector/packages.yaml`.
-- [ ] The `vector-database package sync` CLI command executes planned actions and streams command output.
-- [ ] The `vector-database package add` CLI command accepts package type, URL, and tag inputs and delegates manifest mutation to `add-package`.
-- [ ] The implementation validates that downloaded packages have the minimum required vector repository structure.
-- [ ] The implementation defines how a consuming vector repository accesses documentation from downloaded packages.
-- [ ] Re-running the command with the same manifest produces the same resolved package contents for supported source types.
-- [ ] The bootstrap `.gitignore` template excludes `.vector-database/packages`.
-- [ ] This workspace ignores `.vector-database/packages`.
-- [ ] The implementation documents failure behavior for unsupported source types, missing repositories or files, invalid package structure, missing required tags, duplicate package names, and local cache refreshes.
+- [x] The repository defines the vector package manifest as `.vector/packages.yaml`.
+- [x] The RFC defines a vector package as a vector repository containing `doc/` and `.vector/`.
+- [x] The implementation introduces a dedicated `runtime/packages` crate.
+- [x] The manifest schema supports named package entries with required `type` and `url` fields.
+- [x] The manifest accepts `type: git` and `type: file` only.
+- [x] The manifest requires `tag` for `git` packages.
+- [x] The manifest accepts `tag: branch:<name>` for `git` packages to mean branch HEAD resolution.
+- [x] The manifest treats `tag` as optional for `file` packages.
+- [x] `sync-packages` evaluates `.vector/packages.yaml` without delegating manifest parsing to `runtime/doc` or `runtime/project`.
+- [x] `sync-packages` returns one planned action per package with package name, command type, and execution description.
+- [x] `sync-packages` returns `clone` for missing Git packages, `fetch` for existing Git packages, and `copy` for file packages.
+- [x] `add-package` validates duplicate names and updates `.vector/packages.yaml`.
+- [x] The `vector-database package sync` CLI command executes planned actions and streams command output.
+- [x] The `vector-database package add` CLI command accepts package type, URL, and tag inputs and delegates manifest mutation to `add-package`.
+- [x] The implementation validates that downloaded packages have the minimum required vector repository structure.
+- [x] The implementation defines how a consuming vector repository accesses documentation from downloaded packages.
+- [x] Re-running the command with the same manifest produces the same resolved package contents for supported source types.
+- [x] The bootstrap `.gitignore` template excludes `.vector-database/packages`.
+- [x] This workspace ignores `.vector-database/packages`.
+- [x] The implementation documents failure behavior for unsupported source types, missing repositories or files, invalid package structure, missing required tags, duplicate package names, and local cache refreshes.
 
 ## 6. Open Questions
 

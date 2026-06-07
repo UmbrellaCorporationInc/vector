@@ -5,7 +5,7 @@ code: "00053"
 slug: implement-rfc-00029-vector-packages
 title: Implement RFC 00029 - Vector Packages
 description: Add the new runtime packages crate, manifest mutation and sync-planning operations, package execution CLI, repository structure validation, and ignore rules required to consume vector repository packages locally.
-status: in-progress
+status: done
 created: 2026-06-06
 updated: 2026-06-06
 tags:
@@ -177,5 +177,5 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Update README files for every modified crate or package.
-- [ ] Mark RFC 00029 status as `implemented` only after all acceptance criteria are satisfied end to end.
+- [x] Update README files for every modified crate or package.
+- [x] Mark RFC 00029 status as `implemented` only after all acceptance criteria are satisfied end to end.
