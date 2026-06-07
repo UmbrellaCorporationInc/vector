@@ -66,8 +66,16 @@ where
     Out: FnMut(&[u8]) + Send,
     Err: FnMut(&[u8]) + Send,
 {
+    let width_str = std::env::var("COLUMNS")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(80)
+        .to_string();
+
     // 1. Install mcp-vector
-    eprintln!("Downloading mcp...");
+    eprintln!("+--------------------------------------------------+");
+    eprintln!("|               Updating mcp-vector                |");
+    eprintln!("+--------------------------------------------------+");
     let spec1 = CommandBuilder::new("cargo")
         .arg("install")
         .arg("--git")
@@ -76,6 +84,7 @@ where
         .arg(PACKAGE_NAME)
         .arg("--color=always")
         .env("CARGO_TERM_PROGRESS_WHEN", "always")
+        .env("CARGO_TERM_PROGRESS_WIDTH", &width_str)
         .build()
         .map_err(|e| UpdateError::Spawn(e.to_string()))?;
 
@@ -88,7 +97,10 @@ where
     }
 
     // 2. Install vector-database
-    eprintln!("Downloading vector-database cli...");
+    eprintln!();
+    eprintln!("+--------------------------------------------------+");
+    eprintln!("|            Updating vector-database              |");
+    eprintln!("+--------------------------------------------------+");
     let spec2 = CommandBuilder::new("cargo")
         .arg("install")
         .arg("--git")
@@ -97,6 +109,7 @@ where
         .arg(CLI_PACKAGE_NAME)
         .arg("--color=always")
         .env("CARGO_TERM_PROGRESS_WHEN", "always")
+        .env("CARGO_TERM_PROGRESS_WIDTH", &width_str)
         .build()
         .map_err(|e| UpdateError::Spawn(e.to_string()))?;
 
