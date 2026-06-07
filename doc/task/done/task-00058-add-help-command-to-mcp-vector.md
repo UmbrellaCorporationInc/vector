@@ -5,7 +5,7 @@ code: "00058"
 slug: add-help-command-to-mcp-vector
 title: Add --help command to mcp-vector
 description: Add a help command to mcp-vector and add version and help commands to get-vector CLI.
-status: in-progress
+status: done
 created: 2026-06-07
 updated: 2026-06-07
 tags:
@@ -64,4 +64,4 @@ input:
   language: rust
 ```
 
-- [ ] Update README files on packages modified
+- [x] Update README files on packages modified

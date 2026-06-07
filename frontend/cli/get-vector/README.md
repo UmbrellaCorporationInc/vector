@@ -51,11 +51,29 @@ Cargo's stdout and stderr are streamed live to the terminal as the install runs,
 - stdout and stderr from Cargo are interleaved via concurrent polling — their relative order may differ slightly from a sequential terminal session when both streams have data simultaneously.
 - Version-aware skip logic (avoid reinstalling when already up to date) is deferred; the command always performs a full compile-and-install cycle.
 
+### `--version`, `-V`
+
+Displays the version of the `get-vector` CLI (derived from the cargo package version) to help verify alignment with the workspace and MCP version.
+
+### `--help`, `-h`
+
+Displays usage text for the CLI and an ASCII box containing the `cargo install` command to update the CLI itself.
+
 ## 4. Usage
 
 ```sh
 # Install get-vector
 cargo install --git https://github.com/UmbrellaCorporationInc/vector get-vector
+
+# Display help information
+get-vector --help
+# or
+get-vector -h
+
+# Display version
+get-vector --version
+# or
+get-vector -V
 
 # Install or update mcp-vector
 get-vector update-mcp-vector

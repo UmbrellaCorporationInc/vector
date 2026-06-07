@@ -108,13 +108,21 @@ The executable can be run directly from the command line:
   ```bash
   mcp-vector
   ```
-- **Create Project**: Scaffold a new governed project skeleton in the current working directory. If `[name]` is omitted, the project name defaults to the current directory's name:
+- **Create Project**: Scaffold a new governed vector project with vault and workspace:
   ```bash
   mcp-vector create-project [name]
   ```
 - **Version**: Print the workspace version:
   ```bash
   mcp-vector --version
+  # or
+  mcp-vector -V
+  ```
+- **Help**: Print usage and help information:
+  ```bash
+  mcp-vector --help
+  # or
+  mcp-vector -h
   ```
 
 ## 6. Dependency Boundary
