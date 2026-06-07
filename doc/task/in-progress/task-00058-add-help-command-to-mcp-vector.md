@@ -43,14 +43,14 @@ input:
   language: rust
 ```
 
-- [ ] Add support for `--help` in `mcp-vector` to print help info.
-- [ ] Add support for `--version` in `get-vector` CLI, deriving the version string from the cargo package version.
-- [ ] Add support for `--help` in `get-vector` CLI, displaying usage text and an ASCII box with the command:
+- [x] Add support for `--help` in `mcp-vector` to print help info.
+- [x] Add support for `--version` in `get-vector` CLI, deriving the version string from the cargo package version.
+- [x] Add support for `--help` in `get-vector` CLI, displaying usage text and an ASCII box with the command:
   ```
   cargo install --git https://github.com/UmbrellaCorporationInc/vector get-vector
   ```
-- [ ] Implement command parsing logic to handle these options correctly.
-- [ ] Verify execution of new flags.
+- [x] Implement command parsing logic to handle these options correctly.
+- [x] Verify execution of new flags.
 
 ### 3.2. Phase Z — Wrap-up
 

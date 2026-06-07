@@ -10,11 +10,25 @@ use super::{ProcessMode, process_mode};
 fn version_flag_selects_print_version_mode() {
     let mode = process_mode([OsString::from("--version")]);
     assert!(matches!(mode, ProcessMode::PrintVersion(version) if version == workspace_version()));
+
+    let mode_short = process_mode([OsString::from("-V")]);
+    assert!(
+        matches!(mode_short, ProcessMode::PrintVersion(version) if version == workspace_version())
+    );
 }
 
 #[test]
-fn non_version_arguments_fall_back_to_mcp_server_mode() {
+fn help_flag_selects_print_help_mode() {
     let mode = process_mode([OsString::from("--help")]);
+    assert!(matches!(mode, ProcessMode::PrintHelp));
+
+    let mode_short = process_mode([OsString::from("-h")]);
+    assert!(matches!(mode_short, ProcessMode::PrintHelp));
+}
+
+#[test]
+fn unknown_arguments_fall_back_to_mcp_server_mode() {
+    let mode = process_mode([OsString::from("--unknown-flag")]);
     assert!(matches!(mode, ProcessMode::ServeMcp));
 }
 

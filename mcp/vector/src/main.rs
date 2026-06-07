@@ -7,8 +7,24 @@ use mcp_vector::release::version::workspace_version;
 use mcp_vector::server::VectorServer;
 use runtime_core::channel::Receiver;
 
+const HELP_TEXT: &str = "\
+mcp-vector: Canonical Model Context Protocol (MCP) server for the vector system.
+
+Usage:
+  mcp-vector [OPTIONS]
+  mcp-vector [SUBCOMMAND]
+
+Options:
+  -h, --help       Print help information
+  -V, --version    Print version information
+
+Subcommands:
+  create-project   Scaffold a governed vector project with vault and workspace
+";
+
 enum ProcessMode {
     PrintVersion(&'static str),
+    PrintHelp,
     CreateProject { project_name: Option<String> },
     ServeMcp,
 }
@@ -16,7 +32,10 @@ enum ProcessMode {
 fn process_mode(args: impl IntoIterator<Item = OsString>) -> ProcessMode {
     let mut iter = args.into_iter();
     match iter.next().as_deref() {
-        Some(flag) if flag == "--version" => ProcessMode::PrintVersion(workspace_version()),
+        Some(flag) if flag == "--version" || flag == "-V" => {
+            ProcessMode::PrintVersion(workspace_version())
+        }
+        Some(flag) if flag == "--help" || flag == "-h" => ProcessMode::PrintHelp,
         Some(cmd) if cmd == "create-project" => {
             let project_name = iter.next().map(|s| s.to_string_lossy().into_owned());
             ProcessMode::CreateProject { project_name }
@@ -32,6 +51,11 @@ async fn main() -> Result<(), mcp_vector::error::VectorServerError> {
             let mut stdout = std::io::stdout().lock();
             stdout.write_all(version.as_bytes())?;
             stdout.write_all(b"\n")?;
+            Ok(())
+        }
+        ProcessMode::PrintHelp => {
+            let mut stdout = std::io::stdout().lock();
+            stdout.write_all(HELP_TEXT.as_bytes())?;
             Ok(())
         }
         ProcessMode::CreateProject { project_name } => {
