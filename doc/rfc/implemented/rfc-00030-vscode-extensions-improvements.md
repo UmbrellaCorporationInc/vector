@@ -5,7 +5,7 @@ code: "00030"
 slug: vscode-extensions-improvements
 title: VS Code Extension Cross-Package Wikilinks and Package Sync
 description: This RFC proposes cross-package wikilink resolution, a package sync action in the VS Code extension, and package-aware document lookup support in MCP vector tools.
-status: accepted
+status: implemented
 created: 2026-06-06
 updated: 2026-06-06
 authors:

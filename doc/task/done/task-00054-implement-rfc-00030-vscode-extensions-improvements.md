@@ -5,7 +5,7 @@ code: "00054"
 slug: implement-rfc-00030-vscode-extensions-improvements
 title: Implement RFC 00030 VS Code Extension Improvements
 description: Implement package-qualified wikilink resolution, a sync action in the VS Code extension, and package-aware document lookup support in MCP vector tools.
-status: in-progress
+status: done
 created: 2026-06-06
 updated: 2026-06-06
 tags:
@@ -82,6 +82,6 @@ input:
   language: TypeScript, Rust
 ```
 
-- [ ] Validate that extension behavior and MCP lookup behavior remain aligned for both supported identifier forms.
-- [ ] Confirm all RFC 00030 acceptance criteria are covered by implementation or tests.
-- [ ] Update README files on packages modified.
+- [x] Validate that extension behavior and MCP lookup behavior remain aligned for both supported identifier forms.
+- [x] Confirm all RFC 00030 acceptance criteria are covered by implementation or tests.
+- [x] Update README files on packages modified.
