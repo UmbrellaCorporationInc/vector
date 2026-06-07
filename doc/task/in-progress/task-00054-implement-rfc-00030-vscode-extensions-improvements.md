@@ -29,7 +29,7 @@ superseded_by: null
 ## 2. Specs
 
 - **Module:** `frontend/vscode/vector`, `mcp/vector`, shared document lookup flow
-- **Dependencies:** RFC `rfc-00030-vscode-extensions-improvements`
+- **Dependencies:** RFC [[rfc-00030-vscode-extensions-improvements]]
 
 ## 3. Checklist
 
@@ -45,11 +45,11 @@ input:
   language: TypeScript, Rust
 ```
 
-- [ ] Centralize support for `doc-id` and `package/doc-id` parsing instead of duplicating parsing logic across entrypoints.
-- [ ] Preserve current workspace-local resolution for unqualified identifiers.
-- [ ] Add package-aware lookup support for package-qualified identifiers in MCP vector document lookup flows.
-- [ ] Return actionable errors for unknown packages, unsynchronized packages, and missing governed documents.
-- [ ] Add tests for identifier parsing, workspace-local lookup, package-qualified lookup, and failure cases.
+- [x] Centralize support for `doc-id` and `package/doc-id` parsing instead of duplicating parsing logic across entrypoints.
+- [x] Preserve current workspace-local resolution for unqualified identifiers.
+- [x] Add package-aware lookup support for package-qualified identifiers in MCP vector document lookup flows.
+- [x] Return actionable errors for unknown packages, unsynchronized packages, and missing governed documents.
+- [x] Add tests for identifier parsing, workspace-local lookup, package-qualified lookup, and failure cases.
 
 ### 3.2. Phase B - Update VS Code extension navigation and sync flow
 

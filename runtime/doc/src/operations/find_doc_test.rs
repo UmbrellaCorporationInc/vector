@@ -192,6 +192,29 @@ async fn test_find_doc_with_package() {
 }
 
 #[tokio::test]
+async fn test_find_doc_with_package_not_synchronized() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    // Do not create the package directory at all — simulates an unsynchronized package.
+    let input = FindDocInput {
+        root_dir: root.clone(),
+        package: "nonexistent-package".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 13,
+    };
+
+    let mut sender = MockSender::new();
+    let result = find_doc(input, &mut sender).await;
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("is not synchronized or does not exist"),
+        "error must describe an unsynchronized package; got: {err_msg}"
+    );
+}
+
+#[tokio::test]
 async fn test_find_doc_with_package_invalid_contract() {
     let temp = TempDir::new().unwrap();
     let root = IoPath::new(temp.path());
