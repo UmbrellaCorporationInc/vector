@@ -1,6 +1,6 @@
 //! Plugin operation for package manifest insertion.
 
-use crate::types::{PackageEntry, PackageManifest, load_manifest, save_manifest};
+use crate::types::{PackageEntry, load_manifest, save_manifest};
 use runtime_core::{RuntimeError, RuntimeResult, declare_plugin_operations, plugin::PluginSender};
 use runtime_io::path::IoPath;
 
@@ -47,12 +47,7 @@ async fn add_package(
     input: AddPackageInput,
     output: &mut impl PluginSender<AddPackageOutput>,
 ) -> RuntimeResult<()> {
-    let path = input.root_dir.join(".vector").join("packages.yaml");
-    let mut manifest = if path.as_path().exists() {
-        load_manifest(&input.root_dir).await?
-    } else {
-        PackageManifest::default()
-    };
+    let mut manifest = load_manifest(&input.root_dir).await?;
 
     if input.name.trim().is_empty() {
         return Err(RuntimeError::operation("package name cannot be empty"));

@@ -43,12 +43,12 @@ input:
   language: rust
 ```
 
-- [ ] Extend argument parsing in `mcp-vector` to support the `create-project` subcommand, using the current working directory as the default project name if none is provided.
-- [ ] Implement command execution using `ProjectSetupOp` and print progress messages to stdout.
-- [ ] Modify `load_manifest` in `runtime/packages` to return an empty `PackageManifest::default()` if `.vector/packages.yaml` is missing, instead of returning a `RuntimeError`.
-- [ ] Update `add_package` in `runtime/packages` to directly load the manifest without redundant existence checks.
-- [ ] Update unit tests in `manifest_test.rs` to verify behavior for non-existent manifest files.
-- [ ] Run Cargo unit and integration tests to verify that everything compiles and passes.
+- [x] Extend argument parsing in `mcp-vector` to support the `create-project` subcommand, using the current working directory as the default project name if none is provided.
+- [x] Implement command execution using `ProjectSetupOp` and print progress messages to stdout.
+- [x] Modify `load_manifest` in `runtime/packages` to return an empty `PackageManifest::default()` if `.vector/packages.yaml` is missing, instead of returning a `RuntimeError`.
+- [x] Update `add_package` in `runtime/packages` to directly load the manifest without redundant existence checks.
+- [x] Update unit tests in `manifest_test.rs` to verify behavior for non-existent manifest files.
+- [x] Run Cargo unit and integration tests to verify that everything compiles and passes.
 
 ### 3.2. Phase Z — Wrap-up
 

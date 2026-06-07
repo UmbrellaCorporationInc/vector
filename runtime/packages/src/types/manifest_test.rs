@@ -193,6 +193,6 @@ async fn test_load_save_manifest() {
 async fn test_load_non_existent_manifest() {
     let dir = tempfile::tempdir().unwrap();
     let root_path = IoPath::new(dir.path());
-    let err = load_manifest(&root_path).await.unwrap_err();
-    assert!(err.to_string().contains("failed to read .vector/packages.yaml"));
+    let manifest = load_manifest(&root_path).await.unwrap();
+    assert_eq!(manifest, PackageManifest::default());
 }

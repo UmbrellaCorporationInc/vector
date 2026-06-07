@@ -180,6 +180,9 @@ impl PackageManifest {
 /// Returns a [`RuntimeError`] if reading or parsing the manifest fails.
 pub async fn load_manifest(root_dir: &IoPath) -> RuntimeResult<PackageManifest> {
     let path = root_dir.join(".vector").join("packages.yaml");
+    if !path.as_path().exists() {
+        return Ok(PackageManifest::default());
+    }
     let text = read_file_text(&path).await.map_err(|error| {
         RuntimeError::operation(format!("failed to read .vector/packages.yaml: {error}"))
     })?;
