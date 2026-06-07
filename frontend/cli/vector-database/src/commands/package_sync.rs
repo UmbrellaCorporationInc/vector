@@ -74,9 +74,9 @@ where
         if !msg.is_empty() {
             let border = format!("+---{}---+", "-".repeat(msg.len()));
             println!();
-            println!("{}", border);
-            println!("|   {}   |", msg);
-            println!("{}", border);
+            println!("{border}");
+            println!("|   {msg}   |");
+            println!("{border}");
         }
 
         let target_dir = packages_dir.join(&action.name);
