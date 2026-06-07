@@ -5,7 +5,7 @@ code: "00031"
 slug: add-a-new-command-en-mcp-vector-and-vector-database-improvements
 title: Add a new command in mcp-vector and vector-database improvements
 description: Proposes extending the mcp-vector CLI to support project initialization commands and improving packages manifest parsing to handle missing manifests gracefully.
-status: accepted
+status: implemented
 created: 2026-06-07
 updated: 2026-06-07
 authors: ["Antigravity"]

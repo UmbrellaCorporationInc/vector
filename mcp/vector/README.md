@@ -94,7 +94,24 @@ async fn main() {
 }
 ```
 
-## 5. Dependency Boundary
+## 5. CLI Commands
+
+The executable can be run directly from the command line:
+
+- **Start MCP Server**: Run without arguments (or with unrecognized arguments) to start the stdio MCP server:
+  ```bash
+  mcp-vector
+  ```
+- **Create Project**: Scaffold a new governed project skeleton in the current working directory. If `[name]` is omitted, the project name defaults to the current directory's name:
+  ```bash
+  mcp-vector create-project [name]
+  ```
+- **Version**: Print the workspace version:
+  ```bash
+  mcp-vector --version
+  ```
+
+## 6. Dependency Boundary
 
 This crate enforces the thin-facade boundary defined in RFC-00011 and RFC-00001:
 
@@ -102,7 +119,7 @@ This crate enforces the thin-facade boundary defined in RFC-00011 and RFC-00001:
 - `rmcp` types must not appear in runtime contracts, traits, or operation signatures
 - All reusable capability logic must live in `runtime/*` crates accessed through the dispatcher bridge
 
-## 6. Non-Goals and Future Work
+## 7. Non-Goals and Future Work
 
 - Prompts and resources are not yet registered; tool-only surface is intentional at this phase
 - Additional tool groups (`VaultTools`) will be added as capability domains are specified in separate tasks

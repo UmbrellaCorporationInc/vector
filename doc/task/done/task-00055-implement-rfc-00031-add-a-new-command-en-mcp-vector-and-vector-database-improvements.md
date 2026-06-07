@@ -5,7 +5,7 @@ code: "00055"
 slug: implement-rfc-00031-add-a-new-command-en-mcp-vector-and-vector-database-improvements
 title: "Implement RFC 00031: Add a new command in mcp-vector and vector-database improvements"
 description: Extend mcp-vector CLI to support project creation and make packages manifest loading robust against missing files.
-status: in-progress
+status: done
 created: 2026-06-07
 updated: 2026-06-07
 tags:
@@ -62,4 +62,4 @@ input:
   language: rust
 ```
 
-- [ ] Update README files on packages modified
+- [x] Update README files on packages modified
