@@ -220,6 +220,17 @@ fn test_runtime_markdown_extraction_uses_only_registered_serialization_dependenc
     assert!(dependency_register.contains("Markdown extraction frontmatter metadata"));
 }
 
+#[test]
+fn test_runtime_markdown_readme_documents_extraction_contract() {
+    let readme = include_str!("../README.md");
+
+    assert!(readme.contains("## Extraction Contract"));
+    assert!(readme.contains("extract_markdown_file(&MarkdownDiscoveryRecord)"));
+    assert!(readme.contains("MarkdownExtractionOutcome::Failed"));
+    assert!(readme.contains("malformed_frontmatter"));
+    assert!(readme.contains("parser_dependency_spike_deferred"));
+}
+
 struct ExtractionFixture {
     root: IoPath,
 }

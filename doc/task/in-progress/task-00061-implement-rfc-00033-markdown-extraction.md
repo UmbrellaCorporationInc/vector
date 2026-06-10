@@ -58,6 +58,6 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Update package or command documentation affected by the extraction flow.
-- [ ] Confirm examples and error messages match the implemented behavior.
-- [ ] Run `validate_fix` for governed documentation.
+- [x] Update package or command documentation affected by the extraction flow.
+- [x] Confirm examples and error messages match the implemented behavior.
+- [x] Run `validate_fix` for governed documentation.
