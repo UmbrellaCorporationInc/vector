@@ -60,6 +60,7 @@ Acceptance criteria:
 ### Phase 2: Implement Markdown File Discovery
 
 Implement file discovery for local Markdown corpora.
+See [[rfc-00032-markdown-discovery]] for the proposed runtime crate boundary and dependency-governance decisions for this phase.
 
 - Walk the workspace `doc/` folder.
 - Walk each synchronized package `doc/` folder under `.vector-database/packages/{package}/doc/`.
