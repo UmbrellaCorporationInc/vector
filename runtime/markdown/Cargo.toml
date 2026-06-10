@@ -1,0 +1,12 @@
+[package]
+name = "runtime-markdown"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+runtime-io = { workspace = true }
+
+[lints]
+workspace = true

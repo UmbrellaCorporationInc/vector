@@ -101,10 +101,10 @@ input:
   language: Rust, TOML
 ```
 
-- [ ] Create or update `runtime-markdown` as the owner of Markdown discovery APIs.
-- [ ] Create or update `runtime-rag` as the owner of Phase 1 RAG defaults and Markdown discovery orchestration.
-- [ ] Make `runtime-rag` depend on `runtime-markdown`.
-- [ ] Prevent `runtime-markdown` from depending on `runtime-rag`, LanceDB, embedding code, or MCP-facing types.
+- [x] Create or update `runtime-markdown` as the owner of Markdown discovery APIs.
+- [x] Create or update `runtime-rag` as the owner of Phase 1 RAG defaults and Markdown discovery orchestration.
+- [x] Make `runtime-rag` depend on `runtime-markdown`.
+- [x] Prevent `runtime-markdown` from depending on `runtime-rag`, LanceDB, embedding code, or MCP-facing types.
 
 ### 3.5. Phase E -- Markdown discovery API
 
