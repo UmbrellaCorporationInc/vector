@@ -98,12 +98,19 @@ async fn test_traversal_paths_can_be_read_as_bytes_and_text_deterministically() 
 fn test_runtime_io_traversal_uses_only_workspace_approved_io_dependencies() {
     let crate_manifest = include_str!("../Cargo.toml");
     let workspace_manifest = include_str!("../../../Cargo.toml");
+    let dependency_register =
+        include_str!("../../../doc/project/project-0003-rust-dependencies.md");
 
     assert!(workspace_manifest.contains("tokio = { version = \"1\""));
     assert!(crate_manifest.contains("tokio = { workspace = true }"));
     assert!(
         !crate_manifest.contains("walkdir"),
         "runtime-io traversal should remain backed by tokio::fs unless a new traversal dependency is approved for runtime-io"
+    );
+    assert!(
+        dependency_register
+            .contains("No traversal-specific third-party dependency is approved for `runtime-io`"),
+        "dependency governance should record that runtime-io traversal does not require a new third-party crate"
     );
 }
 

@@ -5,7 +5,7 @@ code: "00060"
 slug: implement-rfc-00032-markdown-discovery
 title: Implement RFC 00032 Markdown Discovery
 description: Implement the runtime crate boundary and deterministic Markdown discovery behavior proposed by RFC 00032.
-status: todo
+status: in-progress
 created: 2026-06-10
 updated: 2026-06-10
 tags:
@@ -68,9 +68,9 @@ input:
   language: Rust, TOML, Markdown
 ```
 
-- [ ] Identify whether traversal requires a new third-party Rust dependency.
-- [ ] Register any required dependency not covered by Phase A in [[project-0003-rust-dependencies]] before modifying workspace manifests.
-- [ ] Keep implementation blocked on governance if a required dependency is not approved.
+- [x] Identify whether traversal requires a new third-party Rust dependency.
+- [x] Register any required dependency not covered by Phase A in [[project-0003-rust-dependencies]] before modifying workspace manifests.
+- [x] Keep implementation blocked on governance if a required dependency is not approved.
 
 ### 3.3. Phase C -- Runtime IO traversal boundary
 
