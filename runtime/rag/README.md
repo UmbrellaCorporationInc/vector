@@ -55,8 +55,11 @@ self-describing when retrieved independently. Overlap is applied only between
 chunks produced from the same oversized section; compact sections do not receive
 overlap.
 
-Neighbor population across multiple chunks is implemented in a later RFC 00034
-phase without changing the public chunk record shape.
+Chunk identifiers are derived from package identity, document stem, heading
+slug, zero-based chunk ordinal, and chunk hash. Chunk hashes use normalized
+chunk text plus structural metadata, so unrelated document edits outside those
+inputs do not churn unchanged chunk identifiers. Adjacent chunks in the same
+document are linked with `previous_chunk_id` and `next_chunk_id`.
 
 ## Boundary Rules
 

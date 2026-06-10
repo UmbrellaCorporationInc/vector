@@ -174,6 +174,129 @@ async fn test_chunk_output_is_deterministic_for_same_input_and_config() {
 }
 
 #[tokio::test]
+async fn test_chunking_populates_neighbor_chunk_ids_within_document_order() {
+    let fixture = fixture_nested_headings().await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+
+    let chunks = chunk_markdown_document(
+        &document,
+        MarkdownChunkingConfig::phase_four_defaults(),
+        &WhitespaceMarkdownTokenCounter,
+    )
+    .unwrap();
+
+    assert_eq!(chunks.len(), 2);
+    assert_eq!(chunks[0].previous_chunk_id, None);
+    assert_eq!(chunks[0].next_chunk_id, Some(chunks[1].chunk_id.clone()));
+    assert_eq!(chunks[1].previous_chunk_id, Some(chunks[0].chunk_id.clone()));
+    assert_eq!(chunks[1].next_chunk_id, None);
+}
+
+#[tokio::test]
+async fn test_chunking_preserves_package_identity_for_synchronized_documents() {
+    let fixture = fixture_package_document().await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+
+    let chunks = chunk_markdown_document(
+        &document,
+        MarkdownChunkingConfig::phase_four_defaults(),
+        &WhitespaceMarkdownTokenCounter,
+    )
+    .unwrap();
+
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0].package.as_deref(), Some("shared-docs"));
+    assert!(
+        chunks[0]
+            .chunk_id
+            .starts_with("shared-docs/spec-00011-rag-plan-implementation/package-spec/0000/")
+    );
+}
+
+#[tokio::test]
+async fn test_unchanged_chunks_keep_ids_when_unrelated_document_content_changes() {
+    let first_fixture = fixture(
+        "stable-identity-original",
+        None,
+        "rfc-00034-markdown-chunking",
+        "# Title\n\n## Stable\n\nKeep this body.\n\n## Changed\n\nOriginal content.\n",
+        "Keep this body.",
+    )
+    .await;
+    let second_fixture = fixture(
+        "stable-identity-edited",
+        None,
+        "rfc-00034-markdown-chunking",
+        "# Title\n\n## Stable\n\nKeep this body.\n\n## Changed\n\nEdited unrelated content.\n",
+        "Keep this body.",
+    )
+    .await;
+    let first_document = MarkdownChunkDocument::from_extraction_record(
+        &first_fixture.extraction,
+        &first_fixture.source,
+    )
+    .unwrap();
+    let second_document = MarkdownChunkDocument::from_extraction_record(
+        &second_fixture.extraction,
+        &second_fixture.source,
+    )
+    .unwrap();
+
+    let first_chunks = chunk_markdown_document(
+        &first_document,
+        MarkdownChunkingConfig::phase_four_defaults(),
+        &WhitespaceMarkdownTokenCounter,
+    )
+    .unwrap();
+    let second_chunks = chunk_markdown_document(
+        &second_document,
+        MarkdownChunkingConfig::phase_four_defaults(),
+        &WhitespaceMarkdownTokenCounter,
+    )
+    .unwrap();
+    let first_stable = first_chunks
+        .iter()
+        .find(|chunk| chunk.heading_path.last().is_some_and(|heading| heading == "Stable"))
+        .unwrap();
+    let second_stable = second_chunks
+        .iter()
+        .find(|chunk| chunk.heading_path.last().is_some_and(|heading| heading == "Stable"))
+        .unwrap();
+
+    assert_ne!(first_stable.document_hash, second_stable.document_hash);
+    assert_eq!(first_stable.text, second_stable.text);
+    assert_eq!(first_stable.chunk_ordinal, second_stable.chunk_ordinal);
+    assert_eq!(first_stable.heading_path, second_stable.heading_path);
+    assert_eq!(first_stable.chunk_hash, second_stable.chunk_hash);
+    assert_eq!(first_stable.chunk_id, second_stable.chunk_id);
+}
+
+#[test]
+fn test_chunk_hash_uses_normalized_chunk_text() {
+    let heading_path = vec!["Title".to_owned()];
+    let lf_hash = stable_chunk_hash(
+        None,
+        "spec-00011-rag-plan-implementation",
+        0,
+        &heading_path,
+        "# Title\n\nBody.",
+    );
+    let crlf_hash = stable_chunk_hash(
+        None,
+        "spec-00011-rag-plan-implementation",
+        0,
+        &heading_path,
+        "# Title\r\n\r\nBody.",
+    );
+
+    assert_eq!(lf_hash, crlf_hash);
+}
+
+#[tokio::test]
 async fn test_sections_at_or_below_maximum_are_emitted_without_overlap() {
     let fixture = fixture_short_section().await;
     let document =

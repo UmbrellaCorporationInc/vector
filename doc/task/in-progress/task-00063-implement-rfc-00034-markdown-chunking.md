@@ -101,11 +101,11 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Derive `chunk_id` from package identity, document stem, heading path or heading slug, chunk ordinal, and chunk hash.
-- [ ] Compute `chunk_hash` from normalized chunk text and structural metadata.
-- [ ] Preserve package identity as `null` or equivalent for workspace documents and as package name for synchronized package documents.
-- [ ] Populate `previous_chunk_id` and `next_chunk_id` for adjacent chunks in the same document.
-- [ ] Add tests proving unchanged chunks keep stable identifiers when unrelated document content changes outside their identity inputs.
+- [x] Derive `chunk_id` from package identity, document stem, heading path or heading slug, chunk ordinal, and chunk hash.
+- [x] Compute `chunk_hash` from normalized chunk text and structural metadata.
+- [x] Preserve package identity as `null` or equivalent for workspace documents and as package name for synchronized package documents.
+- [x] Populate `previous_chunk_id` and `next_chunk_id` for adjacent chunks in the same document.
+- [x] Add tests proving unchanged chunks keep stable identifiers when unrelated document content changes outside their identity inputs.
 
 ### 3.5. Phase E - Integrate chunking into the RAG pipeline
 

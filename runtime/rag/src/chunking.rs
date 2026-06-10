@@ -227,7 +227,7 @@ pub fn chunk_markdown_document(
         );
     }
 
-    let chunks = chunk_texts
+    let mut chunks = chunk_texts
         .into_iter()
         .enumerate()
         .map(|(chunk_ordinal, chunk)| {
@@ -235,7 +235,6 @@ pub fn chunk_markdown_document(
             let chunk_hash = stable_chunk_hash(
                 document.package.as_deref(),
                 &document.document_stem,
-                &document.document_hash,
                 chunk_ordinal,
                 &chunk.heading_path,
                 &chunk.text,
@@ -262,7 +261,9 @@ pub fn chunk_markdown_document(
                 next_chunk_id: None,
             }
         })
-        .collect();
+        .collect::<Vec<_>>();
+
+    populate_neighbor_chunk_ids(&mut chunks);
 
     Ok(chunks)
 }
@@ -792,23 +793,32 @@ fn chunk_id(
     format!("{package_namespace}/{document_stem}/{heading_slug}/{chunk_ordinal:04}/{chunk_hash}")
 }
 
+fn populate_neighbor_chunk_ids(chunks: &mut [MarkdownChunkRecord]) {
+    let chunk_ids = chunks.iter().map(|chunk| chunk.chunk_id.clone()).collect::<Vec<_>>();
+
+    for (index, chunk) in chunks.iter_mut().enumerate() {
+        chunk.previous_chunk_id =
+            index.checked_sub(1).map(|previous_index| chunk_ids[previous_index].clone());
+        chunk.next_chunk_id = chunk_ids.get(index + 1).cloned();
+    }
+}
+
 fn stable_chunk_hash(
     package: Option<&str>,
     document_stem: &str,
-    document_hash: &str,
     chunk_ordinal: usize,
     heading_path: &[String],
     text: &str,
 ) -> String {
     let ordinal = chunk_ordinal.to_string();
     let heading_path = heading_path.join("\u{1f}");
+    let normalized_text = normalized_chunk_text(text);
     let components = [
         package.unwrap_or(WORKSPACE_CHUNK_NAMESPACE),
         document_stem,
-        document_hash,
         &ordinal,
         &heading_path,
-        text,
+        &normalized_text,
     ];
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
 
@@ -822,6 +832,10 @@ fn stable_chunk_hash(
     }
 
     format!("{hash:016x}")
+}
+
+fn normalized_chunk_text(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 fn slug_component(value: &str) -> String {
