@@ -41,11 +41,22 @@ The first local RAG implementation uses:
 `MarkdownTokenCounter`. The chunker does not read files or parse frontmatter;
 those responsibilities remain in Markdown discovery and extraction.
 
-The current Phase A implementation establishes the stable DTO and tokenizer
-boundary with a deterministic whitespace token counter. Heading-aware sectioning,
-oversized section splitting, and neighbor population across multiple chunks are
-implemented in later RFC 00034 phases without changing the public chunk record
-shape.
+The current implementation establishes the stable DTO and tokenizer boundary
+with a deterministic whitespace token counter, parses heading-aware sections,
+and splits oversized sections before embedding. Sections at or below the
+configured maximum token count are emitted unchanged. Oversized sections are
+split using token-aware checks at preferred Markdown block boundaries:
+paragraphs, list items, table rows, fenced code blocks, and blank-line-separated
+blocks. Fenced code blocks are never split internally.
+
+When a table must be split, every emitted table fragment repeats the original
+table header row and separator row. This keeps each table chunk valid and
+self-describing when retrieved independently. Overlap is applied only between
+chunks produced from the same oversized section; compact sections do not receive
+overlap.
+
+Neighbor population across multiple chunks is implemented in a later RFC 00034
+phase without changing the public chunk record shape.
 
 ## Boundary Rules
 

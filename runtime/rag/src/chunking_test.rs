@@ -174,6 +174,168 @@ async fn test_chunk_output_is_deterministic_for_same_input_and_config() {
 }
 
 #[tokio::test]
+async fn test_sections_at_or_below_maximum_are_emitted_without_overlap() {
+    let fixture = fixture_short_section().await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+    let config = MarkdownChunkingConfig::new(3, 6, 3);
+
+    let chunks =
+        chunk_markdown_document(&document, config, &WhitespaceMarkdownTokenCounter).unwrap();
+
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0].text, "## Short Section\n\nA concise section.");
+    assert_eq!(chunks[0].token_count, config.maximum_token_count());
+}
+
+#[tokio::test]
+async fn test_oversized_sections_split_on_token_aware_block_boundaries() {
+    let fixture = fixture(
+        "oversized-paragraph",
+        None,
+        "rfc-00034-markdown-chunking",
+        format!(
+            "# Title\n\n## Long Section\n\n{}\n\n{}\n\n{}",
+            numbered_words("alpha", 8),
+            numbered_words("beta", 8),
+            numbered_words("gamma", 8)
+        ),
+        "gamma-7",
+    )
+    .await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+    let config = MarkdownChunkingConfig::new(10, 12, 0);
+
+    let chunks =
+        chunk_markdown_document(&document, config, &WhitespaceMarkdownTokenCounter).unwrap();
+
+    assert!(chunks.len() > 1);
+    assert!(
+        chunks.iter().all(|chunk| chunk.token_count <= config.maximum_token_count()),
+        "all chunks must stay within the configured maximum: {chunks:#?}"
+    );
+    assert!(chunks.iter().all(|chunk| chunk.text.starts_with("## Long Section\n\n")));
+    assert!(chunks.iter().all(|chunk| !chunk.text.contains("alpha-7\n\nbeta-0")));
+}
+
+#[tokio::test]
+async fn test_oversized_section_overlap_is_local_to_split_section() {
+    let fixture = fixture(
+        "local-overlap",
+        None,
+        "task-00063-implement-rfc-00034-markdown-chunking",
+        "# Title\n\n## Before\n\nBefore body.\n\n## Long List\n\n- first item words\n- second item words\n- third item words\n- fourth item words\n\n## After\n\nAfter body.\n",
+        "fourth item",
+    )
+    .await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+    let config = MarkdownChunkingConfig::new(8, 14, 8);
+
+    let chunks =
+        chunk_markdown_document(&document, config, &WhitespaceMarkdownTokenCounter).unwrap();
+    let long_list_chunks = chunks
+        .iter()
+        .filter(|chunk| chunk.heading_path.last().is_some_and(|heading| heading == "Long List"))
+        .collect::<Vec<_>>();
+
+    assert!(long_list_chunks.len() > 1);
+    assert!(long_list_chunks[0].text.contains("- second item words"));
+    assert!(long_list_chunks[1].text.contains("- second item words"));
+    assert!(!long_list_chunks[0].text.contains("Before body."));
+    assert!(!long_list_chunks.last().unwrap().text.contains("After body."));
+}
+
+#[tokio::test]
+async fn test_oversized_sections_never_split_inside_fenced_code_blocks() {
+    let fixture = fixture(
+        "fenced-code-split",
+        None,
+        "rfc-00034-markdown-chunking",
+        "# Title\n\n## Example\n\nintro one two three four five six\n\n```rust\nfn main() {}\n```\n\ntail one two three four five six\n",
+        "fn main",
+    )
+    .await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+    let config = MarkdownChunkingConfig::new(7, 12, 0);
+
+    let chunks =
+        chunk_markdown_document(&document, config, &WhitespaceMarkdownTokenCounter).unwrap();
+    let code_chunks =
+        chunks.iter().filter(|chunk| chunk.text.contains("```rust")).collect::<Vec<_>>();
+
+    assert_eq!(code_chunks.len(), 1);
+    assert!(code_chunks[0].text.contains("fn main() {}"));
+    assert!(code_chunks[0].text.contains("\n```\n") || code_chunks[0].text.ends_with("\n```"));
+    assert!(
+        chunks.iter().all(|chunk| chunk.token_count <= config.maximum_token_count()),
+        "all chunks must stay within the configured maximum: {chunks:#?}"
+    );
+}
+
+#[tokio::test]
+async fn test_oversized_sections_preserve_valid_list_chunks() {
+    let fixture = fixture(
+        "list-split",
+        None,
+        "task-00063-implement-rfc-00034-markdown-chunking",
+        "# Title\n\n## Steps\n\n- first item words\n- second item words\n- third item words\n- fourth item words\n",
+        "fourth item",
+    )
+    .await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+    let config = MarkdownChunkingConfig::new(8, 12, 0);
+
+    let chunks =
+        chunk_markdown_document(&document, config, &WhitespaceMarkdownTokenCounter).unwrap();
+
+    assert!(chunks.len() > 1);
+    for chunk in &chunks {
+        let body_lines = chunk.text.lines().skip_while(|line| !line.trim().is_empty()).skip(1);
+        for line in body_lines.filter(|line| !line.trim().is_empty()) {
+            assert!(line.starts_with("- "), "list chunk contains a broken item line: {chunk:#?}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_oversized_sections_preserve_valid_table_chunks_with_repeated_headers() {
+    let fixture = fixture(
+        "table-split",
+        None,
+        "rfc-00034-markdown-chunking",
+        "# Title\n\n## Table\n\n| Field | Meaning |\n| --- | --- |\n| alpha | first value |\n| beta | second value |\n| gamma | third value |\n",
+        "| gamma |",
+    )
+    .await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+    let config = MarkdownChunkingConfig::new(16, 18, 0);
+
+    let chunks =
+        chunk_markdown_document(&document, config, &WhitespaceMarkdownTokenCounter).unwrap();
+
+    assert!(chunks.len() > 1);
+    for chunk in chunks.iter().filter(|chunk| chunk.text.contains('|')) {
+        assert!(chunk.text.contains("| Field | Meaning |"));
+        assert!(chunk.text.contains("| --- | --- |"));
+        assert!(
+            chunk.token_count <= config.maximum_token_count(),
+            "table chunk exceeds maximum: {chunk:#?}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn test_chunk_input_rejects_invalid_extraction_body_span() {
     let mut fixture = fixture_short_section().await;
     fixture.extraction.body_span = MarkdownSourceSpan::new(0, fixture.source.len() + 1);
@@ -359,4 +521,8 @@ fn unique_fixture_path(name: &str) -> PathBuf {
     let nanos =
         SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
     std::env::temp_dir().join(format!("vector-runtime-rag-chunking-{name}-{nanos}.md"))
+}
+
+fn numbered_words(prefix: &str, count: usize) -> String {
+    (0..count).map(|index| format!("{prefix}-{index}")).collect::<Vec<_>>().join(" ")
 }

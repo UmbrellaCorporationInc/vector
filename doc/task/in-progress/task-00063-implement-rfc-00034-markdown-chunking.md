@@ -82,12 +82,12 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Emit sections at or below the maximum token limit without overlap.
-- [ ] Split sections above the maximum token limit using token-aware limits and preferred Markdown block boundaries.
-- [ ] Never split inside fenced code blocks.
-- [ ] Preserve valid Markdown when splitting lists and tables.
-- [ ] Apply overlap only between chunks created from the same oversized section.
-- [ ] Decide and document table split behavior, including whether each split table chunk repeats the header row.
+- [x] Emit sections at or below the maximum token limit without overlap.
+- [x] Split sections above the maximum token limit using token-aware limits and preferred Markdown block boundaries.
+- [x] Never split inside fenced code blocks.
+- [x] Preserve valid Markdown when splitting lists and tables.
+- [x] Apply overlap only between chunks created from the same oversized section.
+- [x] Decide and document table split behavior, including whether each split table chunk repeats the header row.
 
 ### 3.4. Phase D - Add stable identity and neighbor metadata
 
