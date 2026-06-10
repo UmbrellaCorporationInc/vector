@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
+use std::thread;
 use std::time::{Duration, SystemTime};
 use tokio::fs;
 
@@ -138,7 +139,7 @@ impl HashFixture {
 
 async fn wait_for_modified_time_change(path: &IoPath, before: SystemTime) -> SystemTime {
     for _ in 0..3 {
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        thread::sleep(Duration::from_secs(1));
         let bytes = read_file_bytes(path).await.unwrap();
         write_file_bytes(path, bytes).await.unwrap();
 

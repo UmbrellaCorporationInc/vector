@@ -4,6 +4,7 @@
 use super::*;
 use crate::memory::{MemReader, MemWriter};
 use runtime_core::{Receiver, Sender};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[tokio::test]
 async fn test_text_reader_valid_utf8() {
@@ -106,8 +107,8 @@ async fn test_text_writer_zero_buffer_size_flushes_one_byte_chunks() {
 }
 
 #[tokio::test]
-async fn test_file_helpers_text() {
-    let test_file = IoPath::new("test_file_helpers_text.txt");
+async fn test_write_file_text_can_be_read_immediately_after_return() {
+    let test_file = IoPath::new(unique_text_fixture_path("test_file_helpers_text.txt"));
     let text = "🚀 Hello, Vector! 🚀".to_string();
 
     write_file_text(&test_file, text.clone()).await.unwrap();
@@ -116,4 +117,10 @@ async fn test_file_helpers_text() {
     assert_eq!(read_data, text);
 
     let _ = std::fs::remove_file(test_file);
+}
+
+fn unique_text_fixture_path(file_name: &str) -> std::path::PathBuf {
+    let nanos =
+        SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
+    std::env::temp_dir().join(format!("vector-runtime-io-text-{nanos}-{file_name}"))
 }

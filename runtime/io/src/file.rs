@@ -103,11 +103,12 @@ impl FileWriter {
     ///
     /// Returns [`IoError::File`] if writing to the file fails.
     pub async fn flush(&mut self) -> Result<(), IoError> {
-        if !self.buffer.is_empty() {
-            if let Some(file) = &mut self.file {
+        if let Some(file) = &mut self.file {
+            if !self.buffer.is_empty() {
                 file.write_all(&self.buffer).await.map_err(|e| IoError::File(e.to_string()))?;
+                self.buffer.clear();
             }
-            self.buffer.clear();
+            file.flush().await.map_err(|e| IoError::File(e.to_string()))?;
         }
         Ok(())
     }
