@@ -82,9 +82,9 @@ input:
   language: markdown, toml, rust
 ```
 
-- [ ] If a new traversal dependency is introduced, update [[project-0003-rust-dependencies]] before adding it to `Cargo.toml`.
-- [ ] Scope any new traversal dependency to `runtime-io` unless another crate has a documented need.
-- [ ] Update workspace dependencies and `runtime/io/Cargo.toml` consistently.
+- [x] If a new traversal dependency is introduced, update [[project-0003-rust-dependencies]] before adding it to `Cargo.toml`.
+- [x] Scope any new traversal dependency to `runtime-io` unless another crate has a documented need.
+- [x] Update workspace dependencies and `runtime/io/Cargo.toml` consistently.
 
 ### 3.4. Phase Z — Wrap-up
 

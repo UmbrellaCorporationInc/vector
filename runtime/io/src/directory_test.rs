@@ -94,6 +94,19 @@ async fn test_traversal_paths_can_be_read_as_bytes_and_text_deterministically() 
     fixture.cleanup().await;
 }
 
+#[test]
+fn test_runtime_io_traversal_uses_only_workspace_approved_io_dependencies() {
+    let crate_manifest = include_str!("../Cargo.toml");
+    let workspace_manifest = include_str!("../../../Cargo.toml");
+
+    assert!(workspace_manifest.contains("tokio = { version = \"1\""));
+    assert!(crate_manifest.contains("tokio = { workspace = true }"));
+    assert!(
+        !crate_manifest.contains("walkdir"),
+        "runtime-io traversal should remain backed by tokio::fs unless a new traversal dependency is approved for runtime-io"
+    );
+}
+
 struct DirectoryFixture {
     root: IoPath,
 }
