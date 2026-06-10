@@ -119,11 +119,11 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Wire the chunker after normalized Markdown metadata extraction and before embedding.
-- [ ] Keep Phase 5 embedding and Phase 6 storage boundaries decoupled from Markdown parsing details.
-- [ ] Return actionable errors for malformed extraction inputs, unsupported Markdown structures, and unsplittable oversized blocks.
-- [ ] Confirm package documents and workspace documents follow the same chunking semantics.
-- [ ] Update any README or developer documentation for the new chunking boundary if a modified package exposes it.
+- [x] Wire the chunker after normalized Markdown metadata extraction and before embedding.
+- [x] Keep Phase 5 embedding and Phase 6 storage boundaries decoupled from Markdown parsing details.
+- [x] Return actionable errors for malformed extraction inputs, unsupported Markdown structures, and unsplittable oversized blocks.
+- [x] Confirm package documents and workspace documents follow the same chunking semantics.
+- [x] Update any README or developer documentation for the new chunking boundary if a modified package exposes it.
 
 ### 3.6. Phase Z - Wrap-up
 

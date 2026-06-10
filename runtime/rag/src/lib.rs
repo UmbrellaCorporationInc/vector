@@ -5,6 +5,8 @@
 
 pub mod chunking;
 pub mod defaults;
+pub mod pipeline;
 
 pub use chunking::*;
 pub use defaults::*;
+pub use pipeline::*;

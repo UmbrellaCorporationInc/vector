@@ -16,6 +16,10 @@ orchestration boundaries for Vector.
   boundary. `MarkdownChunkRecord` exposes package identity, document stem,
   document hash, chunk identity, heading path, text, token count, and
   neighboring chunk references before the embedding boundary.
+- **Extraction-To-Chunking Pipeline**:
+  `chunk_markdown_extraction(...)` wires normalized Markdown extraction outcomes
+  into chunk batches before embedding without exposing Markdown parser internals
+  to later embedding or storage phases.
 
 ## Phase 1 Defaults
 
@@ -60,6 +64,25 @@ slug, zero-based chunk ordinal, and chunk hash. Chunk hashes use normalized
 chunk text plus structural metadata, so unrelated document edits outside those
 inputs do not churn unchanged chunk identifiers. Adjacent chunks in the same
 document are linked with `previous_chunk_id` and `next_chunk_id`.
+
+## Pipeline Boundary
+
+`chunk_markdown_extraction(...)` accepts a `runtime-markdown`
+`MarkdownExtractionOutcome`, the corresponding source text, a
+`MarkdownChunkingConfig`, and a `MarkdownTokenCounter`. Successful extraction
+records become `MarkdownChunkBatch` values containing stable document identity
+and ordered `MarkdownChunkRecord` values ready for the future embedding
+boundary.
+
+The pipeline returns file-scoped failures instead of aborting unrelated
+documents. Malformed extraction output, unsupported Markdown structures
+reported by extraction, and unsplittable oversized Markdown blocks are surfaced
+as actionable `MarkdownChunkingPipelineError` variants with package identity,
+document stem, document hash, and structured details when available.
+
+Embedding and storage code should consume chunk batches and diagnostics from
+this boundary. They should not inspect frontmatter parsing, heading extraction,
+or Markdown source spans except when reporting diagnostics.
 
 ## Boundary Rules
 
