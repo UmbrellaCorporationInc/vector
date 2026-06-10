@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::print_stdout)]
 
 use super::*;
+use std::future::Future;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -12,13 +13,47 @@ fn temp_markdown_dir(test_name: &str) -> PathBuf {
     dir
 }
 
+fn temp_clean_workspace_dir(test_name: &str) -> PathBuf {
+    let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let dir = std::env::temp_dir().join(format!("xtask-clean-workspace-{test_name}-{unique}"));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("Cargo.toml"), "[workspace]\nmembers = []\n").unwrap();
+    dir
+}
+
+struct TestWorkspaceGuard {
+    previous_dir: PathBuf,
+    temp_dir: PathBuf,
+}
+
+impl Drop for TestWorkspaceGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.previous_dir);
+        let _ = fs::remove_dir_all(&self.temp_dir);
+    }
+}
+
+async fn with_clean_workspace<T, F, Fut>(test_name: &str, f: F) -> T
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = T>,
+{
+    let _cwd_guard = crate::quality::CURRENT_DIR_TEST_LOCK.lock().await;
+    let temp_dir = temp_clean_workspace_dir(test_name);
+    let previous_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&temp_dir).unwrap();
+    let _workspace_guard = TestWorkspaceGuard { previous_dir, temp_dir };
+    f().await
+}
+
 // ─── execute (stub-based) ─────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn execute_pass_when_stub_returns_clean_output() {
     let _guard =
         io::stub_shell("xtask-cargo-lint", 0, "   Checking mylib v0.1.0\n    Finished checking\n");
-    let (report, passed) = execute(false, None, false, false).await;
+    let (report, passed) =
+        with_clean_workspace("execute-pass", || execute(false, None, false, false)).await;
     assert!(passed, "expected pass, report:\n{report}");
     assert!(report.contains("Status: PASS"));
 }
@@ -26,7 +61,8 @@ async fn execute_pass_when_stub_returns_clean_output() {
 #[tokio::test]
 async fn execute_report_contains_required_fields() {
     let _guard = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    let (report, _passed) = execute(false, None, false, false).await;
+    let (report, _passed) =
+        with_clean_workspace("execute-report-fields", || execute(false, None, false, false)).await;
     assert!(report.contains("=== Quality Lint Report ==="));
     assert!(report.contains("Timestamp:"));
     assert!(report.contains("Workspace:"));
@@ -201,7 +237,8 @@ async fn execute_fail_when_clippy_exits_nonzero() {
         1,
         "error[E0382]: use of moved value\n  --> src/lib.rs:10:5\n\nerror: aborting due to 1 previous error\n",
     );
-    let (report, passed) = execute(false, None, false, false).await;
+    let (report, passed) =
+        with_clean_workspace("execute-fail-clippy", || execute(false, None, false, false)).await;
     assert!(!passed, "expected FAIL, report:\n{report}");
     assert!(report.contains("Status: FAIL"));
     assert!(report.contains("Diagnostics"));
@@ -210,7 +247,8 @@ async fn execute_fail_when_clippy_exits_nonzero() {
 #[tokio::test]
 async fn execute_with_write_report_true_returns_pass() {
     let _guard = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    let (report, passed) = execute(true, None, false, false).await;
+    let (report, passed) =
+        with_clean_workspace("execute-write-report", || execute(true, None, false, false)).await;
     assert!(passed, "expected PASS, report:\n{report}");
     assert!(report.contains("Status: PASS"));
 }
@@ -233,7 +271,8 @@ async fn execute_markdown_mode_returns_pass_for_clean_workspace() {
 #[tokio::test]
 async fn run_returns_zero_when_lint_passes() {
     let _guard = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    let exit_code = run(false, None, false, false).await;
+    let exit_code =
+        with_clean_workspace("run-pass", || run(false, None, false, false)).await;
     assert_eq!(exit_code, 0);
 }
 
@@ -249,7 +288,10 @@ async fn run_returns_one_when_lint_fails() {
 #[tokio::test]
 async fn execute_with_package_passes_and_returns_pass() {
     let _guard = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    let (report, passed) = execute(false, Some("my_crate"), false, false).await;
+    let (report, passed) = with_clean_workspace("execute-package-pass", || {
+        execute(false, Some("my_crate"), false, false)
+    })
+    .await;
     assert!(passed, "expected PASS, report:\n{report}");
     assert!(report.contains("Status: PASS"));
 }
@@ -257,7 +299,9 @@ async fn execute_with_package_passes_and_returns_pass() {
 #[tokio::test]
 async fn execute_without_package_uses_workspace_scope() {
     let _guard = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    let (report, passed) = execute(false, None, false, false).await;
+    let (report, passed) =
+        with_clean_workspace("execute-workspace-scope", || execute(false, None, false, false))
+            .await;
     assert!(passed, "expected PASS, report:\n{report}");
     assert!(report.contains("Status: PASS"));
 }
@@ -265,7 +309,9 @@ async fn execute_without_package_uses_workspace_scope() {
 #[tokio::test]
 async fn run_with_package_returns_zero_on_pass() {
     let _guard = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    let exit_code = run(false, Some("my_crate"), false, false).await;
+    let exit_code =
+        with_clean_workspace("run-package-pass", || run(false, Some("my_crate"), false, false))
+            .await;
     assert_eq!(exit_code, 0);
 }
 
@@ -284,7 +330,8 @@ async fn run_with_package_returns_zero_on_pass() {
 #[tokio::test]
 async fn case_a_clippy_and_rules_pass_produces_status_pass_with_no_extra_sections() {
     let _guard = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    let (report, passed) = execute(false, None, false, false).await;
+    let (report, passed) =
+        with_clean_workspace("case-a", || execute(false, None, false, false)).await;
     assert!(passed, "Case A: expected passed=true, report:\n{report}");
     assert!(report.contains("Status: PASS"), "Case A: missing Status: PASS");
     assert!(!report.contains("--- Diagnostics ---"), "Case A: must not have Diagnostics section");
@@ -304,7 +351,8 @@ async fn case_b_clippy_fails_rules_pass_has_diagnostics_section_only() {
         1,
         "error[E0382]: use of moved value\n  --> src/lib.rs:10:5\n\nerror: aborting due to 1 previous error\n",
     );
-    let (report, passed) = execute(false, None, false, false).await;
+    let (report, passed) =
+        with_clean_workspace("case-b", || execute(false, None, false, false)).await;
     assert!(!passed, "Case B: expected passed=false");
     assert!(report.contains("Status: FAIL"), "Case B: missing Status: FAIL");
     assert!(report.contains("--- Diagnostics ---"), "Case B: missing Diagnostics section");

@@ -1,10 +1,47 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
+use std::fs;
+use std::future::Future;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn passing_test_output() -> &'static str {
     "Running unittests src/lib.rs (target/debug/deps/mylib-abc123)\n\
      test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n"
+}
+
+fn temp_clean_workspace_dir(test_name: &str) -> PathBuf {
+    let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let dir = std::env::temp_dir().join(format!("xtask-dispatcher-{test_name}-{unique}"));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("Cargo.toml"), "[workspace]\nmembers = []\n").unwrap();
+    dir
+}
+
+struct TestWorkspaceGuard {
+    previous_dir: PathBuf,
+    temp_dir: PathBuf,
+}
+
+impl Drop for TestWorkspaceGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.previous_dir);
+        let _ = fs::remove_dir_all(&self.temp_dir);
+    }
+}
+
+async fn with_clean_workspace<T, F, Fut>(test_name: &str, f: F) -> T
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = T>,
+{
+    let _cwd_guard = crate::quality::CURRENT_DIR_TEST_LOCK.lock().await;
+    let temp_dir = temp_clean_workspace_dir(test_name);
+    let previous_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&temp_dir).unwrap();
+    let _workspace_guard = TestWorkspaceGuard { previous_dir, temp_dir };
+    f().await
 }
 
 // ─── dispatch: happy paths ────────────────────────────────────────────────────
@@ -18,7 +55,13 @@ async fn dispatch_quality_test_returns_zero_on_pass() {
 #[tokio::test]
 async fn dispatch_quality_lint_returns_zero_on_pass() {
     let _g = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    assert_eq!(dispatch(["xtask", "quality-lint"], |e| e.exit()).await, 0);
+    assert_eq!(
+        with_clean_workspace("dispatch-quality-lint", || {
+            dispatch(["xtask", "quality-lint"], |e| e.exit())
+        })
+        .await,
+        0
+    );
 }
 
 #[tokio::test]
@@ -32,7 +75,11 @@ async fn dispatch_quality_returns_zero_on_pass() {
     let _g_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _g_tests = io::stub_shell("xtask-cargo-tests", 0, passing_test_output());
     let _g_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    assert_eq!(dispatch(["xtask", "quality"], |e| e.exit()).await, 0);
+    assert_eq!(
+        with_clean_workspace("dispatch-quality", || dispatch(["xtask", "quality"], |e| e.exit()))
+            .await,
+        0
+    );
 }
 
 #[tokio::test]
@@ -43,7 +90,13 @@ async fn dispatch_quality_stats_returns_zero_on_pass() {
     let _g_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
     let _g_tokei = io::stub_shell("xtask-tokei-stats", 0, "Lines of Code: 100\n");
     let _g_tree = io::stub_shell("xtask-cargo-tree", 0, "workspace deps\n");
-    assert_eq!(dispatch(["xtask", "quality-stats"], |e| e.exit()).await, 0);
+    assert_eq!(
+        with_clean_workspace("dispatch-quality-stats", || {
+            dispatch(["xtask", "quality-stats"], |e| e.exit())
+        })
+        .await,
+        0
+    );
 }
 
 // ─── dispatch: -p / --package flag ───────────────────────────────────────────
@@ -72,13 +125,25 @@ async fn dispatch_quality_test_with_package_long_flag_returns_zero_on_pass() {
 #[tokio::test]
 async fn dispatch_quality_lint_with_package_flag_returns_zero_on_pass() {
     let _g = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    assert_eq!(dispatch(["xtask", "quality-lint", "-p", "my_crate"], |e| e.exit()).await, 0);
+    assert_eq!(
+        with_clean_workspace("dispatch-quality-lint-package-short", || {
+            dispatch(["xtask", "quality-lint", "-p", "my_crate"], |e| e.exit())
+        })
+        .await,
+        0
+    );
 }
 
 #[tokio::test]
 async fn dispatch_quality_lint_with_package_long_flag_returns_zero_on_pass() {
     let _g = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
-    assert_eq!(dispatch(["xtask", "quality-lint", "--package", "my_crate"], |e| e.exit()).await, 0);
+    assert_eq!(
+        with_clean_workspace("dispatch-quality-lint-package-long", || {
+            dispatch(["xtask", "quality-lint", "--package", "my_crate"], |e| e.exit())
+        })
+        .await,
+        0
+    );
 }
 
 #[tokio::test]
@@ -96,7 +161,13 @@ async fn dispatch_quality_with_format_flag_returns_zero_on_pass() {
     let _g_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _g_tests = io::stub_shell("xtask-cargo-tests", 0, passing_test_output());
     let _g_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    assert_eq!(dispatch(["xtask", "quality", "--format"], |e| e.exit()).await, 0);
+    assert_eq!(
+        with_clean_workspace("dispatch-quality-format", || {
+            dispatch(["xtask", "quality", "--format"], |e| e.exit())
+        })
+        .await,
+        0
+    );
 }
 
 // ─── dispatch: parse error path ───────────────────────────────────────────────

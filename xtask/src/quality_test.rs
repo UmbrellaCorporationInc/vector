@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::print_stdout)]
 
 use super::*;
+use std::future::Future;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -10,6 +11,37 @@ fn temp_quality_dir(test_name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("xtask-quality-{test_name}-{unique}"));
     fs::create_dir_all(&dir).unwrap();
     dir
+}
+
+fn temp_clean_workspace_dir(test_name: &str) -> PathBuf {
+    let dir = temp_quality_dir(test_name);
+    fs::write(dir.join("Cargo.toml"), "[workspace]\nmembers = []\n").unwrap();
+    dir
+}
+
+struct TestWorkspaceGuard {
+    previous_dir: PathBuf,
+    temp_dir: PathBuf,
+}
+
+impl Drop for TestWorkspaceGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.previous_dir);
+        let _ = fs::remove_dir_all(&self.temp_dir);
+    }
+}
+
+async fn with_clean_workspace<T, F, Fut>(test_name: &str, f: F) -> T
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = T>,
+{
+    let _cwd_guard = crate::quality::CURRENT_DIR_TEST_LOCK.lock().await;
+    let temp_dir = temp_clean_workspace_dir(test_name);
+    let previous_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&temp_dir).unwrap();
+    let _workspace_guard = TestWorkspaceGuard { previous_dir, temp_dir };
+    f().await
 }
 
 #[test]
@@ -83,7 +115,8 @@ async fn execute_all_pass_returns_pass_status() {
     let _guard_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _guard_tests = io::stub_shell("xtask-cargo-tests", 0, passing_tests_output());
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let (report, passed) = execute(false, false).await;
+    let (report, passed) =
+        with_clean_workspace("execute-all-pass", || execute(false, false)).await;
     assert!(passed, "expected PASS, report:\n{report}");
     assert!(report.contains("Result: PASS"));
 }
@@ -94,7 +127,8 @@ async fn execute_fmt_fail_returns_fail_with_diff() {
     let _guard_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _guard_tests = io::stub_shell("xtask-cargo-tests", 0, passing_tests_output());
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let (report, passed) = execute(false, false).await;
+    let (report, passed) =
+        with_clean_workspace("execute-fmt-fail", || execute(false, false)).await;
     assert!(!passed, "expected FAIL, report:\n{report}");
     assert!(report.contains("Result: FAIL"));
     assert!(report.contains("Diff"));
@@ -108,7 +142,7 @@ async fn run_returns_zero_when_all_pass() {
     let _guard_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _guard_tests = io::stub_shell("xtask-cargo-tests", 0, passing_tests_output());
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let exit_code = run(false, false).await;
+    let exit_code = with_clean_workspace("run-all-pass", || run(false, false)).await;
     assert_eq!(exit_code, 0);
 }
 
@@ -118,7 +152,7 @@ async fn run_returns_one_when_fmt_fails() {
     let _guard_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _guard_tests = io::stub_shell("xtask-cargo-tests", 0, passing_tests_output());
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let exit_code = run(false, false).await;
+    let exit_code = with_clean_workspace("run-fmt-fail", || run(false, false)).await;
     assert_eq!(exit_code, 1);
 }
 
@@ -130,7 +164,8 @@ async fn execute_lint_fail_sets_lint_fail_status() {
     let _guard_lint = io::stub_shell("xtask-cargo-lint", 1, "error[E0001]: unused import\n");
     let _guard_tests = io::stub_shell("xtask-cargo-tests", 0, passing_tests_output());
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let (report, passed) = execute(false, false).await;
+    let (report, passed) =
+        with_clean_workspace("execute-lint-fail", || execute(false, false)).await;
     assert!(!passed, "expected FAIL, report:\n{report}");
     assert!(report.contains("Lint:   FAIL"));
 }
@@ -145,27 +180,26 @@ async fn execute_test_fail_sets_test_fail_status() {
         "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out\n",
     );
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let (report, passed) = execute(false, false).await;
+    let (report, passed) =
+        with_clean_workspace("execute-test-fail", || execute(false, false)).await;
     assert!(!passed, "expected FAIL, report:\n{report}");
     assert!(report.contains("Tests:  FAIL"));
 }
 
 #[tokio::test]
 async fn execute_write_report_true_creates_file() {
-    let _cwd_guard = crate::quality::CURRENT_DIR_TEST_LOCK.lock().await;
     let _guard_fmt = io::stub_shell("xtask-shell-run", 0, "");
     let _guard_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _guard_tests = io::stub_shell("xtask-cargo-tests", 0, passing_tests_output());
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let temp_dir = temp_quality_dir("write-report");
-    let old_dir = std::env::current_dir().expect("current dir accessible");
+    let temp_dir = temp_clean_workspace_dir("write-report");
+    let previous_dir = std::env::current_dir().expect("current dir accessible");
+    let _cwd_guard = crate::quality::CURRENT_DIR_TEST_LOCK.lock().await;
     std::env::set_current_dir(&temp_dir).expect("temp dir must be accessible");
+    let _workspace_guard = TestWorkspaceGuard { previous_dir, temp_dir: temp_dir.clone() };
     let _ = execute(true, false).await;
     let report_path = temp_dir.join("quality-report.txt");
-    std::env::set_current_dir(old_dir).expect("restore current dir");
     assert!(report_path.exists(), "quality-report.txt was not created");
-    let _ = fs::remove_file(&report_path);
-    let _ = fs::remove_dir_all(&temp_dir);
 }
 
 // ─── execute: --format mode ───────────────────────────────────────────────────
@@ -176,7 +210,8 @@ async fn execute_with_format_true_passes_and_uses_format_section_title() {
     let _guard_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _guard_tests = io::stub_shell("xtask-cargo-tests", 0, passing_tests_output());
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let (report, passed) = execute(false, true).await;
+    let (report, passed) =
+        with_clean_workspace("execute-format-pass", || execute(false, true)).await;
     assert!(passed, "expected PASS, report:\n{report}");
     assert!(report.contains("=== Format ==="), "expected '=== Format ===' section, got:\n{report}");
     assert!(
@@ -191,6 +226,6 @@ async fn run_with_format_true_returns_zero_on_pass() {
     let _guard_lint = io::stub_shell("xtask-cargo-lint", 0, "    Finished checking\n");
     let _guard_tests = io::stub_shell("xtask-cargo-tests", 0, passing_tests_output());
     let _guard_cov = io::stub_shell("xtask-cargo-llvm-cov", 0, "");
-    let exit_code = run(false, true).await;
+    let exit_code = with_clean_workspace("run-format-pass", || run(false, true)).await;
     assert_eq!(exit_code, 0);
 }

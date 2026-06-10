@@ -3,12 +3,7 @@
 use super::*;
 
 #[test]
-fn unix_timestamp_is_u64() {
-    let ts: UnixTimestamp = 1_234_567_890;
-    assert_eq!(ts, 1_234_567_890_u64);
-}
-
-#[test]
-fn type_aliases_compile() {
-    // Verify type aliases are correctly defined
+fn reader_alias_compiles() {
+    let reader: Reader = Box::new(std::io::Cursor::new(Vec::<u8>::new()));
+    let _ = reader;
 }
