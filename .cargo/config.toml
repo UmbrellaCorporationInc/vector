@@ -1,3 +1,6 @@
+[build]
+target-dir = "C:/cargo_build/vector"
+
 [profile.dev]
 opt-level = 0
 lto = false
