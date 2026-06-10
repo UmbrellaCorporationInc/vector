@@ -79,6 +79,7 @@ Acceptance criteria:
 ### Phase 3: Extract Markdown Metadata
 
 Extract document-level metadata before chunking.
+See [[rfc-00033-markdown-extraction]] for the proposed extraction boundary, normalized output shape, and failure handling for this phase.
 
 - Parse YAML, TOML, or JSON frontmatter.
 - Parse heading hierarchy.
