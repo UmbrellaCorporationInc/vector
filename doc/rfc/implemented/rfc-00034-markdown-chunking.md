@@ -5,7 +5,7 @@ code: "00034"
 slug: markdown-chunking
 title: Markdown Chunking
 description: Proposes the heading-aware Markdown chunking contract for Phase 4 of the local RAG implementation.
-status: accepted
+status: implemented
 created: 2026-06-10
 updated: 2026-06-10
 authors: []
@@ -223,20 +223,20 @@ The chunker may split before or after the fenced block, but never inside it.
 
 ## 5. Acceptance Criteria
 
-- [ ] Chunking is deterministic for the same extracted document and chunking configuration.
-- [ ] Each chunk includes heading path, chunk ordinal, token count, chunk hash, and neighboring chunk references.
-- [ ] Each chunk includes package and governed document stem identity.
-- [ ] Chunks never contain only a heading.
-- [ ] Fenced code blocks are never split.
-- [ ] Lists and tables remain valid Markdown after splitting.
-- [ ] Sections at or below the maximum token limit are emitted without overlap.
-- [ ] Sections above the maximum token limit are split with token-aware limits and local overlap.
-- [ ] Chunk identifiers remain stable when unchanged content keeps the same package, document stem, heading path, ordinal, and chunk hash.
-- [ ] Tests cover short sections, duplicate headings, nested headings, oversized sections, fenced code blocks, lists, tables, and package documents.
+- [x] Chunking is deterministic for the same extracted document and chunking configuration.
+- [x] Each chunk includes heading path, chunk ordinal, token count, chunk hash, and neighboring chunk references.
+- [x] Each chunk includes package and governed document stem identity.
+- [x] Chunks never contain only a heading.
+- [x] Fenced code blocks are never split.
+- [x] Lists and tables remain valid Markdown after splitting.
+- [x] Sections at or below the maximum token limit are emitted without overlap.
+- [x] Sections above the maximum token limit are split with token-aware limits and local overlap.
+- [x] Chunk identifiers remain stable when unchanged content keeps the same package, document stem, heading path, ordinal, and chunk hash.
+- [x] Tests cover short sections, duplicate headings, nested headings, oversized sections, fenced code blocks, lists, tables, and package documents.
 
-## 6. Open Questions
+## 6. Resolved Questions
 
-- Should `chunk_id` include a shortened heading-path slug, or should it use only package, document stem, ordinal, and chunk hash?
-- Which tokenizer should define the authoritative token count before the embedding boundary is implemented?
-- What overlap size should be used for oversized sections if the default plan only defines target and maximum token counts?
-- Should table splitting preserve the header row in every split table chunk?
+- `chunk_id` includes package identity, document stem, shortened heading slug, zero-based ordinal, and chunk hash.
+- Token counting uses a deterministic whitespace adapter until the embedding boundary provides the authoritative tokenizer.
+- Oversized section overlap is represented in `MarkdownChunkingConfig`; the Phase 4 default is zero overlap because the baseline plan defines target and maximum token counts but no positive overlap size.
+- Split table chunks repeat the table header row and separator row so each emitted table fragment remains valid and self-describing.

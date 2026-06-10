@@ -5,7 +5,7 @@ code: "00063"
 slug: implement-rfc-00034-markdown-chunking
 title: Implement RFC 00034 Markdown Chunking
 description: Implement deterministic heading-aware Markdown chunking for the local RAG pipeline.
-status: in-progress
+status: done
 created: 2026-06-10
 updated: 2026-06-10
 tags:
@@ -137,34 +137,34 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Confirm every acceptance criterion in [[rfc-00034-markdown-chunking]] is covered by implementation or tests.
-- [ ] Run the project quality gate for Rust and governed Markdown changes.
-- [ ] Update README files on packages modified.
-- [ ] Move [[rfc-00034-markdown-chunking]] to implemented status only after implementation and validation are complete.
+- [x] Confirm every acceptance criterion in [[rfc-00034-markdown-chunking]] is covered by implementation or tests.
+- [x] Run the project quality gate for Rust and governed Markdown changes.
+- [x] Update README files on packages modified.
+- [x] Move [[rfc-00034-markdown-chunking]] to implemented status only after implementation and validation are complete.
 
 ## 4. Quality Gate
 
-- [ ] Chunker unit tests pass.
-- [ ] RAG pipeline integration tests pass.
-- [ ] Governed document validation passes.
-- [ ] Project formatting and linting pass.
+- [x] Chunker unit tests pass.
+- [x] RAG pipeline integration tests pass.
+- [x] Governed document validation passes.
+- [x] Project formatting and linting pass.
 
 ## 5. Validation Vector
 
-- [ ] Chunking is deterministic for the same extracted document and configuration.
-- [ ] Each chunk includes heading path, chunk ordinal, token count, chunk hash, and neighboring chunk references.
-- [ ] Each chunk includes package identity and governed document stem identity.
-- [ ] Chunks never contain only a heading.
-- [ ] Fenced code blocks are never split.
-- [ ] Lists and tables remain valid Markdown after splitting.
-- [ ] Sections at or below the maximum token limit are emitted without overlap.
-- [ ] Sections above the maximum token limit are split with token-aware limits and local overlap.
-- [ ] Chunk identifiers remain stable when unchanged content keeps the same package, document stem, heading path, ordinal, and chunk hash.
-- [ ] Tests cover short sections, duplicate headings, nested headings, oversized sections, fenced code blocks, lists, tables, and package documents.
+- [x] Chunking is deterministic for the same extracted document and configuration.
+- [x] Each chunk includes heading path, chunk ordinal, token count, chunk hash, and neighboring chunk references.
+- [x] Each chunk includes package identity and governed document stem identity.
+- [x] Chunks never contain only a heading.
+- [x] Fenced code blocks are never split.
+- [x] Lists and tables remain valid Markdown after splitting.
+- [x] Sections at or below the maximum token limit are emitted without overlap.
+- [x] Sections above the maximum token limit are split with token-aware limits and local overlap.
+- [x] Chunk identifiers remain stable when unchanged content keeps the same package, document stem, heading path, ordinal, and chunk hash.
+- [x] Tests cover short sections, duplicate headings, nested headings, oversized sections, fenced code blocks, lists, tables, and package documents.
 
 ## 6. Gaps, Flaws, and Tradeoffs
 
-- **Gap:** The authoritative tokenizer must be confirmed before implementation. A temporary tokenizer adapter reduces blocking but creates a replacement task if it diverges from embedding behavior.
-- **Gap:** Table splitting behavior needs an explicit decision because preserving valid Markdown may require repeating the table header in each split chunk.
+- **Gap:** The authoritative tokenizer still belongs to the future embedding boundary. The current deterministic whitespace adapter keeps the chunker contract stable, but it must be replaced if embedding tokenization diverges materially.
+- **Resolved:** Split table chunks repeat the table header row and separator row so every emitted table fragment remains valid Markdown.
 - **Flaw:** Heading-path-based identifiers are readable but can change when headings are renamed, even if body content remains equivalent.
 - **Tradeoff:** Markdown-aware chunking adds parser complexity and test surface, but it preserves retrieval context and avoids invalid chunk text that a fixed-size splitter would produce.
