@@ -5,7 +5,7 @@ code: "00060"
 slug: implement-rfc-00032-markdown-discovery
 title: Implement RFC 00032 Markdown Discovery
 description: Implement the runtime crate boundary and deterministic Markdown discovery behavior proposed by RFC 00032.
-status: in-progress
+status: done
 created: 2026-06-10
 updated: 2026-06-10
 tags:
@@ -141,7 +141,7 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Verify all acceptance criteria from [[rfc-00032-markdown-discovery]] are either implemented or explicitly deferred in a follow-up governed document.
-- [ ] Run the relevant Rust tests and project quality gates.
-- [ ] Update README files for any package whose public behavior or setup changes.
-- [ ] Keep the task status aligned with implementation progress.
+- [x] Verify all acceptance criteria from [[rfc-00032-markdown-discovery]] are either implemented or explicitly deferred in a follow-up governed document.
+- [x] Run the relevant Rust tests and project quality gates.
+- [x] Update README files for any package whose public behavior or setup changes.
+- [x] Keep the task status aligned with implementation progress.
