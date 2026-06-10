@@ -8,5 +8,8 @@ license.workspace = true
 [dependencies]
 runtime-io = { workspace = true }
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+
 [lints]
 workspace = true

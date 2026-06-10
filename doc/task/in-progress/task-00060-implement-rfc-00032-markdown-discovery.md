@@ -118,16 +118,16 @@ input:
   language: Rust
 ```
 
-- [ ] Define a discovery API that accepts explicit workspace roots, package roots, ignore behavior, and hashing options from `runtime-rag`.
-- [ ] Discover Markdown files under workspace `doc/` and package `.vector-database/packages/{package}/doc/` roots.
-- [ ] Include `.md` and `.markdown` files.
-- [ ] Validate governed document stems against `<doc-type>-<code>-<slug>`.
-- [ ] Emit deterministic records containing package identity, governed document stem, modified time, content hash, and internal read path.
-- [ ] Use `null` or an equivalent workspace marker for workspace-local package identity.
-- [ ] Use the `runtime-io` file content hashing primitive for discovery record content hashes.
-- [ ] Ensure file hashes change only when file content changes.
-- [ ] Report missing package `doc/` folders as package-structure errors, not workspace discovery failures.
-- [ ] Add tests for workspace discovery, package discovery, extension filtering, invalid stems, ignored paths, missing package `doc/`, and content-hash stability.
+- [x] Define a discovery API that accepts explicit workspace roots, package roots, ignore behavior, and hashing options from `runtime-rag`.
+- [x] Discover Markdown files under workspace `doc/` and package `.vector-database/packages/{package}/doc/` roots.
+- [x] Include `.md` and `.markdown` files.
+- [x] Validate governed document stems against `<doc-type>-<code>-<slug>`.
+- [x] Emit deterministic records containing package identity, governed document stem, modified time, content hash, and internal read path.
+- [x] Use `null` or an equivalent workspace marker for workspace-local package identity.
+- [x] Use the `runtime-io` file content hashing primitive for discovery record content hashes.
+- [x] Ensure file hashes change only when file content changes.
+- [x] Report missing package `doc/` folders as package-structure errors, not workspace discovery failures.
+- [x] Add tests for workspace discovery, package discovery, extension filtering, invalid stems, ignored paths, missing package `doc/`, and content-hash stability.
 
 ### 3.6. Phase Z -- Wrap-up
 
