@@ -71,6 +71,47 @@ impl DirectoryEntry {
     }
 }
 
+/// Generic options for recursive directory traversal.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct DirectoryTraversalOptions {
+    ignored_paths: Vec<IoPath>,
+}
+
+impl DirectoryTraversalOptions {
+    /// Create traversal options with no ignored paths.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Return options with one additional ignored path.
+    #[must_use]
+    pub fn with_ignored_path(mut self, path: IoPath) -> Self {
+        self.ignored_paths.push(path);
+        self
+    }
+
+    /// Return options with additional ignored paths.
+    #[must_use]
+    pub fn with_ignored_paths(mut self, paths: impl IntoIterator<Item = IoPath>) -> Self {
+        self.ignored_paths.extend(paths);
+        self
+    }
+
+    /// Return the ignored path prefixes.
+    #[must_use]
+    pub fn ignored_paths(&self) -> &[IoPath] {
+        &self.ignored_paths
+    }
+
+    fn is_ignored(&self, path: &IoPath) -> bool {
+        self.ignored_paths.iter().any(|ignored_path| {
+            path.as_path() == ignored_path.as_path() || path.as_path().starts_with(ignored_path)
+        })
+    }
+}
+
 /// List the direct children of a directory in deterministic path order.
 ///
 /// # Errors
@@ -102,7 +143,23 @@ pub async fn list_directory(path: &IoPath) -> Result<Vec<DirectoryEntry>, IoErro
 /// Returns [`IoError::File`] if any directory in the traversal cannot be read or
 /// an entry cannot be inspected.
 pub async fn traverse_directory(root: &IoPath) -> Result<Vec<DirectoryEntry>, IoError> {
-    traverse_directories(std::slice::from_ref(root)).await
+    traverse_directory_with_options(root, &DirectoryTraversalOptions::default()).await
+}
+
+/// Recursively traverse a directory in deterministic path order with options.
+///
+/// The returned entries include descendants of `root`, but not `root` itself.
+/// Entries matching an ignored path, or descendants of an ignored path, are
+/// excluded from the result and ignored directories are not descended into.
+///
+/// # Errors
+/// Returns [`IoError::File`] if any non-ignored directory in the traversal
+/// cannot be read or an entry cannot be inspected.
+pub async fn traverse_directory_with_options(
+    root: &IoPath,
+    options: &DirectoryTraversalOptions,
+) -> Result<Vec<DirectoryEntry>, IoError> {
+    traverse_directories_with_options(std::slice::from_ref(root), options).await
 }
 
 /// Recursively traverse multiple directory roots in deterministic path order.
@@ -114,15 +171,41 @@ pub async fn traverse_directory(root: &IoPath) -> Result<Vec<DirectoryEntry>, Io
 /// Returns [`IoError::File`] if any directory in the traversal cannot be read or
 /// an entry cannot be inspected.
 pub async fn traverse_directories(roots: &[IoPath]) -> Result<Vec<DirectoryEntry>, IoError> {
+    traverse_directories_with_options(roots, &DirectoryTraversalOptions::default()).await
+}
+
+/// Recursively traverse multiple directory roots in deterministic path order
+/// with options.
+///
+/// The returned entries include descendants of each root, but not the roots
+/// themselves. Entries matching an ignored path, or descendants of an ignored
+/// path, are excluded from the result and ignored directories are not descended
+/// into.
+///
+/// # Errors
+/// Returns [`IoError::File`] if any non-ignored directory in the traversal
+/// cannot be read or an entry cannot be inspected.
+pub async fn traverse_directories_with_options(
+    roots: &[IoPath],
+    options: &DirectoryTraversalOptions,
+) -> Result<Vec<DirectoryEntry>, IoError> {
     let mut entries = Vec::new();
     let mut pending_roots = roots.to_vec();
     pending_roots.sort_by(|left, right| left.as_path().cmp(right.as_path()));
 
     for root in pending_roots {
+        if options.is_ignored(&root) {
+            continue;
+        }
+
         let mut pending = vec![root];
         while let Some(directory) = pending.pop() {
             let children = list_directory(&directory).await?;
             for child in children {
+                if options.is_ignored(child.path()) {
+                    continue;
+                }
+
                 if child.is_directory() {
                     pending.push(child.path.clone());
                 }

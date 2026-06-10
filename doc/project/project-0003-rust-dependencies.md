@@ -105,6 +105,12 @@ Tags: #rust #cli #terminal
 Scope: `get-vector`
 Description: Retrieve terminal size dynamically. Approved for use in `get-vector` to dynamically format outputs based on the active terminal columns. Approved by [[task-00056-update-get-vector-to-calculate-the-terminal-size]].
 
+## 15. blake3
+
+Tags: #rust #hashing #filesystem
+Scope: `runtime-io`
+Description: BLAKE3 content hashing crate approved for `runtime-io` file-byte hashing primitives. The approved use is limited to hashing file bytes through the generic IO boundary; callers must not include paths, modified times, package identity, Markdown metadata, or other domain data in the hash input.
+
 ## Workspace-local dependencies
 
 These workspace crates are used as internal dependencies and are governed by the workspace architecture rather than third-party dependency approval:

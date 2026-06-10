@@ -5,6 +5,7 @@
 ## Features
 
 - **File IO**: Streaming binary file readers (`FileReader`) and writers (`FileWriter`) with explicit memory buffer allocation.
+- **File Content Hashing**: BLAKE3 file-byte hashing (`hash_file_content`) with a typed lowercase hexadecimal result (`FileContentHash`).
 - **Memory Buffers**: In-memory message queues (`MemReader`, `MemWriter`) for fast testing and buffer swapping.
 - **Text Processing**: UTF-8 aware streaming adapters (`TextReader`, `TextWriter`) that enforce multibyte character boundaries across chunked binary streams.
 - **Path API**: A strict path boundary (`IoPath`, `PathResolver`) enforcing sandbox limitations and path normalization to prevent traversal attacks.
@@ -29,11 +30,47 @@ while let Some(chunk) = text_reader.recv().await? {
 }
 ```
 
+## Directory Traversal
+
+Directory traversal is intentionally generic. `runtime-io` exposes filesystem
+shape and basic metadata, while higher-level crates own domain filtering,
+package attribution, governed document validation, hashing, and parsing.
+
+The traversal API has three entrypoints:
+
+- `list_directory(&IoPath)`: returns only the direct children of one directory.
+- `traverse_directory(&IoPath)`: returns all descendants below one root.
+- `traverse_directories(&[IoPath])`: returns all descendants below multiple
+  roots after sorting the roots by path.
+- `traverse_directory_with_options(&IoPath, &DirectoryTraversalOptions)` and
+  `traverse_directories_with_options(&[IoPath], &DirectoryTraversalOptions)`:
+  traverse with generic ignored path prefixes.
+
+All returned entries are sorted by path so repeated runs over the same
+filesystem state are deterministic. Recursive traversal includes descendant
+files and directories, but it does not include the root directory itself.
+Directory entries expose:
+
+- `path()`: the concrete `IoPath` to pass into file readers or later traversal.
+- `entry_type()`, `is_file()`, and `is_directory()`: generic file type
+  classification without domain semantics.
+- `modified()`: the platform modification time when metadata exposes one.
+
+Missing directories, unreadable directories, and entries whose type or metadata
+cannot be inspected return typed `IoError::File` values. Callers should decide
+whether those errors are fatal, accumulated, or translated into a richer domain
+error.
+
 Higher-level crates should combine directory traversal with the existing file
 readers by passing each file entry path directly into `read_file_bytes`,
 `read_file_text`, or `FileReader::open`. Domain filtering stays outside
-`runtime-io`; for example, a Markdown discovery crate can filter extensions
-before reading candidate files:
+`runtime-io`. Generic ignored path prefixes can be supplied through
+`DirectoryTraversalOptions`; ignored entries and their descendants are omitted
+before callers receive entries. Higher-level crates still own how those ignore
+paths are derived.
+
+For example, a Markdown discovery crate can filter extensions before reading
+candidate files:
 
 ```rust
 use runtime_io::{read_file_text, traverse_directory, IoPath};
@@ -51,6 +88,17 @@ for entry in entries.iter().filter(|entry| entry.is_file()) {
     }
 }
 ```
+
+## File Content Hashing
+
+`hash_file_content(&IoPath)` returns a typed `FileContentHash` computed with
+BLAKE3 over file bytes only. The hash intentionally excludes path, modified
+time, package identity, Markdown metadata, and other higher-level domain data.
+Callers can compare typed hashes directly or use `as_hex()` / `to_string()` for
+the stable lowercase hexadecimal representation.
+
+The implementation streams the file through the `runtime-io` file boundary, so
+callers do not need to load the full file content before hashing.
 
 ## Command Planning and Execution
 

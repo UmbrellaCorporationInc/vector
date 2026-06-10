@@ -5,6 +5,36 @@ use runtime_core::{Receiver, RuntimeError, RuntimeResult, Sender};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+/// Stable BLAKE3 hash of file bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FileContentHash {
+    hex: String,
+}
+
+impl FileContentHash {
+    fn from_blake3_hash(hash: blake3::Hash) -> Self {
+        Self { hex: hash.to_hex().to_string() }
+    }
+
+    /// Return the lowercase hexadecimal representation.
+    #[must_use]
+    pub const fn as_hex(&self) -> &str {
+        self.hex.as_str()
+    }
+
+    /// Convert the typed hash into its lowercase hexadecimal representation.
+    #[must_use]
+    pub fn into_hex(self) -> String {
+        self.hex
+    }
+}
+
+impl std::fmt::Display for FileContentHash {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_hex())
+    }
+}
+
 /// A file-backed receiver that produces bytes.
 #[derive(Debug)]
 pub struct FileReader {
@@ -73,11 +103,12 @@ impl FileWriter {
     ///
     /// Returns [`IoError::File`] if writing to the file fails.
     pub async fn flush(&mut self) -> Result<(), IoError> {
-        if !self.buffer.is_empty() {
-            if let Some(file) = &mut self.file {
+        if let Some(file) = &mut self.file {
+            if !self.buffer.is_empty() {
                 file.write_all(&self.buffer).await.map_err(|e| IoError::File(e.to_string()))?;
+                self.buffer.clear();
             }
-            self.buffer.clear();
+            file.flush().await.map_err(|e| IoError::File(e.to_string()))?;
         }
         Ok(())
     }
@@ -120,6 +151,32 @@ pub async fn read_file_bytes(path: &IoPath) -> Result<Bytes, IoError> {
         buffer.append(&mut chunk);
     }
     Ok(buffer)
+}
+
+/// Hash a file's bytes with BLAKE3.
+///
+/// The hash input is the file content only. Path, modified time, package
+/// identity, Markdown metadata, and other domain data are not included.
+///
+/// # Errors
+///
+/// Returns [`IoError::File`] if the file cannot be opened or read.
+pub async fn hash_file_content(path: &IoPath) -> Result<FileContentHash, IoError> {
+    let mut file =
+        File::open(path.as_path()).await.map_err(|error| IoError::File(error.to_string()))?;
+    let mut hasher = blake3::Hasher::new();
+    let mut buffer = vec![0_u8; 8192];
+
+    loop {
+        let bytes_read =
+            file.read(&mut buffer).await.map_err(|error| IoError::File(error.to_string()))?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    Ok(FileContentHash::from_blake3_hash(hasher.finalize()))
 }
 
 /// Convenience helper to write full bytes to a file using `FileWriter`.
