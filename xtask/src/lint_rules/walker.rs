@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 /// An entry produced by [`walk`]: either a parsed Rust AST or a raw TOML string.
-pub(crate) enum LintEntry {
+pub enum LintEntry {
     /// A successfully parsed Rust source file.
     ///
     /// Fields: `(path, ast, raw_source)`.
@@ -21,7 +21,7 @@ pub(crate) enum LintEntry {
 ///
 /// Rust files that fail to parse are skipped with a warning to `stderr`.
 #[must_use]
-pub(crate) fn walk(workspace_root: &Path) -> Vec<LintEntry> {
+pub fn walk(workspace_root: &Path) -> Vec<LintEntry> {
     WalkDir::new(workspace_root)
         .into_iter()
         .filter_entry(|e| {

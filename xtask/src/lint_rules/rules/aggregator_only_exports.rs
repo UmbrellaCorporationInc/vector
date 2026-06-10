@@ -20,7 +20,7 @@ use syn::spanned::Spanned;
 
 use crate::lint_rules::rule::{Rule, RuleViolation};
 
-pub(crate) struct AggregatorOnlyExports;
+pub struct AggregatorOnlyExports;
 
 impl Rule for AggregatorOnlyExports {
     fn is_active(&self, _future: bool) -> bool {
@@ -63,7 +63,7 @@ struct ForbiddenItem {
 
 /// Returns `true` when the file is an aggregator (`lib.rs` or `mod.rs`).
 fn is_aggregator(path: &Path) -> bool {
-    matches!(path.file_name().and_then(|n| n.to_str()), Some("lib.rs") | Some("mod.rs"))
+    matches!(path.file_name().and_then(|n| n.to_str()), Some("lib.rs" | "mod.rs"))
 }
 
 /// Returns metadata about a forbidden item if the item is not permitted in an

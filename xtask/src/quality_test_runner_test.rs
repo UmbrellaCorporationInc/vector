@@ -439,7 +439,7 @@ fn parse_test_output_success_returns_pass() {
                   test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;";
     let (status, table) = parse_test_output(stdout, "", true);
     assert_eq!(status, "PASS");
-    assert!(table.contains("mylib") || table.contains("3"));
+    assert!(table.contains("mylib") || table.contains('3'));
 }
 
 #[test]

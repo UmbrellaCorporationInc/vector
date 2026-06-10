@@ -12,7 +12,7 @@ use syn::visit::{self, Visit};
 
 use crate::lint_rules::rule::{Rule, RuleViolation};
 
-pub(crate) struct NoPubStructFields;
+pub struct NoPubStructFields;
 
 impl Rule for NoPubStructFields {
     fn is_active(&self, _future: bool) -> bool {
@@ -37,7 +37,7 @@ struct Visitor<'a> {
     out: &'a mut Vec<RuleViolation>,
 }
 
-impl<'a> Visit<'_> for Visitor<'a> {
+impl Visit<'_> for Visitor<'_> {
     fn visit_item_struct(&mut self, node: &syn::ItemStruct) {
         if is_dto_struct(node) {
             return;
@@ -48,9 +48,7 @@ impl<'a> Visit<'_> for Visitor<'a> {
                 let span = field.span();
                 let field_name = field
                     .ident
-                    .as_ref()
-                    .map(|i| i.to_string())
-                    .unwrap_or_else(|| "tuple field".to_string());
+                    .as_ref().map_or_else(|| "tuple field".to_string(), std::string::ToString::to_string);
 
                 self.out.push(RuleViolation {
                     file: self.path.to_path_buf(),

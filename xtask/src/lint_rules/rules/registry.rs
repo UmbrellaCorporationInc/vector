@@ -12,7 +12,7 @@ use super::{
 /// The returned `Vec` contains both standard and future rules. Callers use
 /// [`Rule::is_active`] to filter by run mode before checking.
 #[must_use]
-pub(crate) fn all(future: bool) -> Vec<Box<dyn Rule>> {
+pub fn all(future: bool) -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(aggregator_only_exports::AggregatorOnlyExports),
         Box::new(file_too_long::FileTooLong { limit: 700, is_future: future }),

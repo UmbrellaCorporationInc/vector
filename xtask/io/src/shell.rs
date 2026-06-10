@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tokio::process::Command;
+use tokio::process::Command as TokioCommand;
 
 use crate::{FsError, Reader};
 
@@ -306,11 +306,11 @@ fn resolve_stdin(source: InputSource) -> Result<Stdio, FsError> {
 }
 
 /// Shared helper — configures a [`tokio::process::Command`] from a [`CommandBuilder`].
-fn build_tokio_cmd(builder: &CommandBuilder, stdin: Stdio) -> Command {
+fn build_tokio_cmd(builder: &CommandBuilder, stdin: Stdio) -> TokioCommand {
     // Keep `key` referenced so `CommandBuilder.key` is not considered dead code
     // in non-stubbing builds (the stubbing logic reads it behind cfg gates).
     let _ = &builder.key;
-    let mut cmd = Command::new(&builder.command);
+    let mut cmd = TokioCommand::new(&builder.command);
     cmd.kill_on_drop(true);
     cmd.args(&builder.args);
     if builder.clear_env {

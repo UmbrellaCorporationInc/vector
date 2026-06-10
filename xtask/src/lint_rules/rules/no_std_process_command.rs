@@ -12,7 +12,7 @@ use crate::lint_rules::rule::{Rule, RuleViolation};
 /// 2. Testing mocks (via `io::stub_shell`) can intercept the execution.
 ///
 /// Files inside `xtask/src/` are exempted.
-pub(crate) struct NoStdProcessCommand;
+pub struct NoStdProcessCommand;
 
 impl Rule for NoStdProcessCommand {
     fn is_active(&self, _future: bool) -> bool {
@@ -21,7 +21,7 @@ impl Rule for NoStdProcessCommand {
 
     fn check_rust(&self, path: &Path, ast: &syn::File, _raw: &str, out: &mut Vec<RuleViolation>) {
         // Exempt xtask/src/ and runtime/io/src/shell.rs
-        let path_str = path.to_string_lossy().replace("\\", "/");
+        let path_str = path.to_string_lossy().replace('\\', "/");
         if path_str.contains("xtask/src") || path_str.contains("runtime/io/src/shell.rs") {
             return;
         }
@@ -36,7 +36,7 @@ struct Visitor<'a> {
     out: &'a mut Vec<RuleViolation>,
 }
 
-impl<'a> Visit<'_> for Visitor<'a> {
+impl Visit<'_> for Visitor<'_> {
     fn visit_item_use(&mut self, node: &syn::ItemUse) {
         let use_str = node.to_token_stream().to_string();
         // Quote serializes as "std :: process :: Command"
@@ -73,7 +73,7 @@ impl<'a> Visit<'_> for Visitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> {
+impl Visitor<'_> {
     fn push_violation(&mut self, span: proc_macro2::Span, message: &str) {
         let start = span.start();
         self.out.push(RuleViolation {

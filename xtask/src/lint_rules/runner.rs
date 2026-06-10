@@ -10,7 +10,7 @@ use std::path::Path;
 /// clean. When `future` is `false`, only standard rules are applied. When
 /// `true`, future rules are also evaluated.
 #[must_use]
-pub(crate) fn run(workspace: &Path, future: bool) -> Vec<RuleViolation> {
+pub fn run(workspace: &Path, future: bool) -> Vec<RuleViolation> {
     let active_rules = rules::all(future);
     let entries = walker::walk(workspace);
 
@@ -20,10 +20,10 @@ pub(crate) fn run(workspace: &Path, future: bool) -> Vec<RuleViolation> {
             if rule.is_active(future) {
                 match entry {
                     walker::LintEntry::Rust(path, ast, raw) => {
-                        rule.check_rust(path, ast, raw, &mut violations)
+                        rule.check_rust(path, ast, raw, &mut violations);
                     }
                     walker::LintEntry::Toml(path, content) => {
-                        rule.check_toml(path, content, &mut violations)
+                        rule.check_toml(path, content, &mut violations);
                     }
                 }
             }

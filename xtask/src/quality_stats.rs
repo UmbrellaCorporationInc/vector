@@ -40,7 +40,7 @@ pub async fn execute(write_report: bool, module_structure_crate: Option<&str>) -
 pub async fn run(write_report: bool, module_structure_crate: Option<&str>) -> i32 {
     let (report, passed) = execute(write_report, module_structure_crate).await;
     print!("{report}");
-    if passed { 0 } else { 1 }
+    i32::from(!passed)
 }
 
 /// Build the statistics section string.

@@ -62,7 +62,7 @@ pub async fn execute(
 pub async fn run(write_report: bool, package: Option<&str>, markdown: bool, future: bool) -> i32 {
     let (report, passed) = execute(write_report, package, markdown, future).await;
     print!("{report}");
-    if passed { 0 } else { 1 }
+    i32::from(!passed)
 }
 
 async fn execute_rust_lint(
@@ -169,18 +169,18 @@ fn execute_markdown_lint(workspace: &Path, workspace_str: &str, timestamp: &str)
 
     let report = if passed {
         format!(
-            r#"=== Quality Lint Report ===
+            r"=== Quality Lint Report ===
 Timestamp: {timestamp}
 Workspace: {workspace_str}
 Lint Duration: {duration_secs:.2}s
 Mode: markdown
 Status: {status}
 Summary: {summary}
-"#
+"
         )
     } else {
         format!(
-            r#"=== Quality Lint Report ===
+            r"=== Quality Lint Report ===
 Timestamp: {timestamp}
 Workspace: {workspace_str}
 Lint Duration: {duration_secs:.2}s
@@ -190,7 +190,7 @@ Summary: {summary}
 
 --- Diagnostics ---
 {}
-"#,
+",
             findings.join("\n")
         )
     };

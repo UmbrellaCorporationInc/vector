@@ -15,7 +15,7 @@ use std::path::Path;
 
 use crate::lint_rules::rule::{Rule, RuleViolation};
 
-pub(crate) struct FileTooLong {
+pub struct FileTooLong {
     pub(crate) limit: usize,
     pub(crate) is_future: bool,
 }
@@ -60,7 +60,7 @@ fn is_exempt(path: &Path) -> bool {
 /// A line is excluded when its first non-whitespace content is `//`
 /// (covers `//`, `///`, and `//!`) or when it contains only whitespace.
 #[must_use]
-pub(crate) fn count_code_lines(src: &str) -> usize {
+pub fn count_code_lines(src: &str) -> usize {
     src.lines()
         .filter(|line| {
             let trimmed = line.trim();

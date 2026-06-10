@@ -24,7 +24,7 @@ const WRONG_LOCATION_PREFIX: &str = "WRONG_LOCATION";
 const BOOK_CODE_WIDTH: usize = 3;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-pub(crate) enum VaultDocumentType {
+pub enum VaultDocumentType {
     Task,
     Research,
     Roadmap,
@@ -35,7 +35,7 @@ pub(crate) enum VaultDocumentType {
 
 impl VaultDocumentType {
     #[must_use]
-    fn as_key(self) -> &'static str {
+    const fn as_key(self) -> &'static str {
         match self {
             Self::Task => "task",
             Self::Research => "research",
@@ -47,7 +47,7 @@ impl VaultDocumentType {
     }
 
     #[must_use]
-    fn number_width(self) -> usize {
+    const fn number_width(self) -> usize {
         match self {
             Self::Task => 5,
             Self::Research | Self::Roadmap | Self::Adr | Self::Guide | Self::Rule => 4,
@@ -56,7 +56,7 @@ impl VaultDocumentType {
 }
 
 #[derive(Debug, Subcommand)]
-pub(crate) enum VaultCommand {
+pub enum VaultCommand {
     /// Resolve a task by numeric prefix
     Task {
         /// Numeric task id, padded or unpadded. When omitted, returns task root metadata.
@@ -130,7 +130,7 @@ pub(crate) enum VaultCommand {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct VaultConfig {
+pub struct VaultConfig {
     documents: BTreeMap<String, VaultDocumentRoot>,
 }
 
@@ -229,7 +229,7 @@ struct BookArtifactReserveOutput {
     reserved_name: String,
 }
 
-pub(crate) fn run(command: VaultCommand) -> i32 {
+pub fn run(command: VaultCommand) -> i32 {
     if let VaultCommand::Check { fix } = &command {
         let workspace = match env::current_dir() {
             Ok(workspace) => workspace,
@@ -247,7 +247,7 @@ pub(crate) fn run(command: VaultCommand) -> i32 {
         };
         let (report, passed) = execute_check(&workspace, &config, *fix);
         print!("{report}");
-        return if passed { 0 } else { 1 };
+        return i32::from(!passed);
     }
 
     if let VaultCommand::Query { expression, query_id } = &command {
@@ -381,7 +381,7 @@ fn execute(command: VaultCommand) -> Result<VaultOutput, String> {
 /// Inline `expression` and `query_id` must not both be set (`clap` enforces this for the CLI; this function still checks for direct callers).
 /// When `query_id` is set, the expression text is loaded only from [`NAMED_QUERY_PATH`].
 #[must_use]
-pub(crate) fn run_query(expression: Option<&str>, query_id: Option<&str>) -> i32 {
+pub fn run_query(expression: Option<&str>, query_id: Option<&str>) -> i32 {
     let inline = expression.map(str::trim).filter(|s| !s.is_empty());
     let qid = query_id.map(str::trim).filter(|s| !s.is_empty());
 
@@ -437,7 +437,7 @@ pub(crate) fn run_query(expression: Option<&str>, query_id: Option<&str>) -> i32
 }
 
 /// Runs ADR 0085 query evaluation over the vault; used by tests and [`run_query`].
-pub(crate) fn collect_query_findings(
+pub fn collect_query_findings(
     workspace: &Path,
     config: &VaultConfig,
     expr: &QueryExpr,
@@ -667,7 +667,7 @@ fn collect_book_link_targets(
         let Some(book_code) = parse_book_code_prefix(&entry.file_name().to_string_lossy()) else {
             continue;
         };
-        let padded = format!("{book_code:0>width$}", width = BOOK_CODE_WIDTH);
+        let padded = format!("{book_code:0>BOOK_CODE_WIDTH$}");
         let book_key = read_book_key_from_index(&path)
             .filter(|key| is_valid_book_key(key))
             .unwrap_or_else(|| derive_book_key_from_folder_name(&path));
@@ -748,7 +748,7 @@ fn find_book_root_relative(workspace: &Path, path: &Path) -> Option<String> {
     let second = parts.next()?;
     let third = parts.next()?;
     match (first, second) {
-        ("forge", "50 Books") | ("doc", "50 Books") => Some(format!("50 Books/{third}")),
+        ("forge" | "doc", "50 Books") => Some(format!("50 Books/{third}")),
         _ => None,
     }
 }
@@ -1822,7 +1822,7 @@ fn decode_percent_encoding(value: &str) -> String {
     decoded
 }
 
-fn hex_value(byte: u8) -> Option<u8> {
+const fn hex_value(byte: u8) -> Option<u8> {
     match byte {
         b'0'..=b'9' => Some(byte - b'0'),
         b'a'..=b'f' => Some(byte - b'a' + 10),
@@ -1954,8 +1954,7 @@ fn reserve_parent_dir(
     match (subfolders.is_empty(), subfolder) {
         (true, None) => Ok(root.to_path_buf()),
         (true, Some(requested)) => Err(format!(
-            "subfolder '{}' was provided, but this category root has no subfolders",
-            requested
+            "subfolder '{requested}' was provided, but this category root has no subfolders"
         )),
         (false, None) => {
             let requested = default_subfolder.ok_or_else(|| {
@@ -1982,7 +1981,7 @@ fn reserve_parent_dir(
     }
 }
 
-fn default_reserve_subfolder(doc_type: VaultDocumentType) -> Option<&'static str> {
+const fn default_reserve_subfolder(doc_type: VaultDocumentType) -> Option<&'static str> {
     match doc_type {
         VaultDocumentType::Task => Some("todo"),
         VaultDocumentType::Adr => Some("draft"),
@@ -2083,7 +2082,7 @@ fn reserve_book_command(
     validate_reserve_name(name)?;
     let books_root = book_root(workspace, config)?;
     let next_code = find_max_book_code(&books_root)?.saturating_add(1);
-    let padded_code = format!("{:0>width$}", next_code, width = BOOK_CODE_WIDTH);
+    let padded_code = format!("{next_code:0>BOOK_CODE_WIDTH$}");
     let folder_name = format!("{padded_code} {name}");
     let folder_path = books_root.join(&folder_name);
 
@@ -2171,7 +2170,7 @@ const ARTIFACT_ID_WIDTH: usize = 4;
 
 #[must_use]
 fn normalize_book_key(name: &str) -> String {
-    name.chars().filter(|ch| ch.is_ascii_alphanumeric()).flat_map(char::to_lowercase).collect()
+    name.chars().filter(char::is_ascii_alphanumeric).flat_map(char::to_lowercase).collect()
 }
 
 #[must_use]
@@ -2183,7 +2182,7 @@ fn is_valid_book_key(value: &str) -> bool {
 
 #[must_use]
 fn canonical_book_artifact_filename(id: u32, book_key: &str, title: &str) -> String {
-    format!("b{id:0>width$} {book_key} {title}.md", width = ARTIFACT_ID_WIDTH)
+    format!("b{id:0>ARTIFACT_ID_WIDTH$} {book_key} {title}.md")
 }
 
 #[must_use]
@@ -2311,7 +2310,7 @@ fn reserve_book_artifact_command(
         .map_err(|e| format!("could not write {}: {e}", file_path.display()))?;
 
     Ok(BookArtifactReserveOutput {
-        id: format!("{next_id:0>width$}", width = ARTIFACT_ID_WIDTH),
+        id: format!("{next_id:0>ARTIFACT_ID_WIDTH$}"),
         book_code: book_code.to_string(),
         file_path: display_relative(workspace, &file_path),
         reserved_name: name.to_string(),
@@ -2403,7 +2402,7 @@ fn collect_book_check_findings(
         if entry.file_type().is_ok_and(|ft| ft.is_dir()) {
             // Only process folders whose names match the NNN <name> pattern.
             if let Some(book_code) = parse_book_code_prefix(&entry.file_name().to_string_lossy()) {
-                let padded = format!("{book_code:0>width$}", width = BOOK_CODE_WIDTH);
+                let padded = format!("{book_code:0>BOOK_CODE_WIDTH$}");
                 if let Some(book_key) =
                     walk_book_folder(workspace, &path, &padded, link_context, fix, lines)
                 {
@@ -2531,12 +2530,9 @@ fn validate_book_index(
         return None;
     };
     let mut mapping = match extract_frontmatter(&raw) {
-        Some(fm) => match serde_yaml::from_str::<Mapping>(fm.raw) {
-            Ok(m) => m,
-            Err(_) => {
-                lines.push(format!("{INVALID_FIELDS_PREFIX} {relative} frontmatter"));
-                return None;
-            }
+        Some(fm) => if let Ok(m) = serde_yaml::from_str::<Mapping>(fm.raw) { m } else {
+            lines.push(format!("{INVALID_FIELDS_PREFIX} {relative} frontmatter"));
+            return None;
         },
         None => Mapping::new(),
     };
@@ -2617,12 +2613,9 @@ fn validate_book_artifact(
     };
     let mut current_path = path.to_path_buf();
     let mut mapping = match extract_frontmatter(&raw) {
-        Some(fm) => match serde_yaml::from_str::<Mapping>(fm.raw) {
-            Ok(m) => m,
-            Err(_) => {
-                lines.push(format!("{INVALID_FIELDS_PREFIX} {relative} frontmatter"));
-                return;
-            }
+        Some(fm) => if let Ok(m) = serde_yaml::from_str::<Mapping>(fm.raw) { m } else {
+            lines.push(format!("{INVALID_FIELDS_PREFIX} {relative} frontmatter"));
+            return;
         },
         None => Mapping::new(),
     };

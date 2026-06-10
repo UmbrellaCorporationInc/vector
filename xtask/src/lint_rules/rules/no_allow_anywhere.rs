@@ -42,7 +42,7 @@ const PERMITTED_IN_CLI: &[&str] = &["clippy::print_stderr", "clippy::print_stdou
 /// Only doc-related suppressions are permitted — pest generates undocumented items.
 const PERMITTED_IN_PEST: &[&str] = &["missing_docs", "clippy::missing_docs_in_private_items"];
 
-pub(crate) struct NoAllowAnywhere {
+pub struct NoAllowAnywhere {
     pub(crate) is_future: bool,
 }
 
@@ -80,7 +80,7 @@ struct Visitor<'a> {
     is_future: bool,
 }
 
-impl<'a> Visit<'_> for Visitor<'a> {
+impl Visit<'_> for Visitor<'_> {
     fn visit_item_mod(&mut self, node: &syn::ItemMod) {
         let old_context = self.in_test_context;
         if has_cfg_test(&node.attrs) {
@@ -127,7 +127,7 @@ impl<'a> Visit<'_> for Visitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> {
+impl Visitor<'_> {
     fn check_attrs(&mut self, attrs: &[syn::Attribute]) {
         for attr in attrs {
             if !attr.path().is_ident("allow") {

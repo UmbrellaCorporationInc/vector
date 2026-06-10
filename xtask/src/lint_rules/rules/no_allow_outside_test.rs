@@ -11,7 +11,7 @@ use syn::visit::{self, Visit};
 
 use crate::lint_rules::rule::{Rule, RuleViolation};
 
-pub(crate) struct NoAllowOutsideTest;
+pub struct NoAllowOutsideTest;
 
 impl Rule for NoAllowOutsideTest {
     fn is_active(&self, _future: bool) -> bool {
@@ -35,7 +35,7 @@ struct Visitor<'a> {
     in_test_context: bool,
 }
 
-impl<'a> Visit<'_> for Visitor<'a> {
+impl Visit<'_> for Visitor<'_> {
     fn visit_item_mod(&mut self, node: &syn::ItemMod) {
         let old_context = self.in_test_context;
         if has_cfg_test(&node.attrs) {
@@ -85,7 +85,7 @@ impl<'a> Visit<'_> for Visitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> {
+impl Visitor<'_> {
     fn check_attrs(&mut self, attrs: &[syn::Attribute]) {
         if self.in_test_context {
             return;

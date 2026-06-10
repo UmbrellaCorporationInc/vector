@@ -1,10 +1,10 @@
-//! Core types for the lint_rules subsystem: `RuleViolation` and the `Rule` trait.
+//! Core types for the `lint_rules` subsystem: `RuleViolation` and the `Rule` trait.
 
 use std::path::PathBuf;
 
 /// A single violation reported by a lint rule.
 #[derive(Debug)]
-pub(crate) struct RuleViolation {
+pub struct RuleViolation {
     /// Absolute path to the file where the violation was detected.
     pub(crate) file: PathBuf,
     /// 1-based line number of the offending node, if available.
@@ -18,7 +18,7 @@ pub(crate) struct RuleViolation {
 }
 
 /// A project-local lint rule operating on either parsed Rust source or TOML manifests.
-pub(crate) trait Rule {
+pub trait Rule {
     /// Returns `true` when this rule is active in the current run mode.
     ///
     /// Standard rules always return `true`. Rules gated behind `--future` return `true`

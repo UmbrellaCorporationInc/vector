@@ -4,18 +4,18 @@ use serde_yaml::{Mapping, Value};
 
 /// Top-level expression: one or more brace groups, OR’d together.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct QueryExpr {
+pub struct QueryExpr {
     pub(crate) groups: Vec<BraceGroup>,
 }
 
 /// One `{ ... }` group: predicates are AND’d.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BraceGroup {
+pub struct BraceGroup {
     pub(crate) predicates: Vec<Predicate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Predicate {
+pub enum Predicate {
     /// `field='value'`
     Eq { field: String, value: String },
     /// `field=['a','b']` — any listed value may match (OR within the list).
@@ -27,7 +27,7 @@ pub(crate) enum Predicate {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ParseError {
+pub struct ParseError {
     pub(crate) offset: usize,
     pub(crate) message: String,
 }
@@ -44,7 +44,7 @@ impl ParseError {
 ///
 /// Returns [`ParseError`] with a byte offset into the original trimmed input when the expression
 /// is not well-formed.
-pub(crate) fn parse_query_expression(input: &str) -> Result<QueryExpr, ParseError> {
+pub fn parse_query_expression(input: &str) -> Result<QueryExpr, ParseError> {
     let input = input.trim();
     if input.is_empty() {
         return Err(ParseError::new(
@@ -255,7 +255,7 @@ struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    fn new(s: &'a str, base: usize) -> Self {
+    const fn new(s: &'a str, base: usize) -> Self {
         Self { s, pos: 0, base }
     }
 
@@ -263,7 +263,7 @@ impl<'a> Parser<'a> {
         ParseError::new(self.pos + self.base, message)
     }
 
-    fn is_eof(&self) -> bool {
+    const fn is_eof(&self) -> bool {
         self.pos >= self.s.len()
     }
 
@@ -304,7 +304,7 @@ impl<'a> Parser<'a> {
 
 /// True if the document's frontmatter satisfies the expression (OR of brace groups, AND of predicates within a group).
 #[must_use]
-pub(crate) fn eval_query_expr(expr: &QueryExpr, mapping: &Mapping) -> bool {
+pub fn eval_query_expr(expr: &QueryExpr, mapping: &Mapping) -> bool {
     expr.groups
         .iter()
         .any(|group| group.predicates.iter().all(|pred| eval_predicate(pred, mapping)))
@@ -313,15 +313,14 @@ pub(crate) fn eval_query_expr(expr: &QueryExpr, mapping: &Mapping) -> bool {
 fn eval_predicate(pred: &Predicate, mapping: &Mapping) -> bool {
     match pred {
         Predicate::Eq { field, value } => {
-            mapping_get(mapping, field).map(|v| yaml_value_eq_str(v, value)).unwrap_or(false)
+            mapping_get(mapping, field).is_some_and(|v| yaml_value_eq_str(v, value))
         }
         Predicate::InList { field, values } => in_list_matches(mapping_get(mapping, field), values),
         Predicate::AllInList { field, values } => {
             all_in_list_matches(mapping_get(mapping, field), values)
         }
         Predicate::Substring { field, needle } => mapping_get(mapping, field)
-            .map(|v| value_substring_haystack(v).contains(needle.as_str()))
-            .unwrap_or(false),
+            .is_some_and(|v| value_substring_haystack(v).contains(needle.as_str())),
     }
 }
 

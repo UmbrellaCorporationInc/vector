@@ -12,7 +12,7 @@
 use crate::lint_rules::rule::{Rule, RuleViolation};
 use std::path::Path;
 
-pub(crate) struct NoWorkspaceDependency;
+pub struct NoWorkspaceDependency;
 
 impl Rule for NoWorkspaceDependency {
     fn is_active(&self, _future: bool) -> bool {

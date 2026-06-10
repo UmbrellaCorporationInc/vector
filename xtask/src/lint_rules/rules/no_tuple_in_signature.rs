@@ -3,7 +3,7 @@
 //! Three conditions are checked on every `fn` item:
 //!
 //! - **RULE-5A**: flag any tuple with 2+ elements in any `fn` signature (parameters or return type); exempt `*_test.rs`.
-//! - **RULE-5B**: flag `pub` fn signatures containing a generic type with 2+ type params not in the wrapper exemption list (Arc, Rc, Mutex, RwLock, Result, Option).
+//! - **RULE-5B**: flag `pub` fn signatures containing a generic type with 2+ type params not in the wrapper exemption list (Arc, Rc, Mutex, `RwLock`, Result, Option).
 //! - **RULE-5C**: flag any `impl Trait` in any `fn` signature whose trait carries at least one concrete generic argument (e.g. `impl Iterator<Item = String>`); concrete means not a bare uppercase type parameter. Use a type alias instead.
 
 use std::path::Path;
@@ -13,7 +13,7 @@ use syn::visit::{self, Visit};
 
 use crate::lint_rules::rule::{Rule, RuleViolation};
 
-pub(crate) struct NoTupleInSignature;
+pub struct NoTupleInSignature;
 
 impl Rule for NoTupleInSignature {
     fn is_active(&self, _future: bool) -> bool {
@@ -40,7 +40,7 @@ struct Visitor<'a> {
     in_pub_trait: bool,
 }
 
-impl<'a> Visit<'_> for Visitor<'a> {
+impl Visit<'_> for Visitor<'_> {
     fn visit_item_trait(&mut self, node: &syn::ItemTrait) {
         let old = self.in_pub_trait;
         self.in_pub_trait = matches!(node.vis, syn::Visibility::Public(_));
@@ -72,7 +72,7 @@ impl<'a> Visit<'_> for Visitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> {
+impl Visitor<'_> {
     fn check_fn(&mut self, is_pub: bool, sig: &syn::Signature) {
         // Check inputs (parameters)
         for arg in &sig.inputs {

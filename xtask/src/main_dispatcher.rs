@@ -5,13 +5,13 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "xtask")]
 #[command(about = "Forge workspace build and quality automation")]
-pub(crate) struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Commands,
 }
 
 #[derive(Subcommand)]
-pub(crate) enum Commands {
+pub enum Commands {
     /// Resolve and reserve numbered vault documents
     Vault {
         #[command(subcommand)]
@@ -85,7 +85,7 @@ pub(crate) enum Commands {
     },
 }
 
-pub(crate) async fn dispatch<I, T, F>(args: I, on_parse_error: F) -> i32
+pub async fn dispatch<I, T, F>(args: I, on_parse_error: F) -> i32
 where
     I: IntoIterator<Item = T>,
     T: Into<std::ffi::OsString> + Clone,

@@ -22,12 +22,12 @@ fn rule_ids(violations: &[RuleViolation]) -> Vec<&str> {
 
 #[test]
 fn rule_7_fires_for_allow_unwrap_in_production_fn() {
-    let source = r#"
+    let source = r"
         #[allow(clippy::unwrap_used)]
         fn foo() {
             let x = Some(1).unwrap();
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-7"), "expected RULE-7, got: {ids:?}");
@@ -35,10 +35,10 @@ fn rule_7_fires_for_allow_unwrap_in_production_fn() {
 
 #[test]
 fn rule_7_fires_for_allow_expect_in_production_struct() {
-    let source = r#"
+    let source = r"
         #[allow(clippy::expect_used)]
         struct Foo;
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-7"), "expected RULE-7, got: {ids:?}");
@@ -46,10 +46,10 @@ fn rule_7_fires_for_allow_expect_in_production_struct() {
 
 #[test]
 fn rule_7_fires_for_allow_unwrap_in_file_level_attribute() {
-    let source = r#"
+    let source = r"
         #![allow(clippy::unwrap_used)]
         fn foo() {}
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-7"), "expected RULE-7, got: {ids:?}");
@@ -57,12 +57,12 @@ fn rule_7_fires_for_allow_unwrap_in_file_level_attribute() {
 
 #[test]
 fn rule_7_does_not_fire_in_test_file() {
-    let source = r#"
+    let source = r"
         #[allow(clippy::unwrap_used)]
         fn test_foo() {
             let x = Some(1).unwrap();
         }
-    "#;
+    ";
     let violations = check("src/lib_test.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "RULE-7 must not fire in *_test.rs file, got: {ids:?}");
@@ -70,7 +70,7 @@ fn rule_7_does_not_fire_in_test_file() {
 
 #[test]
 fn rule_7_does_not_fire_in_test_module() {
-    let source = r#"
+    let source = r"
         #[cfg(test)]
         mod tests {
             #[allow(clippy::unwrap_used)]
@@ -78,7 +78,7 @@ fn rule_7_does_not_fire_in_test_module() {
                 let x = Some(1).unwrap();
             }
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "RULE-7 must not fire in #[cfg(test)] module, got: {ids:?}");
@@ -86,11 +86,11 @@ fn rule_7_does_not_fire_in_test_module() {
 
 #[test]
 fn rule_7_does_not_fire_on_test_fn() {
-    let source = r#"
+    let source = r"
         #[test]
         #[allow(clippy::expect_used)]
         fn test_it() {}
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "RULE-7 must not fire on #[test] function, got: {ids:?}");
@@ -98,10 +98,10 @@ fn rule_7_does_not_fire_on_test_fn() {
 
 #[test]
 fn rule_7_handles_comma_separated_allow() {
-    let source = r#"
+    let source = r"
         #[allow(dead_code, clippy::unwrap_used)]
         fn foo() {}
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-7"), "expected RULE-7 for comma-separated allow, got: {ids:?}");

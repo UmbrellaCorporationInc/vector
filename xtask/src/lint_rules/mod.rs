@@ -15,5 +15,5 @@ mod rules;
 mod runner;
 mod walker;
 
-pub(crate) use rule::RuleViolation;
-pub(crate) use runner::run;
+pub use rule::RuleViolation;
+pub use runner::run;

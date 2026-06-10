@@ -15,7 +15,7 @@ use syn::visit::Visit;
 
 use crate::lint_rules::rule::{Rule, RuleViolation};
 
-pub(crate) struct NoInlineTests;
+pub struct NoInlineTests;
 
 impl Rule for NoInlineTests {
     fn is_active(&self, _future: bool) -> bool {
@@ -65,7 +65,7 @@ struct Visitor<'a> {
     out: &'a mut Vec<RuleViolation>,
 }
 
-impl<'a> Visit<'_> for Visitor<'a> {
+impl Visit<'_> for Visitor<'_> {
     fn visit_item_mod(&mut self, node: &syn::ItemMod) {
         if !has_cfg_test(&node.attrs) {
             // Not a test module — recurse in case there are nested mods.

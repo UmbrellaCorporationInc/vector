@@ -29,10 +29,10 @@ pub struct QualityTestConfig<'a> {
 /// Report string + pass/fail status.
 pub type TestReport = (String, bool);
 
-/// Pair of (status_tag, table_output).
+/// Pair of (`status_tag`, `table_output`).
 type TestStatusLine = (&'static str, String);
 
-/// Pair of (crate_name, test_type).
+/// Pair of (`crate_name`, `test_type`).
 type CrateTestMetadata = (String, String);
 
 /// Build the test+coverage report string and return it together with pass/fail.
@@ -65,10 +65,7 @@ pub async fn execute(config: &QualityTestConfig<'_>) -> TestReport {
         "--output-path",
         "lcov.info",
     ]);
-    builder = match config.include_ignore {
-        true => builder.args(["--", "--include-ignored"]),
-        false => builder,
-    };
+    builder = if config.include_ignore { builder.args(["--", "--include-ignored"]) } else { builder };
 
     let (test_output, passed) = match builder.workdir(&workspace).run() {
         Err(e) => {
@@ -94,7 +91,7 @@ pub async fn execute(config: &QualityTestConfig<'_>) -> TestReport {
 
     let mut report = if config.verbose {
         format!(
-            r#"{report_title}
+            r"{report_title}
 Timestamp: {timestamp}
 Workspace: {workspace_str}
 Test Duration: {test_duration_secs:.2}s
@@ -103,22 +100,22 @@ Summary: {summary}
 
 --- Raw Output ---
 {test_output}
-"#
+"
         )
     } else if passed {
         format!(
-            r#"{report_title}
+            r"{report_title}
 Timestamp: {timestamp}
 Workspace: {workspace_str}
 Test Duration: {test_duration_secs:.2}s
 Status: {status}
 Summary: {summary}
-"#
+"
         )
     } else {
         let failure_output = extract_failure_output(&test_output, "");
         format!(
-            r#"{report_title}
+            r"{report_title}
 Timestamp: {timestamp}
 Workspace: {workspace_str}
 Test Duration: {test_duration_secs:.2}s
@@ -127,7 +124,7 @@ Summary: {summary}
 
 --- Failures ---
 {failure_output}
-"#
+"
         )
     };
 
@@ -149,14 +146,14 @@ Summary: {summary}
             let cov_table =
                 extract_lcov_coverage_table(&lcov_str, threshold, config.complete_coverage_summary);
             report.push_str(&format!(
-                r#"
+                r"
 
 === Coverage Report (per-file: function, line, branch) ===
 Duration: {cov_duration_secs:.2}s
 Threshold: {threshold}% (N/A = - = 100%)
 
 {cov_table}
-"#
+"
             ));
         }
 
@@ -197,7 +194,7 @@ Threshold: {threshold}% (N/A = - = 100%)
 pub async fn run(config: QualityTestConfig<'_>) -> i32 {
     let (report, passed) = execute(&config).await;
     print!("{report}");
-    if passed { 0 } else { 1 }
+    i32::from(!passed)
 }
 
 // --- Test summary table ---
@@ -412,7 +409,7 @@ struct CoverageRow {
     branch_pct: Option<f64>,
 }
 
-/// One parsed block from an lcov.info file (SF: … end_of_record).
+/// One parsed block from an lcov.info file (SF: … `end_of_record`).
 struct LcovRecord {
     filename: String,
     fn_found: u64,
@@ -556,7 +553,7 @@ fn extract_lcov_coverage_table(lcov_str: &str, threshold: u8, complete: bool) ->
 fn fmt_pct(pct: Option<f64>) -> String {
     match pct {
         None => "-".to_string(),
-        Some(v) => format!("{:.1}%", v),
+        Some(v) => format!("{v:.1}%"),
     }
 }
 
@@ -565,7 +562,7 @@ fn any_below_threshold(r: &CoverageRow, thresh: f64) -> bool {
 }
 
 fn min_applicable(r: &CoverageRow) -> f64 {
-    [r.func_pct, r.line_pct, r.branch_pct].into_iter().flatten().fold(f64::MAX, |a, b| a.min(b))
+    [r.func_pct, r.line_pct, r.branch_pct].into_iter().flatten().fold(f64::MAX, f64::min)
 }
 
 fn truncate_path(s: &str, max: usize) -> String {

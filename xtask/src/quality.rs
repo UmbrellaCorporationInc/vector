@@ -8,7 +8,7 @@ use chrono::Utc;
 use io::CommandBuilder;
 
 #[cfg(test)]
-pub(crate) static CURRENT_DIR_TEST_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+pub static CURRENT_DIR_TEST_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> =
     std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
 
 /// String report + passed/failed status.
@@ -106,7 +106,7 @@ pub async fn execute(write_report: bool, format: bool) -> QualityReport {
 pub async fn run(write_report: bool, format: bool) -> i32 {
     let (report, passed) = execute(write_report, format).await;
     print!("{report}");
-    if passed { 0 } else { 1 }
+    i32::from(!passed)
 }
 
 fn build_fmt_section(passed: bool, duration_secs: f64, raw: &str, applied: bool) -> String {

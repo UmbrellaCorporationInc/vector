@@ -10,7 +10,7 @@ use syn::visit::{self, Visit};
 
 use crate::lint_rules::rule::{Rule, RuleViolation};
 
-pub(crate) struct NoToStringInMapErr;
+pub struct NoToStringInMapErr;
 
 impl Rule for NoToStringInMapErr {
     fn is_active(&self, _future: bool) -> bool {
@@ -30,7 +30,7 @@ struct Visitor<'a> {
     out: &'a mut Vec<RuleViolation>,
 }
 
-impl<'a> Visit<'_> for Visitor<'a> {
+impl Visit<'_> for Visitor<'_> {
     fn visit_expr_method_call(&mut self, node: &syn::ExprMethodCall) {
         if node.method == "map_err"
             && node.args.len() == 1

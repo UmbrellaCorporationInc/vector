@@ -88,7 +88,7 @@ fn remove_tree(path: &Path) -> std::io::Result<()> {
 }
 
 fn lock_test_dir() -> std::sync::MutexGuard<'static, ()> {
-    CURRENT_DIR_TEST_LOCK.lock().unwrap_or_else(|poison| poison.into_inner())
+    CURRENT_DIR_TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 #[test]
@@ -309,7 +309,7 @@ fn reserve_rejects_empty_name() {
 
     let error = execute(VaultCommand::Reserve {
         doc_type: VaultDocumentType::Task,
-        name: "".to_string(),
+        name: String::new(),
         subfolder: Some("todo".to_string()),
     })
     .unwrap_err();
@@ -1948,7 +1948,7 @@ tags:\n\
     )
     .unwrap();
     let guide_path = ws.root.join("doc/40 Guides/0001 guide Link Guide.md");
-    let absolute_target = adr_path.to_string_lossy().replace('\\', "/").replace(" ", "%20");
+    let absolute_target = adr_path.to_string_lossy().replace('\\', "/").replace(' ', "%20");
     fs::write(
         &guide_path,
         format!(
@@ -2001,7 +2001,7 @@ tags:\n\
     .unwrap();
     let task_path = ws.root.join("doc/00 Project Hub/Tasks/done/00001 task Link Task.md");
     let file_uri =
-        format!("file:///{}", adr_path.to_string_lossy().replace('\\', "/").replace(" ", "%20"));
+        format!("file:///{}", adr_path.to_string_lossy().replace('\\', "/").replace(' ', "%20"));
     fs::write(
         &task_path,
         format!(

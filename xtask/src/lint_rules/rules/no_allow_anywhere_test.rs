@@ -31,10 +31,10 @@ fn rule_f1_always_active() {
 
 #[test]
 fn rule_f1_fires_for_any_allow_in_production_fn() {
-    let source = r#"
+    let source = r"
         #[allow(dead_code)]
         fn foo() {}
-    "#;
+    ";
     let violations = check("src/lib.rs", source, true);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-F1"), "expected RULE-F1, got: {ids:?}");
@@ -43,10 +43,10 @@ fn rule_f1_fires_for_any_allow_in_production_fn() {
 #[test]
 fn rule_f1_fires_for_permitted_allow_in_production_code() {
     // Even "permitted" args are forbidden outside test contexts.
-    let source = r#"
+    let source = r"
         #[allow(clippy::unwrap_used)]
         fn foo() {}
-    "#;
+    ";
     let violations = check("src/lib.rs", source, true);
     let ids = rule_ids(&violations);
     assert!(
@@ -57,10 +57,10 @@ fn rule_f1_fires_for_permitted_allow_in_production_code() {
 
 #[test]
 fn rule_f1_fires_for_file_level_allow_in_production_code() {
-    let source = r#"
+    let source = r"
         #![allow(unused_imports)]
         fn foo() {}
-    "#;
+    ";
     let violations = check("src/lib.rs", source, true);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-F1"), "expected RULE-F1 for file-level allow, got: {ids:?}");
@@ -68,10 +68,10 @@ fn rule_f1_fires_for_file_level_allow_in_production_code() {
 
 #[test]
 fn rule_f1_fires_for_allow_on_struct_in_production_code() {
-    let source = r#"
+    let source = r"
         #[allow(dead_code)]
         struct Foo;
-    "#;
+    ";
     let violations = check("src/lib.rs", source, true);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-F1"), "expected RULE-F1 on struct, got: {ids:?}");
@@ -81,14 +81,14 @@ fn rule_f1_fires_for_allow_on_struct_in_production_code() {
 
 #[test]
 fn rule_f1_does_not_fire_for_permitted_allow_in_test_file() {
-    let source = r#"
+    let source = r"
         #[allow(clippy::unwrap_used)]
         fn test_foo() {}
         #[allow(clippy::expect_used)]
         fn test_bar() {}
         #[allow(clippy::print_stdout)]
         fn test_baz() {}
-    "#;
+    ";
     let violations = check("src/lib_test.rs", source, true);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "permitted allows in *_test.rs must not fire, got: {ids:?}");
@@ -96,10 +96,10 @@ fn rule_f1_does_not_fire_for_permitted_allow_in_test_file() {
 
 #[test]
 fn rule_f1_fires_for_non_permitted_allow_in_test_file() {
-    let source = r#"
+    let source = r"
         #[allow(dead_code)]
         fn test_foo() {}
-    "#;
+    ";
     let violations = check("src/lib_test.rs", source, true);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-F1"), "non-permitted allow in *_test.rs must fire, got: {ids:?}");
@@ -108,10 +108,10 @@ fn rule_f1_fires_for_non_permitted_allow_in_test_file() {
 #[test]
 fn rule_f1_fires_only_for_non_permitted_in_comma_list_in_test_file() {
     // unwrap_used is permitted; dead_code is not — only dead_code should be flagged.
-    let source = r#"
+    let source = r"
         #[allow(clippy::unwrap_used, dead_code)]
         fn test_foo() {}
-    "#;
+    ";
     let violations = check("src/lib_test.rs", source, true);
     assert_eq!(violations.len(), 1, "only dead_code should be flagged, got: {violations:?}");
     assert!(violations[0].message.contains("dead_code"));
@@ -121,12 +121,12 @@ fn rule_f1_fires_only_for_non_permitted_in_comma_list_in_test_file() {
 fn rule_f1_as_conversions_and_indexing_slicing_permitted_in_test_files() {
     // clippy::as_conversions and clippy::indexing_slicing are in PERMITTED_IN_TESTS —
     // they are always permitted in *_test.rs files regardless of --future mode.
-    let source = r#"
+    let source = r"
         #[allow(clippy::as_conversions)]
         fn test_as() {}
         #[allow(clippy::indexing_slicing)]
         fn test_index() {}
-    "#;
+    ";
 
     let violations_std = check("src/lib_test.rs", source, false);
     assert!(violations_std.is_empty(), "must be permitted in test files (future=false)");
@@ -139,13 +139,13 @@ fn rule_f1_as_conversions_and_indexing_slicing_permitted_in_test_files() {
 
 #[test]
 fn rule_f1_does_not_fire_for_permitted_allow_in_cfg_test_module() {
-    let source = r#"
+    let source = r"
         #[cfg(test)]
         mod tests {
             #[allow(clippy::unwrap_used)]
             fn helper() {}
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source, true);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "permitted allow in #[cfg(test)] mod must not fire, got: {ids:?}");
@@ -153,13 +153,13 @@ fn rule_f1_does_not_fire_for_permitted_allow_in_cfg_test_module() {
 
 #[test]
 fn rule_f1_fires_for_non_permitted_allow_in_cfg_test_module() {
-    let source = r#"
+    let source = r"
         #[cfg(test)]
         mod tests {
             #[allow(unused_variables)]
             fn helper() {}
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source, true);
     let ids = rule_ids(&violations);
     assert!(
@@ -170,9 +170,9 @@ fn rule_f1_fires_for_non_permitted_allow_in_cfg_test_module() {
 
 #[test]
 fn rule_f1_does_not_fire_when_no_allow_attrs_present() {
-    let source = r#"
+    let source = r"
         fn foo() -> u32 { 42 }
-    "#;
+    ";
     let violations = check("src/lib.rs", source, true);
     assert!(
         violations.is_empty(),
@@ -215,21 +215,21 @@ fn rule_f1_fires_for_non_permitted_allow_in_pest_grammar_file() {
 #[test]
 fn rule_f1_fires_normally_without_grammar_attr() {
     // Same #[allow] but no #[grammar = "..."] — treated as regular production code.
-    let source = r#"
+    let source = r"
         #![allow(missing_docs)]
 
         pub struct NotAPestParser;
-    "#;
+    ";
     let violations = check("src/grammar/parser.rs", source, true);
     assert!(!violations.is_empty(), "without #[grammar], allow must still fire");
 }
 
 #[test]
 fn rule_f1_agnostic_permitted_list() {
-    let source = r#"
+    let source = r"
         #[allow(clippy::as_conversions)]
         fn foo() {}
-    "#;
+    ";
 
     // Even in non-test (production) code, PERMITTED list is allowed if future=false
     let violations = check("src/lib.rs", source, false);

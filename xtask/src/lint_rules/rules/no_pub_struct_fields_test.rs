@@ -22,11 +22,11 @@ fn rule_ids(violations: &[RuleViolation]) -> Vec<&str> {
 
 #[test]
 fn rule_10_fires_for_pub_field() {
-    let source = r#"
+    let source = r"
         struct Foo {
             pub x: i32,
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-10"), "expected RULE-10, got: {ids:?}");
@@ -34,9 +34,9 @@ fn rule_10_fires_for_pub_field() {
 
 #[test]
 fn rule_10_fires_for_pub_tuple_field() {
-    let source = r#"
+    let source = r"
         struct Foo(pub i32);
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-10"), "expected RULE-10, got: {ids:?}");
@@ -44,12 +44,12 @@ fn rule_10_fires_for_pub_tuple_field() {
 
 #[test]
 fn rule_10_does_not_fire_for_private_field() {
-    let source = r#"
+    let source = r"
         struct Foo {
             x: i32,
             pub(crate) y: i32,
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "RULE-10 must not fire for non-pub, got: {ids:?}");
@@ -57,14 +57,14 @@ fn rule_10_does_not_fire_for_private_field() {
 
 #[test]
 fn rule_10_does_not_fire_for_dto_struct() {
-    let source = r#"
+    let source = r"
         /// A sample data object.
         ///
         /// # DTO(data transfer)
         struct Foo {
             pub x: i32,
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "RULE-10 must not fire for DTO with explanation, got: {ids:?}");
@@ -72,14 +72,14 @@ fn rule_10_does_not_fire_for_dto_struct() {
 
 #[test]
 fn rule_10_fires_for_dto_without_explanation() {
-    let source = r#"
+    let source = r"
         /// A sample data object.
         ///
         /// # DTO
         struct Foo {
             pub x: i32,
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-10"), "RULE-10 must fire for DTO without explanation");
@@ -87,14 +87,14 @@ fn rule_10_fires_for_dto_without_explanation() {
 
 #[test]
 fn rule_10_fires_for_dto_with_empty_explanation() {
-    let source = r#"
+    let source = r"
         /// A sample data object.
         ///
         /// # DTO()
         struct Foo {
             pub x: i32,
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-10"), "RULE-10 must fire for DTO with empty explanation");
@@ -102,14 +102,14 @@ fn rule_10_fires_for_dto_with_empty_explanation() {
 
 #[test]
 fn rule_10_fires_for_dto_with_whitespace_explanation() {
-    let source = r#"
+    let source = r"
         /// A sample data object.
         ///
         /// # DTO(   )
         struct Foo {
             pub x: i32,
         }
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-10"), "RULE-10 must fire for DTO with whitespace explanation");
@@ -117,11 +117,11 @@ fn rule_10_fires_for_dto_with_whitespace_explanation() {
 
 #[test]
 fn rule_10_does_not_fire_in_test_file() {
-    let source = r#"
+    let source = r"
         struct Foo {
             pub x: i32,
         }
-    "#;
+    ";
     let violations = check("src/lib_test.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "RULE-10 must not fire in *_test.rs, got: {ids:?}");
@@ -129,11 +129,11 @@ fn rule_10_does_not_fire_in_test_file() {
 
 #[test]
 fn rule_10_does_not_fire_in_tests_dir() {
-    let source = r#"
+    let source = r"
         struct Foo {
             pub x: i32,
         }
-    "#;
+    ";
     let violations = check("cli/foo/tests/integration.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.is_empty(), "RULE-10 must not fire in tests/ dir, got: {ids:?}");

@@ -20,7 +20,7 @@ quote = { workspace = true }
 proc-macro2 = { workspace = true }
 tokio = { workspace = true }
 walkdir = { workspace = true }
-io = { package = "xtask-io", path = "io" }
+io = { workspace = true }
 
 [dev-dependencies]
-io = { package = "xtask-io", path = "io", features = ["test-utils"] }
+io = { workspace = true, features = ["test-utils"] }

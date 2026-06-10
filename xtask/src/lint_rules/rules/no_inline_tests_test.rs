@@ -23,14 +23,14 @@ fn rule_ids(violations: &[RuleViolation]) -> Vec<&str> {
 #[test]
 fn rule_13a_fires_for_inline_cfg_test_mod_in_non_test_file() {
     // mod with an inline body in a logic file — the violation case.
-    let source = r#"
+    let source = r"
         #[cfg(test)]
         mod tests {
             use super::*;
             #[test]
             fn it_works() {}
         }
-    "#;
+    ";
     let violations = check("src/foo.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-13A"), "expected RULE-13A, got: {ids:?}");
@@ -39,14 +39,14 @@ fn rule_13a_fires_for_inline_cfg_test_mod_in_non_test_file() {
 #[test]
 fn rule_13a_does_not_fire_in_test_file() {
     // Inline body in a _test.rs file — allowed.
-    let source = r#"
+    let source = r"
         #[cfg(test)]
         mod tests {
             use super::*;
             #[test]
             fn it_works() {}
         }
-    "#;
+    ";
     let violations = check("src/foo_test.rs", source);
     let ids = rule_ids(&violations);
     assert!(!ids.contains(&"RULE-13A"), "RULE-13A must not fire in _test.rs, got: {ids:?}");
@@ -70,9 +70,9 @@ fn rule_13a_does_not_fire_for_canonical_path_delegation_in_logic_file() {
 
 #[test]
 fn rule_13a_does_not_fire_when_no_cfg_test() {
-    let source = r#"
+    let source = r"
         mod helpers;
-    "#;
+    ";
     let violations = check("src/foo.rs", source);
     let ids = rule_ids(&violations);
     // RULE-13D fires here (no cfg(test) mod) — but not 13A.
@@ -137,12 +137,12 @@ fn rule_13c_does_not_fire_when_path_matches_stem() {
 #[test]
 fn rule_13c_does_not_fire_when_no_path_attr() {
     // Inline mod with a body — only 13A/13B may fire.
-    let source = r#"
+    let source = r"
         #[cfg(test)]
         mod tests {
             use super::*;
         }
-    "#;
+    ";
     let violations = check("src/foo_test.rs", source);
     let ids = rule_ids(&violations);
     assert!(!ids.contains(&"RULE-13C"), "RULE-13C must not fire when no #[path], got: {ids:?}");
@@ -166,10 +166,10 @@ fn canonical_declaration_emits_no_violations() {
 
 #[test]
 fn non_test_mod_items_produce_no_violations() {
-    let source = r#"
+    let source = r"
         pub mod handlers;
         pub mod models;
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     assert!(violations.is_empty(), "non-test mods must produce no violations, got: {violations:?}");
 }
@@ -178,9 +178,9 @@ fn non_test_mod_items_produce_no_violations() {
 
 #[test]
 fn rule_13d_fires_when_no_cfg_test_mod() {
-    let source = r#"
+    let source = r"
         pub fn add(a: i32, b: i32) -> i32 { a + b }
-    "#;
+    ";
     let violations = check("src/math.rs", source);
     let ids = rule_ids(&violations);
     assert!(ids.contains(&"RULE-13D"), "expected RULE-13D, got: {ids:?}");
@@ -204,9 +204,9 @@ fn rule_13d_does_not_fire_when_cfg_test_mod_present() {
 
 #[test]
 fn rule_13d_exempt_main_rs() {
-    let source = r#"
+    let source = r"
         fn main() {}
-    "#;
+    ";
     let violations = check("src/main.rs", source);
     let ids = rule_ids(&violations);
     assert!(!ids.contains(&"RULE-13D"), "RULE-13D must not fire on main.rs, got: {ids:?}");
@@ -214,9 +214,9 @@ fn rule_13d_exempt_main_rs() {
 
 #[test]
 fn rule_13d_exempt_lib_rs() {
-    let source = r#"
+    let source = r"
         pub mod handlers;
-    "#;
+    ";
     let violations = check("src/lib.rs", source);
     let ids = rule_ids(&violations);
     assert!(!ids.contains(&"RULE-13D"), "RULE-13D must not fire on lib.rs, got: {ids:?}");
@@ -224,9 +224,9 @@ fn rule_13d_exempt_lib_rs() {
 
 #[test]
 fn rule_13d_exempt_mod_rs() {
-    let source = r#"
+    let source = r"
         pub use handlers::Handler;
-    "#;
+    ";
     let violations = check("src/http/mod.rs", source);
     let ids = rule_ids(&violations);
     assert!(!ids.contains(&"RULE-13D"), "RULE-13D must not fire on mod.rs, got: {ids:?}");
@@ -234,10 +234,10 @@ fn rule_13d_exempt_mod_rs() {
 
 #[test]
 fn rule_13d_exempt_test_files() {
-    let source = r#"
+    let source = r"
         #[test]
         fn it_works() {}
-    "#;
+    ";
     let violations = check("src/math_test.rs", source);
     let ids = rule_ids(&violations);
     assert!(!ids.contains(&"RULE-13D"), "RULE-13D must not fire on _test.rs files, got: {ids:?}");
@@ -246,10 +246,10 @@ fn rule_13d_exempt_test_files() {
 #[test]
 fn rule_13d_exempt_integration_test_folder() {
     // Files under a `tests/` directory are Cargo integration tests — no `mod tests` needed.
-    let source = r#"
+    let source = r"
         #[test]
         fn it_works() {}
-    "#;
+    ";
     let violations = check("cli/babel-cli/tests/cli.rs", source);
     let ids = rule_ids(&violations);
     assert!(
@@ -262,7 +262,7 @@ fn rule_13d_exempt_integration_test_folder() {
 fn rule_13d_does_not_fire_when_inline_cfg_test_mod_present() {
     // Inline body means RULE-13A fires, but RULE-13D must NOT fire because a
     // #[cfg(test)] mod is present (even if inline).
-    let source = r#"
+    let source = r"
         pub fn foo() {}
         #[cfg(test)]
         mod tests {
@@ -270,7 +270,7 @@ fn rule_13d_does_not_fire_when_inline_cfg_test_mod_present() {
             #[test]
             fn it_works() {}
         }
-    "#;
+    ";
     let violations = check("src/foo.rs", source);
     let ids = rule_ids(&violations);
     assert!(!ids.contains(&"RULE-13D"), "inline cfg(test) mod satisfies 13D, got: {ids:?}");

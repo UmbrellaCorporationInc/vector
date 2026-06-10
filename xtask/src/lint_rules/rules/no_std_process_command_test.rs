@@ -11,10 +11,10 @@ fn check_rule(path: &str, content: &str) -> Vec<RuleViolation> {
 
 #[test]
 fn rule_14_detects_direct_use_statement() {
-    let content = r#"
+    let content = r"
         use std::process::Command;
         fn main() {}
-    "#;
+    ";
     let violations = check_rule("src/main.rs", content);
     assert!(!violations.is_empty());
     assert!(violations[0].message.contains("direct use of std::process::Command"));
@@ -22,10 +22,10 @@ fn rule_14_detects_direct_use_statement() {
 
 #[test]
 fn rule_14_detects_wildcard_use_statement() {
-    let content = r#"
+    let content = r"
         use std::process::*;
         fn main() {}
-    "#;
+    ";
     let violations = check_rule("src/main.rs", content);
     assert!(!violations.is_empty());
     assert!(violations[0].message.contains("direct use of std::process::Command"));
