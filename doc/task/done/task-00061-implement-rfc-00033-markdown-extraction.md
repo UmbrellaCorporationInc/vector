@@ -5,7 +5,7 @@ code: "00061"
 slug: implement-rfc-00033-markdown-extraction
 title: Implement RFC 00033 Markdown Extraction
 description: Implement the markdown extraction capability proposed by RFC 00033.
-status: in-progress
+status: done
 created: 2026-06-10
 updated: 2026-06-10
 tags: []

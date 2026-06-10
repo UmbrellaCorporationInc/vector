@@ -5,7 +5,7 @@ code: "00033"
 slug: markdown-extraction
 title: Markdown Extraction
 description: Proposes the Markdown metadata extraction boundary for phase 3 of the local RAG implementation.
-status: accepted
+status: implemented
 created: 2026-06-10
 updated: 2026-06-10
 authors: []
@@ -37,6 +37,8 @@ input:
 Phase 3 of [[spec-00011-rag-plan-implementation]] needs a concrete extraction contract before the indexer can chunk, embed, and persist Markdown documents. The current plan states what must be extracted, but it does not define the runtime boundary, the normalized output shape, or how partial failures should be represented.
 
 Without that contract, later phases risk duplicating Markdown parsing logic, storing inconsistent metadata, or treating malformed frontmatter as a global indexing failure. The extraction layer must be deterministic, package-aware, and precise enough for chunking, filtering, attribution, and debugging.
+
+[[task-00061-implement-rfc-00033-markdown-extraction]] covers this RFC's expected extraction format at the implementation-task level: it depends on this RFC, directs the implementation of the Markdown extraction behavior, preserves existing metadata and validation semantics, and requires tests for successful extraction and malformed input handling. The RFC acceptance criteria remain the source of truth for verifying the exact output shape because the task summarizes the work instead of restating every extraction field, parser-spike requirement, fixture, and diagnostic case.
 
 ## 2. Proposal
 
