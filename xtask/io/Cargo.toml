@@ -1,0 +1,25 @@
+[package]
+name = "xtask-io"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "io"
+
+[features]
+## Exposes [`stub_shell`] and [`StubShellGuard`] for mocking shell execution in tests.
+## Add `io = { package = "xtask-io", path = "io", features = ["test-utils"] }` to `[dev-dependencies]`.
+test-utils = []
+
+[lints]
+workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+thiserror = { workspace = true }
+os_pipe = { workspace = true }
+base64 = { workspace = true }
+zip = { workspace = true }
+chrono = { workspace = true }
