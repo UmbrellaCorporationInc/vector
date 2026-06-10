@@ -64,11 +64,11 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Parse Markdown into heading sections that include heading path and content until the next heading of the same or higher level.
-- [ ] Ensure emitted chunk text includes the relevant heading context.
-- [ ] Prevent chunks that contain only a heading.
-- [ ] Preserve deterministic ordering and zero-based chunk ordinals for each document.
-- [ ] Cover root-level content before the first heading if existing extracted documents can contain it.
+- [x] Parse Markdown into heading sections that include heading path and content until the next heading of the same or higher level.
+- [x] Ensure emitted chunk text includes the relevant heading context.
+- [x] Prevent chunks that contain only a heading.
+- [x] Preserve deterministic ordering and zero-based chunk ordinals for each document.
+- [x] Cover root-level content before the first heading if existing extracted documents can contain it.
 
 ### 3.3. Phase C - Split oversized sections safely
 

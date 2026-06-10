@@ -2,10 +2,12 @@
 
 use runtime_markdown::{MarkdownExtractionRecord, MarkdownHeading, MarkdownSourceSpan};
 
+type ParsedAtxHeading<'a> = (u8, &'a str);
+
 /// Package identity used for workspace-local chunk identifiers.
 pub const WORKSPACE_CHUNK_NAMESPACE: &str = "workspace";
 
-/// Default heading slug used before heading-aware sectioning is implemented.
+/// Default heading slug used for root-level content before the first heading.
 pub const ROOT_CHUNK_HEADING_SLUG: &str = "root";
 
 /// Chunking configuration shared by Markdown chunking and the embedding boundary.
@@ -94,6 +96,8 @@ pub struct MarkdownChunkDocument {
     pub document_hash: String,
     /// Markdown body text after frontmatter removal.
     pub body: String,
+    /// Source start offset for the body inside the original Markdown file.
+    pub body_start: usize,
     /// Extracted heading hierarchy from Phase 3.
     pub headings: Vec<MarkdownHeading>,
 }
@@ -121,6 +125,7 @@ impl MarkdownChunkDocument {
             document_stem: extraction.document_stem.clone(),
             document_hash: extraction.document_hash.clone(),
             body,
+            body_start: extraction.body_span.start,
             headings: extraction.headings.clone(),
         })
     }
@@ -185,54 +190,167 @@ impl std::error::Error for MarkdownChunkingError {}
 
 /// Produce deterministic contract-level chunks for a normalized Markdown document.
 ///
-/// Phase A establishes the output shape and tokenizer boundary. Heading-aware
-/// sectioning and oversized section splitting are implemented in later phases.
+/// Phase B adds heading-aware sectioning. Oversized section splitting is
+/// implemented in a later phase.
 ///
 /// # Errors
-/// This function currently has no runtime error cases.
+/// Returns [`MarkdownChunkingError::InvalidBodySpan`] when heading source spans
+/// do not align with the extracted document body.
 pub fn chunk_markdown_document(
     document: &MarkdownChunkDocument,
     _config: MarkdownChunkingConfig,
     token_counter: &impl MarkdownTokenCounter,
 ) -> Result<Vec<MarkdownChunkRecord>, MarkdownChunkingError> {
-    let text = document.body.trim().to_owned();
-    if text.is_empty() {
-        return Ok(Vec::new());
+    let sections = heading_sections(document)?;
+    let chunks = sections
+        .into_iter()
+        .enumerate()
+        .map(|(chunk_ordinal, section)| {
+            let token_count = token_counter.count_tokens(&section.text);
+            let chunk_hash = stable_chunk_hash(
+                document.package.as_deref(),
+                &document.document_stem,
+                &document.document_hash,
+                chunk_ordinal,
+                &section.heading_path,
+                &section.text,
+            );
+            let chunk_id = chunk_id(
+                document.package.as_deref(),
+                &document.document_stem,
+                &section.heading_path,
+                chunk_ordinal,
+                &chunk_hash,
+            );
+
+            MarkdownChunkRecord {
+                chunk_id,
+                package: document.package.clone(),
+                document_stem: document.document_stem.clone(),
+                document_hash: document.document_hash.clone(),
+                chunk_hash,
+                chunk_ordinal,
+                heading_path: section.heading_path,
+                text: section.text,
+                token_count,
+                previous_chunk_id: None,
+                next_chunk_id: None,
+            }
+        })
+        .collect();
+
+    Ok(chunks)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HeadingSection {
+    heading_path: Vec<String>,
+    text: String,
+}
+
+fn heading_sections(
+    document: &MarkdownChunkDocument,
+) -> Result<Vec<HeadingSection>, MarkdownChunkingError> {
+    let mut sections = Vec::new();
+    let mut sorted_headings = document.headings.iter().collect::<Vec<_>>();
+    sorted_headings.sort_by_key(|heading| (heading.source_span.start, heading.ordinal));
+
+    if let Some(first_heading) = sorted_headings.first() {
+        let first_heading_start = relative_offset(document, first_heading.source_span.start)?;
+        push_section(&mut sections, Vec::new(), &document.body[..first_heading_start]);
+    } else {
+        push_section(&mut sections, Vec::new(), &document.body);
+        return Ok(sections);
     }
 
-    let heading_path =
-        document.headings.first().map_or_else(Vec::new, |heading| heading.path.clone());
-    let token_count = token_counter.count_tokens(&text);
-    let chunk_ordinal = 0;
-    let chunk_hash = stable_chunk_hash(
-        document.package.as_deref(),
-        &document.document_stem,
-        &document.document_hash,
-        chunk_ordinal,
-        &heading_path,
-        &text,
-    );
-    let chunk_id = chunk_id(
-        document.package.as_deref(),
-        &document.document_stem,
-        &heading_path,
-        chunk_ordinal,
-        &chunk_hash,
-    );
+    for (index, heading) in sorted_headings.iter().enumerate() {
+        let section_start = relative_offset(document, heading.source_span.start)?;
+        let direct_content_end = next_heading_start(document, &sorted_headings, index, |_| true)?;
+        let section_end = next_heading_start(document, &sorted_headings, index, |next_heading| {
+            next_heading.level <= heading.level
+        })?;
 
-    Ok(vec![MarkdownChunkRecord {
-        chunk_id,
-        package: document.package.clone(),
-        document_stem: document.document_stem.clone(),
-        document_hash: document.document_hash.clone(),
-        chunk_hash,
-        chunk_ordinal,
-        heading_path,
-        text,
-        token_count,
-        previous_chunk_id: None,
-        next_chunk_id: None,
-    }])
+        if section_start > section_end || section_end > document.body.len() {
+            return Err(MarkdownChunkingError::InvalidBodySpan {
+                span: heading.source_span,
+                source_len: document.body_start + document.body.len(),
+            });
+        }
+
+        let raw_text = &document.body[section_start..section_end];
+        let direct_text = &document.body[section_start..direct_content_end];
+        if contains_non_heading_content(direct_text) {
+            push_section(&mut sections, heading.path.clone(), raw_text);
+        }
+    }
+
+    Ok(sections)
+}
+
+fn next_heading_start<P>(
+    document: &MarkdownChunkDocument,
+    headings: &[&MarkdownHeading],
+    current_index: usize,
+    predicate: P,
+) -> Result<usize, MarkdownChunkingError>
+where
+    P: Fn(&MarkdownHeading) -> bool,
+{
+    headings[current_index + 1..]
+        .iter()
+        .find(|heading| predicate(heading))
+        .map_or(Ok(document.body.len()), |heading| {
+            relative_offset(document, heading.source_span.start)
+        })
+}
+
+fn relative_offset(
+    document: &MarkdownChunkDocument,
+    source_offset: usize,
+) -> Result<usize, MarkdownChunkingError> {
+    let relative = source_offset.checked_sub(document.body_start).ok_or_else(|| {
+        MarkdownChunkingError::InvalidBodySpan {
+            span: MarkdownSourceSpan::new(source_offset, source_offset),
+            source_len: document.body_start + document.body.len(),
+        }
+    })?;
+    if relative <= document.body.len() {
+        return Ok(relative);
+    }
+
+    Err(MarkdownChunkingError::InvalidBodySpan {
+        span: MarkdownSourceSpan::new(source_offset, source_offset),
+        source_len: document.body_start + document.body.len(),
+    })
+}
+
+fn push_section(sections: &mut Vec<HeadingSection>, heading_path: Vec<String>, raw_text: &str) {
+    let text = raw_text.trim().to_owned();
+    if !text.is_empty() {
+        sections.push(HeadingSection { heading_path, text });
+    }
+}
+
+fn contains_non_heading_content(raw_text: &str) -> bool {
+    raw_text
+        .lines()
+        .skip(1)
+        .map(str::trim)
+        .any(|line| !line.is_empty() && parse_atx_heading(line).is_none())
+}
+
+fn parse_atx_heading(line: &str) -> Option<ParsedAtxHeading<'_>> {
+    let trimmed = line.trim_start();
+    let level = trimmed.chars().take_while(|character| *character == '#').count();
+    if !(1..=6).contains(&level) {
+        return None;
+    }
+    let rest = trimmed[level..].strip_prefix(' ')?;
+    let text = rest.trim().trim_end_matches('#').trim();
+    if text.is_empty() {
+        return None;
+    }
+    Some((u8::try_from(level).ok()?, text))
 }
 
 fn chunk_id(

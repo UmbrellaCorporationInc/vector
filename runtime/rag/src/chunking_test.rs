@@ -22,6 +22,7 @@ async fn test_chunk_document_from_extraction_preserves_phase_three_contract() {
     assert_eq!(document.document_stem, "spec-00011-rag-plan-implementation");
     assert_eq!(document.document_hash, fixture.extraction.document_hash);
     assert_eq!(document.body, "# Title\n\n## Short Section\n\nA concise section.\n");
+    assert_eq!(document.body_start, 21);
     assert_eq!(
         document.headings.iter().map(|heading| heading.text.as_str()).collect::<Vec<_>>(),
         vec!["Title", "Short Section"]
@@ -44,17 +45,106 @@ async fn test_chunk_record_exposes_rfc_required_fields() {
 
     assert_eq!(chunks.len(), 1);
     let chunk = &chunks[0];
-    assert!(chunk.chunk_id.starts_with("workspace/spec-00011-rag-plan-implementation/title/0000/"));
+    assert!(
+        chunk
+            .chunk_id
+            .starts_with("workspace/spec-00011-rag-plan-implementation/short-section/0000/")
+    );
     assert_eq!(chunk.package, None);
     assert_eq!(chunk.document_stem, "spec-00011-rag-plan-implementation");
     assert_eq!(chunk.document_hash, document.document_hash);
     assert!(!chunk.chunk_hash.is_empty());
     assert_eq!(chunk.chunk_ordinal, 0);
-    assert_eq!(chunk.heading_path, vec!["Title".to_owned()]);
-    assert_eq!(chunk.text, "# Title\n\n## Short Section\n\nA concise section.");
-    assert_eq!(chunk.token_count, 8);
+    assert_eq!(chunk.heading_path, vec!["Title".to_owned(), "Short Section".to_owned()]);
+    assert_eq!(chunk.text, "## Short Section\n\nA concise section.");
+    assert_eq!(chunk.token_count, 6);
     assert_eq!(chunk.previous_chunk_id, None);
     assert_eq!(chunk.next_chunk_id, None);
+}
+
+#[tokio::test]
+async fn test_chunking_emits_heading_sections_with_paths_in_source_order() {
+    let fixture = fixture_nested_headings().await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+
+    let chunks = chunk_markdown_document(
+        &document,
+        MarkdownChunkingConfig::phase_four_defaults(),
+        &WhitespaceMarkdownTokenCounter,
+    )
+    .unwrap();
+
+    assert_eq!(chunks.len(), 2);
+    assert_eq!(chunks[0].chunk_ordinal, 0);
+    assert_eq!(chunks[0].heading_path, vec!["RFC 00034".to_owned(), "Proposal".to_owned()]);
+    assert_eq!(
+        chunks[0].text,
+        "## Proposal\n\nProposal introduction.\n\n### Details\n\nNested content."
+    );
+    assert_eq!(chunks[1].chunk_ordinal, 1);
+    assert_eq!(
+        chunks[1].heading_path,
+        vec!["RFC 00034".to_owned(), "Proposal".to_owned(), "Details".to_owned()]
+    );
+    assert_eq!(chunks[1].text, "### Details\n\nNested content.");
+}
+
+#[tokio::test]
+async fn test_chunking_skips_heading_only_sections() {
+    let fixture = fixture(
+        "heading-only",
+        None,
+        "task-00063-implement-rfc-00034-markdown-chunking",
+        "# Title\n\n## Empty\n\n## Full\n\nBody.\n",
+        "Body.",
+    )
+    .await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+
+    let chunks = chunk_markdown_document(
+        &document,
+        MarkdownChunkingConfig::phase_four_defaults(),
+        &WhitespaceMarkdownTokenCounter,
+    )
+    .unwrap();
+
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0].heading_path, vec!["Title".to_owned(), "Full".to_owned()]);
+    assert_eq!(chunks[0].text, "## Full\n\nBody.");
+}
+
+#[tokio::test]
+async fn test_chunking_preserves_root_level_content_before_first_heading() {
+    let fixture = fixture(
+        "root-preface",
+        None,
+        "spec-00011-rag-plan-implementation",
+        "Opening paragraph before headings.\n\n# Title\n\nBody.\n",
+        "Opening paragraph",
+    )
+    .await;
+    let document =
+        MarkdownChunkDocument::from_extraction_record(&fixture.extraction, &fixture.source)
+            .unwrap();
+
+    let chunks = chunk_markdown_document(
+        &document,
+        MarkdownChunkingConfig::phase_four_defaults(),
+        &WhitespaceMarkdownTokenCounter,
+    )
+    .unwrap();
+
+    assert_eq!(chunks.len(), 2);
+    assert_eq!(chunks[0].chunk_ordinal, 0);
+    assert_eq!(chunks[0].heading_path, Vec::<String>::new());
+    assert_eq!(chunks[0].text, "Opening paragraph before headings.");
+    assert_eq!(chunks[1].chunk_ordinal, 1);
+    assert_eq!(chunks[1].heading_path, vec!["Title".to_owned()]);
+    assert_eq!(chunks[1].text, "# Title\n\nBody.");
 }
 
 #[test]
@@ -148,7 +238,7 @@ async fn fixture_nested_headings() -> ChunkFixture {
         "nested-headings",
         None,
         "rfc-00034-markdown-chunking",
-        "# RFC 00034\n\n## Proposal\n\n### Details\n\nNested content.\n",
+        "# RFC 00034\n\n## Proposal\n\nProposal introduction.\n\n### Details\n\nNested content.\n",
         "Nested content.",
     )
     .await
