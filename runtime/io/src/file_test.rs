@@ -138,8 +138,8 @@ impl HashFixture {
 }
 
 async fn wait_for_modified_time_change(path: &IoPath, before: SystemTime) -> SystemTime {
-    for _ in 0..10 {
-        thread::sleep(Duration::from_millis(25));
+    for _ in 0..3 {
+        tokio::time::sleep(Duration::from_secs(1)).await;
         let bytes = read_file_bytes(path).await.unwrap();
         write_file_bytes(path, bytes).await.unwrap();
 
