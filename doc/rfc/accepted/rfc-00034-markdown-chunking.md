@@ -13,7 +13,8 @@ tags:
   - rag
   - markdown
   - chunking
-related: []
+related:
+  - task-00063-implement-rfc-00034-markdown-chunking
 supersedes: []
 superseded_by: null
 aliases:
