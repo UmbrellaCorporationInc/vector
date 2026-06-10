@@ -5,6 +5,7 @@
 ## Features
 
 - **File IO**: Streaming binary file readers (`FileReader`) and writers (`FileWriter`) with explicit memory buffer allocation.
+- **File Content Hashing**: BLAKE3 file-byte hashing (`hash_file_content`) with a typed lowercase hexadecimal result (`FileContentHash`).
 - **Memory Buffers**: In-memory message queues (`MemReader`, `MemWriter`) for fast testing and buffer swapping.
 - **Text Processing**: UTF-8 aware streaming adapters (`TextReader`, `TextWriter`) that enforce multibyte character boundaries across chunked binary streams.
 - **Path API**: A strict path boundary (`IoPath`, `PathResolver`) enforcing sandbox limitations and path normalization to prevent traversal attacks.
@@ -79,6 +80,17 @@ for entry in entries.iter().filter(|entry| entry.is_file()) {
     }
 }
 ```
+
+## File Content Hashing
+
+`hash_file_content(&IoPath)` returns a typed `FileContentHash` computed with
+BLAKE3 over file bytes only. The hash intentionally excludes path, modified
+time, package identity, Markdown metadata, and other higher-level domain data.
+Callers can compare typed hashes directly or use `as_hex()` / `to_string()` for
+the stable lowercase hexadecimal representation.
+
+The implementation streams the file through the `runtime-io` file boundary, so
+callers do not need to load the full file content before hashing.
 
 ## Command Planning and Execution
 

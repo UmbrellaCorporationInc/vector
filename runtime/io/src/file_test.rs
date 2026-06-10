@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
+use std::thread;
+use std::time::{Duration, SystemTime};
 use tokio::fs;
 
 #[tokio::test]
@@ -62,4 +64,90 @@ async fn test_create_dir_all_and_parent_guarantee() {
 
     // Cleanup
     let _ = fs::remove_dir_all(base_dir).await;
+}
+
+#[tokio::test]
+async fn test_hash_file_content_returns_same_hash_for_same_bytes_across_paths() {
+    let fixture = HashFixture::new("same-bytes");
+    let left = fixture.file_path("left.bin");
+    let right = fixture.file_path("right.bin");
+
+    write_file_bytes(&left, b"same content".to_vec()).await.unwrap();
+    write_file_bytes(&right, b"same content".to_vec()).await.unwrap();
+
+    let left_hash = hash_file_content(&left).await.unwrap();
+    let right_hash = hash_file_content(&right).await.unwrap();
+
+    assert_eq!(left_hash, right_hash);
+    assert_eq!(left_hash.as_hex(), left_hash.as_hex().to_lowercase());
+    assert_eq!(left_hash.as_hex().len(), 64);
+
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn test_hash_file_content_changes_when_bytes_change() {
+    let fixture = HashFixture::new("changed-bytes");
+    let path = fixture.file_path("content.bin");
+
+    write_file_bytes(&path, b"before".to_vec()).await.unwrap();
+    let before_hash = hash_file_content(&path).await.unwrap();
+
+    write_file_bytes(&path, b"after".to_vec()).await.unwrap();
+    let after_hash = hash_file_content(&path).await.unwrap();
+
+    assert_ne!(before_hash, after_hash);
+
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn test_hash_file_content_ignores_modified_time_without_content_change() {
+    let fixture = HashFixture::new("modified-time");
+    let path = fixture.file_path("content.bin");
+
+    write_file_bytes(&path, b"stable content".to_vec()).await.unwrap();
+    let before_hash = hash_file_content(&path).await.unwrap();
+    let before_modified = fs::metadata(path.as_path()).await.unwrap().modified().unwrap();
+
+    let after_modified = wait_for_modified_time_change(&path, before_modified).await;
+    let after_hash = hash_file_content(&path).await.unwrap();
+
+    assert!(after_modified > before_modified);
+    assert_eq!(before_hash, after_hash);
+
+    fixture.cleanup().await;
+}
+
+struct HashFixture {
+    root: IoPath,
+}
+
+impl HashFixture {
+    fn new(name: &str) -> Self {
+        Self { root: IoPath::new(format!("test_file_hash_{name}")) }
+    }
+
+    fn file_path(&self, name: &str) -> IoPath {
+        self.root.join(name)
+    }
+
+    async fn cleanup(self) {
+        let _ = fs::remove_dir_all(self.root).await;
+    }
+}
+
+async fn wait_for_modified_time_change(path: &IoPath, before: SystemTime) -> SystemTime {
+    for _ in 0..10 {
+        thread::sleep(Duration::from_millis(25));
+        let bytes = read_file_bytes(path).await.unwrap();
+        write_file_bytes(path, bytes).await.unwrap();
+
+        let modified = fs::metadata(path.as_path()).await.unwrap().modified().unwrap();
+        if modified > before {
+            return modified;
+        }
+    }
+
+    fs::metadata(path.as_path()).await.unwrap().modified().unwrap()
 }
