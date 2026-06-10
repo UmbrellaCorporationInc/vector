@@ -18,6 +18,7 @@
 pub mod alias;
 pub mod bytes;
 pub mod command;
+pub mod directory;
 pub mod error;
 pub mod file;
 pub mod memory;
@@ -27,6 +28,7 @@ pub mod text;
 pub use alias::{Reader, Writer};
 pub use bytes::*;
 pub use command::*;
+pub use directory::*;
 pub use error::*;
 pub use file::*;
 pub use memory::*;

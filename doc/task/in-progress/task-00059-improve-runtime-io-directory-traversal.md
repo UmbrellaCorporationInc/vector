@@ -46,12 +46,12 @@ input:
   language: rust
 ```
 
-- [ ] Add a generic directory entry type that exposes path, file type, and modified time when available.
-- [ ] Add non-recursive directory listing support.
-- [ ] Add deterministic recursive traversal support over `IoPath` roots.
-- [ ] Ensure traversal output ordering is stable across repeated runs.
-- [ ] Ensure missing directories and unreadable entries return typed `IoError` values.
-- [ ] Keep `runtime-io` free of Markdown, RAG, package, and governed-document semantics.
+- [x] Add a generic directory entry type that exposes path, file type, and modified time when available.
+- [x] Add non-recursive directory listing support.
+- [x] Add deterministic recursive traversal support over `IoPath` roots.
+- [x] Ensure traversal output ordering is stable across repeated runs.
+- [x] Ensure missing directories and unreadable entries return typed `IoError` values.
+- [x] Keep `runtime-io` free of Markdown, RAG, package, and governed-document semantics.
 
 ### 3.2. Phase B — File Read Integration
 
