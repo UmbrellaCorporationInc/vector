@@ -67,15 +67,10 @@ document-types:
   research:
     description: Investigation and spikes on specific technical topics.
     tags: [research, discovery]
-    layout: status
+    layout: category
     code-width: 5
     prompt: prompts-00002-create-doc
     create-document-form: form-00001-create-document
-    initial-status: active
-    statuses:
-      - active
-      - completed
-      - archived
   ai-rule:
     description: Operational rules for AI agents in the project.
     tags: [governance, ai]

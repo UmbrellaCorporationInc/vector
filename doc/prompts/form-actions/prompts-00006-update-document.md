@@ -31,8 +31,9 @@ The change applies under `#{document-header}`
 1. Use `find_doc` (vector MCP) to locate the governed document identified by `#{document-stem}`.
 2. Read the document to understand its current content and structure.
 3. Apply the update requested in the context above, staying within the section indicated by the author.
-4. Run `validate_fix` (vector MCP) after writing.
-5. Stop — report the updated file path and the changes made.
+4. Use wikilinks to referenciate other governed documents, don't use wikiliinks in the frontmatter
+5. Run `validate_fix` (vector MCP) after writing.
+6. Stop — report the updated file path and the changes made.
 
 **Never** rewrite sections unrelated to the author's request.
 
