@@ -8,5 +8,9 @@ license.workspace = true
 [dependencies]
 runtime-markdown = { workspace = true }
 
+[dev-dependencies]
+runtime-io = { workspace = true }
+tokio = { workspace = true, features = ["fs", "macros", "rt"] }
+
 [lints]
 workspace = true
