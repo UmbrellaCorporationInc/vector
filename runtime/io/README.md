@@ -42,6 +42,9 @@ The traversal API has three entrypoints:
 - `traverse_directory(&IoPath)`: returns all descendants below one root.
 - `traverse_directories(&[IoPath])`: returns all descendants below multiple
   roots after sorting the roots by path.
+- `traverse_directory_with_options(&IoPath, &DirectoryTraversalOptions)` and
+  `traverse_directories_with_options(&[IoPath], &DirectoryTraversalOptions)`:
+  traverse with generic ignored path prefixes.
 
 All returned entries are sorted by path so repeated runs over the same
 filesystem state are deterministic. Recursive traversal includes descendant
@@ -61,8 +64,13 @@ error.
 Higher-level crates should combine directory traversal with the existing file
 readers by passing each file entry path directly into `read_file_bytes`,
 `read_file_text`, or `FileReader::open`. Domain filtering stays outside
-`runtime-io`; for example, a Markdown discovery crate can filter extensions
-before reading candidate files:
+`runtime-io`. Generic ignored path prefixes can be supplied through
+`DirectoryTraversalOptions`; ignored entries and their descendants are omitted
+before callers receive entries. Higher-level crates still own how those ignore
+paths are derived.
+
+For example, a Markdown discovery crate can filter extensions before reading
+candidate files:
 
 ```rust
 use runtime_io::{read_file_text, traverse_directory, IoPath};

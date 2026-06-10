@@ -58,6 +58,61 @@ async fn test_traverse_directories_sorts_multiple_roots() {
 }
 
 #[tokio::test]
+async fn test_traverse_directory_with_options_omits_ignored_files() {
+    let fixture = DirectoryFixture::create("ignored-file").await;
+    fixture.write_file("keep.md").await;
+    fixture.write_file("skip.md").await;
+    let options =
+        DirectoryTraversalOptions::new().with_ignored_path(fixture.root().join("skip.md"));
+
+    let entries = traverse_directory_with_options(fixture.root(), &options).await.unwrap();
+
+    assert_eq!(fixture.relative_paths(&entries), vec!["keep.md"]);
+
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn test_traverse_directory_with_options_omits_ignored_directory_descendants() {
+    let fixture = DirectoryFixture::create("ignored-directory").await;
+    fixture.create_dir("keep").await;
+    fixture.write_file("keep/read.md").await;
+    fixture.create_dir("skip").await;
+    fixture.write_file("skip/secret.md").await;
+    let options =
+        DirectoryTraversalOptions::new().with_ignored_paths(vec![fixture.root().join("skip")]);
+
+    let entries = traverse_directory_with_options(fixture.root(), &options).await.unwrap();
+
+    assert_eq!(fixture.relative_paths(&entries), vec!["keep", "keep/read.md"]);
+
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn test_traverse_directories_with_options_omits_ignored_root() {
+    let left = DirectoryFixture::create("ignored-left-root").await;
+    let right = DirectoryFixture::create("included-right-root").await;
+    left.write_file("left.md").await;
+    right.write_file("right.md").await;
+    let options = DirectoryTraversalOptions::new().with_ignored_path(left.root().clone());
+
+    let entries =
+        traverse_directories_with_options(&[left.root().clone(), right.root().clone()], &options)
+            .await
+            .unwrap();
+
+    assert_eq!(entries.len(), 1);
+    assert_eq!(
+        entries[0].path().as_path().strip_prefix(right.root().as_path()).unwrap(),
+        "right.md"
+    );
+
+    left.cleanup().await;
+    right.cleanup().await;
+}
+
+#[tokio::test]
 async fn test_list_directory_returns_typed_error_for_missing_directory() {
     let fixture = DirectoryFixture::create("missing").await;
     let missing = fixture.root().join("missing");
@@ -89,6 +144,25 @@ async fn test_traversal_paths_can_be_read_as_bytes_and_text_deterministically() 
             ("b/two.md".to_string(), "bravo".to_string(), b"bravo".to_vec()),
             ("z.md".to_string(), "zulu".to_string(), b"zulu".to_vec()),
         ]
+    );
+
+    fixture.cleanup().await;
+}
+
+#[tokio::test]
+async fn test_ignored_traversal_paths_are_not_read_by_file_helpers() {
+    let fixture = DirectoryFixture::create("ignored-read-composition").await;
+    fixture.write_file_with_content("included.md", "included").await;
+    fixture.create_dir("ignored").await;
+    fixture.write_file_with_content("ignored/secret.md", "secret").await;
+    let options =
+        DirectoryTraversalOptions::new().with_ignored_path(fixture.root().join("ignored"));
+
+    let records = read_file_records_with_options(fixture.root(), &options).await;
+
+    assert_eq!(
+        records,
+        vec![("included.md".to_string(), "included".to_string(), b"included".to_vec())]
     );
 
     fixture.cleanup().await;
@@ -172,7 +246,14 @@ fn unique_fixture_path(name: &str) -> PathBuf {
 }
 
 async fn read_file_records(root: &IoPath) -> Vec<(String, String, Vec<u8>)> {
-    let entries = traverse_directory(root).await.unwrap();
+    read_file_records_with_options(root, &DirectoryTraversalOptions::default()).await
+}
+
+async fn read_file_records_with_options(
+    root: &IoPath,
+    options: &DirectoryTraversalOptions,
+) -> Vec<(String, String, Vec<u8>)> {
+    let entries = traverse_directory_with_options(root, options).await.unwrap();
     let mut records = Vec::new();
 
     for entry in entries.iter().filter(|entry| entry.is_file()) {

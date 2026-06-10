@@ -84,10 +84,10 @@ input:
   language: Rust
 ```
 
-- [ ] Extend `runtime-io` with generic directory traversal primitives required by Markdown discovery.
-- [ ] Extend `runtime-io` with file-reading primitives required by Markdown discovery.
-- [ ] Keep `runtime-io` free of Markdown, RAG, package, and governed-document semantics.
-- [ ] Add focused tests for traversal, ignored-path handling, and file-reading behavior.
+- [x] Extend `runtime-io` with generic directory traversal primitives required by Markdown discovery.
+- [x] Extend `runtime-io` with file-reading primitives required by Markdown discovery.
+- [x] Keep `runtime-io` free of Markdown, RAG, package, and governed-document semantics.
+- [x] Add focused tests for traversal, ignored-path handling, and file-reading behavior.
 
 ### 3.4. Phase D -- Runtime crate boundary
 
