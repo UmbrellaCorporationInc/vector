@@ -65,10 +65,10 @@ input:
   language: rust
 ```
 
-- [ ] Confirm existing byte and text readers can be used by callers that receive paths from traversal.
-- [ ] Add helper APIs only if existing `read_file_bytes` and text adapters are insufficient for Markdown discovery.
-- [ ] Cover traversal and file-reading composition with deterministic tests.
-- [ ] Document how higher-level crates should combine traversal with file readers.
+- [x] Confirm existing byte and text readers can be used by callers that receive paths from traversal.
+- [x] Add helper APIs only if existing `read_file_bytes` and text adapters are insufficient for Markdown discovery.
+- [x] Cover traversal and file-reading composition with deterministic tests.
+- [x] Document how higher-level crates should combine traversal with file readers.
 
 ### 3.3. Phase C — Dependency Governance
 

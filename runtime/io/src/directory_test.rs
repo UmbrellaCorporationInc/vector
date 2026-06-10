@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used)]
 
 use super::*;
+use crate::{read_file_bytes, read_file_text};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
@@ -68,6 +69,31 @@ async fn test_list_directory_returns_typed_error_for_missing_directory() {
     fixture.cleanup().await;
 }
 
+#[tokio::test]
+async fn test_traversal_paths_can_be_read_as_bytes_and_text_deterministically() {
+    let fixture = DirectoryFixture::create("read-composition").await;
+    fixture.write_file_with_content("z.md", "zulu").await;
+    fixture.create_dir("a").await;
+    fixture.write_file_with_content("a/one.md", "alpha").await;
+    fixture.create_dir("b").await;
+    fixture.write_file_with_content("b/two.md", "bravo").await;
+
+    let first = read_file_records(fixture.root()).await;
+    let second = read_file_records(fixture.root()).await;
+
+    assert_eq!(first, second);
+    assert_eq!(
+        first,
+        vec![
+            ("a/one.md".to_string(), "alpha".to_string(), b"alpha".to_vec()),
+            ("b/two.md".to_string(), "bravo".to_string(), b"bravo".to_vec()),
+            ("z.md".to_string(), "zulu".to_string(), b"zulu".to_vec()),
+        ]
+    );
+
+    fixture.cleanup().await;
+}
+
 struct DirectoryFixture {
     root: IoPath,
 }
@@ -88,11 +114,15 @@ impl DirectoryFixture {
     }
 
     async fn write_file(&self, relative_path: &str) {
+        self.write_file_with_content(relative_path, "test").await;
+    }
+
+    async fn write_file_with_content(&self, relative_path: &str, content: &str) {
         let path = self.root.join(relative_path);
         if let Some(parent) = path.as_path().parent() {
             fs::create_dir_all(parent).await.unwrap();
         }
-        fs::write(path.as_path(), b"test").await.unwrap();
+        fs::write(path.as_path(), content.as_bytes()).await.unwrap();
     }
 
     fn relative_paths(&self, entries: &[DirectoryEntry]) -> Vec<String> {
@@ -119,4 +149,24 @@ fn unique_fixture_path(name: &str) -> PathBuf {
     let nanos =
         SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
     std::env::temp_dir().join(format!("vector-runtime-io-directory-{name}-{nanos}"))
+}
+
+async fn read_file_records(root: &IoPath) -> Vec<(String, String, Vec<u8>)> {
+    let entries = traverse_directory(root).await.unwrap();
+    let mut records = Vec::new();
+
+    for entry in entries.iter().filter(|entry| entry.is_file()) {
+        let relative_path = entry
+            .path()
+            .as_path()
+            .strip_prefix(root.as_path())
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        let text = read_file_text(entry.path()).await.unwrap();
+        let bytes = read_file_bytes(entry.path()).await.unwrap();
+        records.push((relative_path, text, bytes));
+    }
+
+    records
 }
