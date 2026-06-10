@@ -48,14 +48,14 @@ Description: Official Rust MCP SDK approved as the server integration dependency
 ## 5. serde
 
 Tags: #rust #serialization
-Scope: `runtime-doc`, `runtime-language`, `runtime-packages`, `mcp-vector`
-Description: Serialization framework approved for structured document metadata, package and language metadata decoding, and MCP-facing DTO handling.
+Scope: `runtime-doc`, `runtime-language`, `runtime-packages`, `runtime-markdown`, `mcp-vector`
+Description: Serialization framework approved for structured document metadata, package and language metadata decoding, Markdown extraction records, and MCP-facing DTO handling.
 
 ## 6. serde_yaml
 
 Tags: #rust #serialization #yaml
-Scope: `runtime-doc`, `runtime-language`, `runtime-packages`
-Description: YAML codec approved for parsing governed Markdown frontmatter and related project, language, and package metadata.
+Scope: `runtime-doc`, `runtime-language`, `runtime-packages`, `runtime-markdown`
+Description: YAML codec approved for parsing governed Markdown frontmatter, Markdown extraction frontmatter metadata, and related project, language, and package metadata.
 
 ## 7. tempfile
 

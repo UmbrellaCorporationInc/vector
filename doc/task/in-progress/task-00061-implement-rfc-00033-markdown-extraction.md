@@ -40,11 +40,11 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Locate the current governed document parsing and rendering boundaries.
-- [ ] Implement markdown extraction behavior required by [[rfc-00033-markdown-extraction]].
-- [ ] Preserve existing document metadata and validation semantics.
-- [ ] Add focused tests for successful extraction and malformed input handling.
-- [ ] Run the relevant quality gates.
+- [x] Locate the current governed document parsing and rendering boundaries.
+- [x] Implement markdown extraction behavior required by [[rfc-00033-markdown-extraction]].
+- [x] Preserve existing document metadata and validation semantics.
+- [x] Add focused tests for successful extraction and malformed input handling.
+- [x] Run the relevant quality gates.
 
 ### 3.2. Phase Z — Documentation and Wrap-up
 
