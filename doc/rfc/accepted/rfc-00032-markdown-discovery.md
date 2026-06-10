@@ -5,7 +5,7 @@ code: "00032"
 slug: markdown-discovery
 title: Markdown Discovery Runtime Boundary
 description: Proposes the runtime crate boundary for Phase 2 Markdown discovery in the local RAG implementation.
-status: draft
+status: accepted
 created: 2026-06-10
 updated: 2026-06-10
 authors: []

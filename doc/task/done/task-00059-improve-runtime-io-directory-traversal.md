@@ -5,7 +5,7 @@ code: "00059"
 slug: improve-runtime-io-directory-traversal
 title: Improve Runtime IO Directory Traversal
 description: Adds reusable directory traversal and file-reading primitives needed by Markdown discovery.
-status: in-progress
+status: done
 created: 2026-06-10
 updated: 2026-06-10
 tags:
@@ -98,6 +98,6 @@ input:
   language: markdown, rust
 ```
 
-- [ ] Update `runtime/io/README.md` with the directory traversal contract.
-- [ ] Run focused `runtime-io` tests.
-- [ ] Run relevant workspace checks for affected crates.
+- [x] Update `runtime/io/README.md` with the directory traversal contract.
+- [x] Run focused `runtime-io` tests.
+- [x] Run relevant workspace checks for affected crates.
