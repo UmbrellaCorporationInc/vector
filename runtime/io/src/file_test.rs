@@ -1,6 +1,5 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-use std::thread;
 use std::time::{Duration, SystemTime};
 use tokio::fs;
 
