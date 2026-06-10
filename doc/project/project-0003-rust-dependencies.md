@@ -6,7 +6,7 @@ slug: rust-dependencies
 title: Rust Dependencies
 description: Defines the approved Rust dependencies for VECTOR project crates.
 created: 2026-05-02
-updated: 2026-06-07
+updated: 2026-06-10
 tags:
   - project
   - rust
@@ -16,6 +16,7 @@ related:
   - task-00001-bootstrap-runtime-core-crate-and-rust-dependency-governance
   - task-00004-extract-tokio-backed-runtime-channel-crate-and-remove-runtime-core-channel-implementation
   - task-00011-bootstrap-mcp-vector-crate-and-approve-rmcp-dependency
+  - task-00059-improve-runtime-io-directory-traversal
 ---
 
 # Dependencies
@@ -129,6 +130,7 @@ Workspace members `get-vector` and `vector-database` are application crates, not
 - `runtime-channel` uses `tokio::sync::mpsc` (bounded) for message transport and `tokio::sync::watch` for cancellation wake-up.
 - Channel capacity is configurable through a `runtime-channel` configuration value; the standard implementation must not default to unbounded channel transport.
 - `runtime-io` is allowed to depend on Tokio because it owns the concrete async I/O boundary for filesystem and process-backed operations.
+- `runtime-io` directory traversal is implemented with Tokio filesystem primitives. No traversal-specific third-party dependency is approved for `runtime-io` by [[task-00059-improve-runtime-io-directory-traversal]].
 - Any additional Tokio-adjacent dependency beyond `tokio` itself must be justified separately in a future task or RFC if it is not strictly required by the current async runtime and I/O boundaries.
 - `rmcp` is **not** approved for `runtime/*` crates or plugin crates. Only `mcp-vector` may take a direct dependency on `rmcp`. Runtime and plugin crates must remain MCP-SDK-agnostic so they stay reusable from CLI or future non-MCP frontends.
 - `rmcp` types must not leak into runtime contracts. The MCP facade boundary stops at `mcp-vector`; all protocol types stay inside that crate.

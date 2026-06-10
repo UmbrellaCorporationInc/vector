@@ -8,23 +8,47 @@
 - **Memory Buffers**: In-memory message queues (`MemReader`, `MemWriter`) for fast testing and buffer swapping.
 - **Text Processing**: UTF-8 aware streaming adapters (`TextReader`, `TextWriter`) that enforce multibyte character boundaries across chunked binary streams.
 - **Path API**: A strict path boundary (`IoPath`, `PathResolver`) enforcing sandbox limitations and path normalization to prevent traversal attacks.
+- **Directory Traversal**: Deterministic directory listing and recursive traversal over `IoPath` roots with generic entry metadata.
 - **Shell Commands**: Spec-first command planning (`CommandBuilder`, `CommandSpec`), explicit execution (`CommandExecutor`, `ProcessCommandExecutor`), and typed process handles (`CommandHandle`, `CommandInput`, `CommandOutput`).
 - **Helpers**: Full-file read/write adapters for `Bytes` and `String` built transparently over the streaming API.
 
 ## Usage
 
 ```rust
-use runtime_io::{FileReader, TextReader};
 use runtime_core::Receiver;
+use runtime_io::{FileReader, IoPath, TextReader};
 
 // Read a file chunk by chunk with an 8KB buffer
-let mut reader = FileReader::open("data.txt", 8192).await?;
+let reader = FileReader::open(&IoPath::new("data.txt"), 8192).await?;
 
 // Transparently wrap the byte stream in a UTF-8 character-aware text adapter
 let mut text_reader = TextReader::new(reader, 8192);
 
-while let Some(chunk) = text_reader.recv().await {
+while let Some(chunk) = text_reader.recv().await? {
     println!("Received text chunk: {}", chunk);
+}
+```
+
+Higher-level crates should combine directory traversal with the existing file
+readers by passing each file entry path directly into `read_file_bytes`,
+`read_file_text`, or `FileReader::open`. Domain filtering stays outside
+`runtime-io`; for example, a Markdown discovery crate can filter extensions
+before reading candidate files:
+
+```rust
+use runtime_io::{read_file_text, traverse_directory, IoPath};
+
+let root = IoPath::new("doc");
+let entries = traverse_directory(&root).await?;
+
+for entry in entries.iter().filter(|entry| entry.is_file()) {
+    if matches!(
+        entry.path().as_path().extension().and_then(|extension| extension.to_str()),
+        Some("md" | "markdown")
+    ) {
+        let content = read_file_text(entry.path()).await?;
+        println!("{} bytes", content.len());
+    }
 }
 ```
 

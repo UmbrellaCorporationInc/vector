@@ -29,8 +29,9 @@ You are creating a governed document of type #{document-type} in this repository
 1. Call `create_doc_prompt` immediately — no pre-work, no file exploration, no research first.
 2. Use the path returned by `create_doc_prompt` to write the document content.
 3. Derive content from what you already know in the conversation. Only read other files if a specific piece of information is genuinely unknown and required for the content.
-4. Run `validate_fix` (vector MCP) after writing.
-5. Stop — report the file path to the user.
+4. Use wikilinks to referenciate other governed documents, don't use wikiliinks in the frontmatter
+5. Run `validate_fix` (vector MCP) after writing.
+6. Stop — report the file path to the user.
 
 **Never** bootstrap a governed document by manually writing a Markdown file before calling `create_doc_prompt`.
 
