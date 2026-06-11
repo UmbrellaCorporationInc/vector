@@ -148,6 +148,6 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Run the relevant unit and integration tests.
-- [ ] Run governed document validation.
-- [ ] Update README files only if user-facing tool behavior changes.
+- [x] Run the relevant unit and integration tests.
+- [x] Run governed document validation.
+- [x] Update README files only if user-facing tool behavior changes.
