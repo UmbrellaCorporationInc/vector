@@ -97,6 +97,6 @@ input:
   language: Rust
 ```
 
-- [ ] Update `runtime/rag/README.md` with the embedder boundary and model metadata.
-- [ ] Run the relevant Rust quality gates for `runtime-rag`.
-- [ ] Confirm every acceptance criterion in [[rfc-00036-phase-5-embedder]] has implementation or test coverage.
+- [x] Update `runtime/rag/README.md` with the embedder boundary and model metadata.
+- [x] Run the relevant Rust quality gates for `runtime-rag`.
+- [x] Confirm every acceptance criterion in [[rfc-00036-phase-5-embedder]] has implementation or test coverage.
