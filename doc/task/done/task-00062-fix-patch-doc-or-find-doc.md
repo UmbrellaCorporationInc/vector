@@ -5,7 +5,7 @@ code: "00062"
 slug: fix-patch-doc-or-find-doc
 title: Fix patch_doc Rejections and Markdown Hygiene
 description: Make governed document patching reliable and enforce canonical Markdown hygiene.
-status: in-progress
+status: done
 created: 2026-06-10
 updated: 2026-06-11
 tags:
