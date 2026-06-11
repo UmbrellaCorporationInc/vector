@@ -33,7 +33,7 @@ blake3 = "1"
 [workspace.package]
 edition = "2024"
 rust-version = "1.95.0"
-version = "0.2.4"
+version = "0.2.5"
 license = "MIT"
 
 [workspace.lints.clippy]
