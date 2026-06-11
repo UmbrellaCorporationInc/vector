@@ -63,10 +63,10 @@ input:
   language: Rust
 ```
 
-- [ ] Add a `fastembed`-backed implementation for `BGESmallENV15`.
-- [ ] Configure the implementation to use model code `Xenova/bge-small-en-v1.5`.
-- [ ] Treat the expected embedding dimension `384` as part of the implementation contract.
-- [ ] Keep model download and runtime initialization behavior isolated from the indexing pipeline.
+- [x] Add a `fastembed`-backed implementation for `BGESmallENV15`.
+- [x] Configure the implementation to use model code `Xenova/bge-small-en-v1.5`.
+- [x] Treat the expected embedding dimension `384` as part of the implementation contract.
+- [x] Keep model download and runtime initialization behavior isolated from the indexing pipeline.
 
 ### 3.3. Phase C — Pipeline Integration
 

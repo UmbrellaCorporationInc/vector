@@ -1,6 +1,8 @@
 //! Embedding contracts for local RAG indexing.
 
 use crate::MarkdownChunkRecord;
+use crate::defaults::{EMBEDDING_DIMENSION, EMBEDDING_MODEL_CODE, EMBEDDING_MODEL_IDENTIFIER};
+use std::sync::Mutex;
 
 /// Dense vector emitted by an embedding model.
 pub type EmbeddingVector = Vec<f32>;
@@ -84,6 +86,68 @@ impl std::fmt::Display for EmbeddingError {
 
 impl std::error::Error for EmbeddingError {}
 
+/// Fastembed-backed embedder for the baseline `BGESmallENV15` model.
+pub struct FastembedBgeSmallEnV15Embedder {
+    runtime: Mutex<Box<dyn FastembedRuntime>>,
+}
+
+impl std::fmt::Debug for FastembedBgeSmallEnV15Embedder {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("FastembedBgeSmallEnV15Embedder")
+            .field("model_id", &self.model_id())
+            .field("model_code", &self.model_code())
+            .field("dimension", &self.dimension())
+            .finish_non_exhaustive()
+    }
+}
+
+impl FastembedBgeSmallEnV15Embedder {
+    /// Initialize the local fastembed runtime for `BGESmallENV15`.
+    ///
+    /// # Errors
+    /// Returns [`EmbeddingError`] when the fastembed model registry no longer
+    /// matches Vector's model contract or when fastembed cannot initialize the
+    /// runtime. Model download and ONNX runtime setup happen here, keeping
+    /// indexing callers dependent only on the [`Embedder`] boundary.
+    pub fn try_new() -> Result<Self, EmbeddingError> {
+        validate_fastembed_model_contract()?;
+        let runtime = FastembedTextEmbeddingRuntime::try_new()?;
+        Ok(Self::from_runtime(runtime))
+    }
+
+    /// Return the exact fastembed model code required by Vector.
+    #[must_use]
+    pub const fn model_code(&self) -> &'static str {
+        EMBEDDING_MODEL_CODE
+    }
+
+    fn from_runtime(runtime: impl FastembedRuntime + 'static) -> Self {
+        Self { runtime: Mutex::new(Box::new(runtime)) }
+    }
+}
+
+impl Embedder for FastembedBgeSmallEnV15Embedder {
+    fn model_id(&self) -> &str {
+        EMBEDDING_MODEL_IDENTIFIER
+    }
+
+    fn dimension(&self) -> usize {
+        EMBEDDING_DIMENSION
+    }
+
+    fn embed_batch(&self, inputs: &[&str]) -> Result<Vec<EmbeddingVector>, EmbeddingError> {
+        let embeddings = {
+            let mut runtime = self.runtime.lock().map_err(|_error| {
+                backend_error("Fastembed embedding runtime lock was poisoned".to_owned())
+            })?;
+            runtime.embed(inputs)?
+        };
+        validate_embedding_batch_shape(inputs.len(), self.dimension(), &embeddings)?;
+        Ok(embeddings)
+    }
+}
+
 /// Embed Markdown chunks and validate vector shape before downstream writes.
 ///
 /// # Errors
@@ -135,6 +199,76 @@ fn validate_embedding_batch_shape(
     }
 
     Ok(())
+}
+
+trait FastembedRuntime: Send {
+    fn embed(&mut self, inputs: &[&str]) -> Result<Vec<EmbeddingVector>, EmbeddingError>;
+}
+
+struct FastembedTextEmbeddingRuntime {
+    model: fastembed::TextEmbedding,
+}
+
+impl FastembedTextEmbeddingRuntime {
+    fn try_new() -> Result<Self, EmbeddingError> {
+        let options =
+            fastembed::InitOptions::new(fastembed_model()).with_show_download_progress(false);
+        let model = fastembed::TextEmbedding::try_new(options).map_err(|error| {
+            backend_error(format!("Fastembed runtime initialization failed: {error}"))
+        })?;
+        Ok(Self { model })
+    }
+}
+
+impl FastembedRuntime for FastembedTextEmbeddingRuntime {
+    fn embed(&mut self, inputs: &[&str]) -> Result<Vec<EmbeddingVector>, EmbeddingError> {
+        self.model
+            .embed(inputs, None)
+            .map_err(|error| backend_error(format!("Fastembed batch embedding failed: {error}")))
+    }
+}
+
+fn validate_fastembed_model_contract() -> Result<(), EmbeddingError> {
+    let model_info = fastembed_model_info()?;
+
+    if model_info.model_code != EMBEDDING_MODEL_CODE {
+        return Err(backend_error(format!(
+            "Fastembed BGESmallENV15 model code changed to {}; expected {}",
+            model_info.model_code, EMBEDDING_MODEL_CODE
+        )));
+    }
+
+    if model_info.dim != EMBEDDING_DIMENSION {
+        return Err(backend_error(format!(
+            "Fastembed BGESmallENV15 embedding dimension changed to {}; expected {}",
+            model_info.dim, EMBEDDING_DIMENSION
+        )));
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FastembedModelInfo {
+    model_code: String,
+    dim: usize,
+}
+
+fn fastembed_model_info() -> Result<FastembedModelInfo, EmbeddingError> {
+    let model = fastembed_model();
+    let model_info = fastembed::TextEmbedding::get_model_info(&model).map_err(|error| {
+        backend_error(format!("Fastembed model metadata lookup failed: {error}"))
+    })?;
+
+    Ok(FastembedModelInfo { model_code: model_info.model_code.clone(), dim: model_info.dim })
+}
+
+const fn fastembed_model() -> fastembed::EmbeddingModel {
+    fastembed::EmbeddingModel::BGESmallENV15
+}
+
+const fn backend_error(message: String) -> EmbeddingError {
+    EmbeddingError::Backend { message }
 }
 
 #[cfg(test)]

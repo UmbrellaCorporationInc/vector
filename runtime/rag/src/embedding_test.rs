@@ -70,6 +70,52 @@ fn test_embed_markdown_chunks_rejects_batch_length_mismatch() {
     assert_eq!(error, EmbeddingError::BatchLengthMismatch { input_count: 2, output_count: 1 });
 }
 
+#[test]
+fn test_fastembed_bge_small_en_v15_contract_matches_rag_defaults() {
+    let model_info = fastembed_model_info().unwrap();
+
+    assert_eq!(model_info.model_code, EMBEDDING_MODEL_CODE);
+    assert_eq!(model_info.dim, EMBEDDING_DIMENSION);
+    validate_fastembed_model_contract().unwrap();
+}
+
+#[test]
+fn test_fastembed_bge_small_en_v15_embedder_exposes_model_contract() {
+    let embedder = FastembedBgeSmallEnV15Embedder::from_runtime(FakeFastembedRuntime::new(384));
+
+    assert_eq!(embedder.model_id(), EMBEDDING_MODEL_IDENTIFIER);
+    assert_eq!(embedder.model_code(), EMBEDDING_MODEL_CODE);
+    assert_eq!(embedder.dimension(), EMBEDDING_DIMENSION);
+}
+
+#[test]
+fn test_fastembed_bge_small_en_v15_embedder_delegates_batch_embedding() {
+    let embedder = FastembedBgeSmallEnV15Embedder::from_runtime(FakeFastembedRuntime::new(384));
+
+    let embeddings = embedder.embed_batch(&["alpha", "beta"]).unwrap();
+
+    assert_eq!(embeddings.len(), 2);
+    assert_eq!(embeddings[0].len(), EMBEDDING_DIMENSION);
+    assert_eq!(embeddings[0][0].to_bits(), 5.0_f32.to_bits());
+    assert_eq!(embeddings[1][0].to_bits(), 4.0_f32.to_bits());
+}
+
+#[test]
+fn test_fastembed_bge_small_en_v15_embedder_rejects_invalid_runtime_dimensions() {
+    let embedder = FastembedBgeSmallEnV15Embedder::from_runtime(FakeFastembedRuntime::new(383));
+
+    let error = embedder.embed_batch(&["alpha"]).unwrap_err();
+
+    assert_eq!(
+        error,
+        EmbeddingError::DimensionMismatch {
+            chunk_index: 0,
+            expected_dimension: EMBEDDING_DIMENSION,
+            actual_dimension: 383,
+        }
+    );
+}
+
 #[derive(Debug, Clone)]
 struct DeterministicEmbedder {
     model_id: String,
@@ -150,6 +196,32 @@ impl Embedder for ShortBatchEmbedder {
 
     fn embed_batch(&self, _inputs: &[&str]) -> Result<Vec<EmbeddingVector>, EmbeddingError> {
         Ok(vec![vec![1.0, 2.0]])
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FakeFastembedRuntime {
+    dimension: usize,
+}
+
+impl FakeFastembedRuntime {
+    fn new(dimension: usize) -> Self {
+        Self { dimension }
+    }
+}
+
+impl FastembedRuntime for FakeFastembedRuntime {
+    fn embed(&mut self, inputs: &[&str]) -> Result<Vec<EmbeddingVector>, EmbeddingError> {
+        Ok(inputs
+            .iter()
+            .map(|input| {
+                let mut embedding = vec![0.0; self.dimension];
+                if let Some(first_dimension) = embedding.first_mut() {
+                    *first_dimension = f32::from(u16::try_from(input.len()).unwrap());
+                }
+                embedding
+            })
+            .collect())
     }
 }
 
