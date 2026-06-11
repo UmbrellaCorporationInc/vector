@@ -9,7 +9,8 @@ use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_doc::operations::{
     CreateDocInput, CreateDocOp, CreateDocTypeInput, CreateDocTypeOp, FindDocInput, FindDocOp,
-    PatchDocFormat, PatchDocInput, PatchDocOp, ValidateInput, ValidateOp,
+    PatchDocFormat, PatchDocInput, PatchDocOp, ReplaceDocInput, ReplaceDocOp, ValidateInput,
+    ValidateOp,
 };
 use runtime_io::path::IoPath;
 use serde::{Deserialize, Serialize};
@@ -158,6 +159,31 @@ pub struct PatchDocParams {
     /// If this field is used, it is interpreted as `format: "unified"`.
     #[serde(default)]
     pub git_diff: Option<String>,
+}
+
+/// MCP-facing parameters for the `replace_doc` tool.
+///
+/// # DTO(MCP protocol input mapped at the adapter boundary; serde deserialization requires public fields)
+#[non_exhaustive]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ReplaceDocParams {
+    /// Optional synchronized package name for package-qualified lookup.
+    ///
+    /// When empty, the document is resolved within the active workspace at `root_dir`.
+    /// When set, the document is resolved inside `.vector-database/packages/{package}/`.
+    #[serde(default)]
+    pub package: String,
+    /// Absolute or relative path to the root directory of the project.
+    pub root_dir: String,
+    /// The document type identifier (e.g. "rfc", "task").
+    pub doc_type: String,
+    /// The numeric code of the document to replace.
+    pub code: u32,
+    /// The complete replacement document content.
+    ///
+    /// Must be valid UTF-8 without a BOM. The governed front matter identity fields
+    /// (`id`, `type`, `code`, `slug`) must match the resolved document.
+    pub content: String,
 }
 
 /// MCP tool group for document operations.
@@ -434,6 +460,37 @@ impl DocumentTools {
             Ok(Some(output)) => Ok(format!("path: {}\n\n{}", output.path, output.content)),
             Ok(None) => Err("patch_doc failed: operation completed with no output".to_string()),
             Err(e) => Err(format!("patch_doc failed: {e}")),
+        }
+    }
+
+    /// Replace a governed document with complete content and return the resolved path and final content.
+    ///
+    /// Executes `ReplaceDocOp` through the standard dispatcher path.
+    /// All path authorization, identity validation, and write rules live in `runtime-doc`;
+    /// this method only maps MCP params to the runtime input and returns the result.
+    ///
+    /// Use `replace_doc` after `create_doc_prompt` to write a fully authored document without
+    /// generating a patch against the placeholder template.
+    #[tool(
+        description = "Replace a governed document with complete content and return the resolved path and final content. Resolves the target from `doc_type`, `code`, and optional `package`; callers do not provide a write path. The replacement `content` must be valid UTF-8 without a BOM and must preserve the governed front matter identity (`id`, `type`, `code`, `slug`). Use `replace_doc` after `create_doc_prompt` to author the full document without generating a patch."
+    )]
+    async fn replace_doc(
+        &self,
+        Parameters(ReplaceDocParams { package, root_dir, doc_type, code, content }): Parameters<
+            ReplaceDocParams,
+        >,
+    ) -> Result<String, String> {
+        let input = ReplaceDocInput::new(IoPath::new(root_dir), package, doc_type, code, content);
+
+        let (_cancel, mut receiver) = PluginDispatcher::new(ReplaceDocOp::new())
+            .input(input)
+            .build()
+            .map_err(|e| format!("dispatcher build failed: {e}"))?;
+
+        match receiver.recv().await {
+            Ok(Some(output)) => Ok(format!("path: {}\n\n{}", output.path, output.content)),
+            Ok(None) => Err("replace_doc failed: operation completed with no output".to_string()),
+            Err(e) => Err(format!("replace_doc failed: {e}")),
         }
     }
 }

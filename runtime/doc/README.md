@@ -55,6 +55,24 @@ let input = PatchDocInput::with_format(
 );
 ```
 
+- **`replace_doc`**: Replaces a governed document with complete content identified by `doc_type`, `code`, and optional `package`. The caller provides the full replacement text; the document path is resolved from governed metadata. The operation rejects UTF-8 BOM content, verifies that the `id`, `type`, `code`, and `slug` front matter fields match the resolved document identity, writes the content, and returns `path` and `content`. Use `replace_doc` after `create_doc` to author the complete document without generating a patch against the placeholder template.
+
+Bootstrap example:
+
+```rust
+use runtime_doc::operations::ReplaceDocInput;
+use runtime_io::path::IoPath;
+
+let content = "---\nid: rfc-00037-extend-patch-doc-formats\ntype: rfc\ncode: \"00037\"\nslug: extend-patch-doc-formats\n---\n\n# RFC 00037\n\n...\n".to_string();
+let input = ReplaceDocInput::new(
+    IoPath::new("/path/to/project"),
+    String::new(),
+    "rfc".to_string(),
+    37,
+    content,
+);
+```
+
 ### Discovery
 
 - **`find_doc`**: Locates a document by type and code. Returns `path` (absolute, canonicalized), `package` (the package name, or empty for workspace-local lookup), and `content` (full document text read in the same lookup). The optional input `package` field allows resolving against the synchronized package location under `.vector-database/packages/{package}/` when set, rather than performing a workspace-local lookup. See RFC 00030 for package-qualified lookup semantics.

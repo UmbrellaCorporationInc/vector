@@ -1274,6 +1274,174 @@ async fn patch_doc_tool_returns_error_for_target_mismatch() {
     );
 }
 
+// ── replace_doc tool helpers ──────────────────────────────────────────────────
+
+fn create_replace_doc_test_project() -> (tempfile::TempDir, std::path::PathBuf) {
+    use std::fs;
+    let dir = tempfile::tempdir().expect("temp dir");
+
+    let vector_dir = dir.path().join(".vector");
+    fs::create_dir_all(&vector_dir).expect("create .vector dir");
+
+    let config = "doc-type: {template: t, prompt-template: pt, prompt: p, create-document-type-form: f}\ndocument-types:\n  rfc:\n    layout: status\n    code-width: 5\n    prompt: prompts-00001-create-rfc\n    create-document-form: form-00001\n    statuses: [draft]";
+    fs::write(vector_dir.join("document-types.yaml"), config).expect("write config");
+
+    let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&rfc_dir).expect("create rfc dir");
+
+    let initial_content = "---\nid: rfc-00042-my-rfc\ntype: rfc\ncode: \"00042\"\nslug: my-rfc\n---\n\n# Placeholder\n";
+    fs::write(rfc_dir.join("rfc-00042-my-rfc.md"), initial_content).expect("write doc");
+
+    let root = dir.path().to_path_buf();
+    (dir, root)
+}
+
+/// Verifies that `ReplaceDocParams` deserializes correctly with all fields present.
+#[test]
+fn replace_doc_params_deserializes_correctly() {
+    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "content": "body"}"#;
+    let params: super::ReplaceDocParams =
+        serde_json::from_str(raw).expect("must deserialize ReplaceDocParams");
+    assert_eq!(params.root_dir, "/tmp/p");
+    assert_eq!(params.doc_type, "rfc");
+    assert_eq!(params.code, 42);
+    assert_eq!(params.content, "body");
+    assert_eq!(params.package, "", "package must default to empty string when absent");
+}
+
+/// Verifies that `ReplaceDocParams` deserializes correctly when `package` is explicitly provided.
+#[test]
+fn replace_doc_params_accepts_optional_package_field() {
+    let raw = r#"{"package": "my-pkg", "root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "content": "body"}"#;
+    let params: super::ReplaceDocParams =
+        serde_json::from_str(raw).expect("must deserialize ReplaceDocParams with package");
+    assert_eq!(params.package, "my-pkg");
+}
+
+/// Verifies that the `replace_doc` tool writes the replacement content and returns path and content.
+#[tokio::test]
+async fn replace_doc_tool_returns_path_and_content_for_valid_replacement() {
+    let (dir, root) = create_replace_doc_test_project();
+    let rfc_path = dir.path().join("doc").join("rfc").join("draft").join("rfc-00042-my-rfc.md");
+
+    let replacement = "---\nid: rfc-00042-my-rfc\ntype: rfc\ncode: \"00042\"\nslug: my-rfc\n---\n\n# Replaced Content\n\nThis is the fully authored document.\n";
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .replace_doc(Parameters(super::ReplaceDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            content: replacement.to_string(),
+        }))
+        .await
+        .expect("replace_doc must succeed for valid replacement content");
+
+    let expected_path =
+        dunce::canonicalize(&rfc_path).expect("canonicalize").to_string_lossy().to_string();
+    assert!(
+        result.contains(&format!("path: {expected_path}")),
+        "result must contain the canonicalized path; got: {result}"
+    );
+    assert!(
+        result.contains("Replaced Content"),
+        "result must contain the replacement content; got: {result}"
+    );
+    assert!(
+        !result.contains("Placeholder"),
+        "result must not contain the original placeholder content; got: {result}"
+    );
+
+    let on_disk = std::fs::read_to_string(&rfc_path).expect("read replaced doc");
+    assert_eq!(on_disk, replacement, "on-disk content must match the replacement payload");
+}
+
+/// Verifies that the `replace_doc` tool returns an error when the document does not exist.
+#[tokio::test]
+async fn replace_doc_tool_returns_error_when_document_not_found() {
+    let (_dir, root) = create_replace_doc_test_project();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .replace_doc(Parameters(super::ReplaceDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 999,
+            content: "---\nid: rfc-00999-missing\ntype: rfc\ncode: \"00999\"\nslug: missing\n---\n"
+                .to_string(),
+        }))
+        .await;
+
+    assert!(result.is_err(), "replace_doc must return an error when the document does not exist");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("replace_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+}
+
+/// Verifies that the `replace_doc` tool returns an error when the replacement content has mismatched identity.
+#[tokio::test]
+async fn replace_doc_tool_returns_error_for_mismatched_identity() {
+    let (_dir, root) = create_replace_doc_test_project();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .replace_doc(Parameters(super::ReplaceDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            content:
+                "---\nid: rfc-00001-wrong-id\ntype: rfc\ncode: \"00001\"\nslug: wrong-id\n---\n"
+                    .to_string(),
+        }))
+        .await;
+
+    assert!(
+        result.is_err(),
+        "replace_doc must return an error when replacement identity does not match the resolved document"
+    );
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("replace_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+    assert!(
+        err.contains("id") || err.contains("identity") || err.contains("match"),
+        "error must reference the identity mismatch; got: {err:?}"
+    );
+}
+
+/// Verifies that the `replace_doc` tool returns an error when the replacement content has a BOM.
+#[tokio::test]
+async fn replace_doc_tool_returns_error_for_bom_content() {
+    let (_dir, root) = create_replace_doc_test_project();
+
+    let bom_content = "\u{FEFF}---\nid: rfc-00042-my-rfc\ntype: rfc\ncode: \"00042\"\nslug: my-rfc\n---\n\n# BOM Content\n";
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .replace_doc(Parameters(super::ReplaceDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            content: bom_content.to_string(),
+        }))
+        .await;
+
+    assert!(result.is_err(), "replace_doc must return an error when content contains a BOM");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("replace_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+    assert!(err.contains("BOM"), "error must mention BOM for remediation guidance; got: {err:?}");
+}
+
 /// Verifies that the `patch_doc` tool returns an error when the diff would produce BOM content.
 #[tokio::test]
 async fn patch_doc_tool_returns_error_for_bom_content() {

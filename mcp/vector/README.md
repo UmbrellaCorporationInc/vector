@@ -32,7 +32,7 @@
 | `runtime-channel` | `PluginDispatcher` execution bridge between tools and operations   |
 | `runtime-io`      | `IoPath` type used in MCP-to-runtime input translation             |
 | `runtime-language`| `QualityGateOp`, `BestPracticesOp`, and their inputs for language prompt resolution |
-| `runtime-doc`     | Document capability operations: `ValidateOp`, `FindDocOp`, `CreateDocOp`, `CreateDocTypeOp`, `PatchDocOp`, and their corresponding input/output types |
+| `runtime-doc`     | Document capability operations: `ValidateOp`, `FindDocOp`, `CreateDocOp`, `CreateDocTypeOp`, `PatchDocOp`, `ReplaceDocOp`, and their corresponding input/output types |
 | `runtime-project` | `ProjectSetupOp` and `ProjectSetupInput` for the project tool path |
 | `serde`           | MCP parameter deserialization                                      |
 | `thiserror`       | MCP-local error enum derivation                                    |
@@ -64,6 +64,7 @@
 | `create_doc_prompt`     | Document          | Create a governed document and return the resolved authoring prompt |
 | `create_doc_type_prompt`| Document          | Create a governed document type and return the resolved authoring prompt |
 | `patch_doc`             | Document          | Apply a patch to a governed document; supports `format: "unified"` and omitted-format `apply_patch`, enforces target matching, returns format-specific diagnostics, rejects BOM-encoded output, and returns the final patched content |
+| `replace_doc`           | Document          | Replace a governed document with complete content; resolves the target from `doc_type`, `code`, and optional `package`, validates governed front matter identity, rejects BOM content, and returns the resolved path and final content. Bootstrap companion to `create_doc_prompt`. |
 | `language_quality_gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
 | `language_best_practices` | Language        | Resolve and concatenate governed best-practices prompt bodies for a language list |
 
@@ -112,6 +113,25 @@ Omitted-format `apply_patch` example:
   "patch": "*** Begin Patch\n*** Update File: doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n@@\n-old\n+new\n*** End Patch\n"
 }
 ```
+
+### `replace_doc` input contract
+
+`replace_doc` is the bootstrap companion to `create_doc_prompt`. After `create_doc_prompt` creates the governed document skeleton, call `replace_doc` to write the fully authored content without generating a patch against the placeholder template.
+
+`replace_doc` resolves the writable document from `root_dir`, `doc_type`, `code`, and optional `package`. The caller provides the complete replacement `content`; the document path is not caller-supplied. The `content` must be valid UTF-8 without a BOM and must preserve the governed front matter identity fields — `id`, `type`, `code`, and `slug` — of the resolved document.
+
+Bootstrap example — replacing a newly created RFC document:
+
+```json
+{
+  "root_dir": "/path/to/project",
+  "doc_type": "rfc",
+  "code": 37,
+  "content": "---\nid: rfc-00037-extend-patch-doc-formats\ntype: rfc\ncode: \"00037\"\nslug: extend-patch-doc-formats\ntitle: Extend Document Patch and Replacement Operations\ndescription: Proposes extending patch_doc and adding replace_doc.\nstatus: draft\ncreated: 2026-06-11\nupdated: 2026-06-11\nauthors: []\ntags: []\nrelated: []\n---\n\n# RFC 00037: Extend Document Patch and Replacement Operations\n\n## 1. Problem\n\n...\n"
+}
+```
+
+`replace_doc` returns `path` and the final document content after a successful write.
 
 ## 4. Usage Example
 

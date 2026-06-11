@@ -136,10 +136,10 @@ input:
   language: rust
 ```
 
-- [ ] Add a thin MCP `replace_doc` tool that delegates to the runtime operation.
-- [ ] Add MCP parameter handling for `root_dir`, `doc_type`, `code`, optional `package`, and `content`.
-- [ ] Document `replace_doc` as the bootstrap companion to `create_doc_prompt`.
-- [ ] Include one working runtime or MCP README example that replaces a newly created governed document.
+- [x] Add a thin MCP `replace_doc` tool that delegates to the runtime operation.
+- [x] Add MCP parameter handling for `root_dir`, `doc_type`, `code`, optional `package`, and `content`.
+- [x] Document `replace_doc` as the bootstrap companion to `create_doc_prompt`.
+- [x] Include one working runtime or MCP README example that replaces a newly created governed document.
 
 ### 3.7. Phase G - Test the Contract
 
