@@ -81,11 +81,11 @@ input:
   language: rust
 ```
 
-- [ ] Parse omitted `format` payloads as `apply_patch`-style patches with `*** Begin Patch` and `*** End Patch` boundaries.
-- [ ] Support `*** Update File:` only when the target path matches the governed document resolved by the tool inputs.
-- [ ] Apply update hunks without requiring numeric hunk ranges.
-- [ ] Reject `Add File`, `Delete File`, and `Move to` operations with format-specific errors.
-- [ ] Report missing boundaries, unsupported operations, ambiguous context, and target mismatches with actionable diagnostics.
+- [x] Parse omitted `format` payloads as `apply_patch`-style patches with `*** Begin Patch` and `*** End Patch` boundaries.
+- [x] Support `*** Update File:` only when the target path matches the governed document resolved by the tool inputs.
+- [x] Apply update hunks without requiring numeric hunk ranges.
+- [x] Reject `Add File`, `Delete File`, and `Move to` operations with format-specific errors.
+- [x] Report missing boundaries, unsupported operations, ambiguous context, and target mismatches with actionable diagnostics.
 
 ### 3.4. Phase D - Expose the MCP Tool Shape and Documentation
 

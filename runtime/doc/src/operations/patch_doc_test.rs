@@ -82,6 +82,20 @@ fn make_diff(filename: &str, old_line: &str, new_line: &str) -> String {
     format!("--- a/{filename}\n+++ b/{filename}\n@@ -1,1 +1,1 @@\n-{old_line}\n+{new_line}\n")
 }
 
+fn make_apply_patch(filename: &str, old_line: &str, new_line: &str) -> String {
+    format!(
+        "\
+*** Begin Patch
+*** Update File: doc/task/draft/{filename}
+@@
+-{old_line}
++{new_line}
+ second line
+*** End Patch
+"
+    )
+}
+
 #[test]
 fn test_patch_doc_format_contract_defaults_to_apply_patch() {
     let format = PatchDocFormat::parse_optional(None).unwrap();
@@ -99,13 +113,13 @@ fn test_patch_doc_format_contract_rejects_unknown_values() {
 }
 
 #[tokio::test]
-async fn test_patch_doc_apply_patch_format_is_recognized_but_not_applied_in_phase_a() {
+async fn test_patch_doc_apply_patch_format_updates_without_numeric_hunk_ranges() {
     let temp = TempDir::new().unwrap();
     let root = IoPath::new(temp.path());
 
     write_doc_config(&temp, "task");
     let filename = "task-00001-foo.md";
-    let original = "old content\n";
+    let original = "old content\nsecond line\n";
     create_doc_file(&temp, "task", filename, original);
 
     let input = PatchDocInput::with_format(
@@ -114,20 +128,17 @@ async fn test_patch_doc_apply_patch_format_is_recognized_but_not_applied_in_phas
         "task".to_string(),
         1,
         PatchDocFormat::ApplyPatch,
-        "*** Begin Patch\n*** End Patch\n".to_string(),
+        make_apply_patch(filename, "old content", "new content"),
     );
     let mut sender = MockSender::new();
-    let result = patch_doc(input, &mut sender).await;
+    patch_doc(input, &mut sender).await.unwrap();
 
-    assert!(result.is_err(), "Phase A only recognizes the apply_patch format contract");
-    let err = result.unwrap_err().to_string();
-    assert!(err.contains("format 'apply_patch' is recognized"), "{err}");
-    assert!(err.contains("not implemented until Phase C"), "{err}");
-    assert!(sender.outputs.is_empty(), "unapplied formats must not emit patched content");
+    assert_eq!(sender.outputs.len(), 1);
+    assert_eq!(sender.outputs[0].content, "new content\nsecond line\n");
 
     let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
     let on_disk = fs::read_to_string(&doc_path).unwrap();
-    assert_eq!(on_disk, original, "file must not be modified before apply_patch is implemented");
+    assert_eq!(on_disk, "new content\nsecond line\n");
 }
 
 // ── happy path ───────────────────────────────────────────────────────────────
@@ -325,6 +336,48 @@ async fn test_patch_doc_target_mismatch_rejected() {
     assert!(err.contains("main.rs") || err.contains("task-00001"), "{err}");
 }
 
+#[tokio::test]
+async fn test_patch_doc_apply_patch_target_mismatch_rejected() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "old content\nsecond line\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let patch = "\
+*** Begin Patch
+*** Update File: doc/task/draft/task-00002-other.md
+@@
+-old content
++new content
+ second line
+*** End Patch
+";
+
+    let input = PatchDocInput::with_format(
+        root,
+        String::new(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::ApplyPatch,
+        patch.to_string(),
+    );
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(result.is_err(), "expected apply_patch target mismatch rejection");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"apply_patch\""), "{err}");
+    assert!(err.contains("patch targets 'doc/task/draft/task-00002-other.md'"), "{err}");
+    assert!(sender.outputs.is_empty(), "target mismatch must not emit patched content");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when target mismatches");
+}
+
 // ── unsupported diff shapes ───────────────────────────────────────────────────
 
 #[tokio::test]
@@ -382,6 +435,229 @@ async fn test_patch_doc_malformed_diff_rejected() {
     let result = patch_doc(input, &mut sender).await;
 
     assert!(result.is_err(), "expected error for malformed diff");
+}
+
+#[tokio::test]
+async fn test_patch_doc_apply_patch_missing_boundaries_rejected() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "old content\nsecond line\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let cases = [
+        (
+            "*** Update File: doc/task/draft/task-00001-foo.md\n@@\n-old content\n+new content\n",
+            "*** Begin Patch",
+        ),
+        (
+            "*** Begin Patch\n*** Update File: doc/task/draft/task-00001-foo.md\n@@\n-old content\n+new content\n",
+            "*** End Patch",
+        ),
+    ];
+
+    for (patch, expected) in cases {
+        let input = PatchDocInput::with_format(
+            root.clone(),
+            String::new(),
+            "task".to_string(),
+            1,
+            PatchDocFormat::ApplyPatch,
+            patch.to_string(),
+        );
+        let mut sender = MockSender::new();
+        let result = patch_doc(input, &mut sender).await;
+
+        assert!(result.is_err(), "expected missing boundary rejection for {expected}");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("format: \"apply_patch\""), "{err}");
+        assert!(err.contains("missing apply_patch boundary"), "{err}");
+        assert!(err.contains(expected), "{err}");
+        assert!(sender.outputs.is_empty(), "boundary failures must not emit patched content");
+    }
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when boundaries are missing");
+}
+
+#[tokio::test]
+async fn test_patch_doc_apply_patch_unsupported_operations_rejected() {
+    let cases = [
+        (
+            "\
+*** Begin Patch
+*** Add File: doc/task/draft/task-00001-foo.md
++new content
+*** End Patch
+",
+            "Add File",
+        ),
+        (
+            "\
+*** Begin Patch
+*** Delete File: doc/task/draft/task-00001-foo.md
+*** End Patch
+",
+            "Delete File",
+        ),
+        (
+            "\
+*** Begin Patch
+*** Update File: doc/task/draft/task-00001-foo.md
+*** Move to: doc/task/draft/task-00001-bar.md
+*** End Patch
+",
+            "Move to",
+        ),
+    ];
+
+    for (patch, operation) in cases {
+        let temp = TempDir::new().unwrap();
+        let root = IoPath::new(temp.path());
+        write_doc_config(&temp, "task");
+        create_doc_file(&temp, "task", "task-00001-foo.md", "old content\n");
+
+        let input = PatchDocInput::with_format(
+            root,
+            String::new(),
+            "task".to_string(),
+            1,
+            PatchDocFormat::ApplyPatch,
+            patch.to_string(),
+        );
+        let mut sender = MockSender::new();
+        let result = patch_doc(input, &mut sender).await;
+
+        assert!(result.is_err(), "expected rejection for {operation}");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("format: \"apply_patch\""), "{err}");
+        assert!(err.contains("unsupported apply_patch operation"), "{err}");
+        assert!(err.contains(operation), "{err}");
+        assert!(sender.outputs.is_empty(), "unsupported operations must not emit output");
+    }
+}
+
+#[tokio::test]
+async fn test_patch_doc_apply_patch_ambiguous_context_rejected() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "same\nkeep\nsame\nkeep\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let patch = "\
+*** Begin Patch
+*** Update File: doc/task/draft/task-00001-foo.md
+@@
+ same
+-keep
++changed
+*** End Patch
+";
+
+    let input = PatchDocInput::with_format(
+        root,
+        String::new(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::ApplyPatch,
+        patch.to_string(),
+    );
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(result.is_err(), "expected ambiguous context rejection");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"apply_patch\""), "{err}");
+    assert!(err.contains("ambiguous context in hunk 1"), "{err}");
+    assert!(err.contains("old-side lines match 2 locations"), "{err}");
+    assert!(sender.outputs.is_empty(), "ambiguous context failures must not emit output");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when context is ambiguous");
+}
+
+#[tokio::test]
+async fn test_patch_doc_apply_patch_missing_context_rejected() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "actual\nsecond line\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let patch = "\
+*** Begin Patch
+*** Update File: doc/task/draft/task-00001-foo.md
+@@
+-expected
++new content
+ second line
+*** End Patch
+";
+
+    let input = PatchDocInput::with_format(
+        root,
+        String::new(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::ApplyPatch,
+        patch.to_string(),
+    );
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(result.is_err(), "expected missing context rejection");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"apply_patch\""), "{err}");
+    assert!(err.contains("missing context for hunk 1"), "{err}");
+    assert!(sender.outputs.is_empty(), "missing context failures must not emit output");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when context is missing");
+}
+
+#[tokio::test]
+async fn test_patch_doc_apply_patch_can_remove_only_line_without_leaving_newline() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(&temp, "task", filename, "obsolete\n");
+
+    let patch = "\
+*** Begin Patch
+*** Update File: doc/task/draft/task-00001-foo.md
+@@
+-obsolete
+*** End Patch
+";
+
+    let input = PatchDocInput::with_format(
+        root,
+        String::new(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::ApplyPatch,
+        patch.to_string(),
+    );
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs[0].content, "");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let written = fs::read(&doc_path).unwrap();
+    assert!(written.is_empty(), "removing the only line must produce an empty file");
 }
 
 #[tokio::test]
