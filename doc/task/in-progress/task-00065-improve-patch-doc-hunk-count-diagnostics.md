@@ -5,7 +5,7 @@ code: "00065"
 slug: improve-patch-doc-hunk-count-diagnostics
 title: Improve patch_doc Hunk Count Diagnostics
 description: Make patch_doc failures for unified-diff hunk count mismatches actionable for agents.
-status: todo
+status: in-progress
 created: 2026-06-11
 updated: 2026-06-11
 tags:
@@ -59,10 +59,10 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Add a focused regression test where `patch_doc` receives a unified diff whose hunk header declares more old/new lines than the hunk body contains.
-- [ ] Assert that the failure is produced during diff parsing, before target mismatch checks and before file writes.
-- [ ] Include the original failure shape in the test fixture or assertion message: declared hunk counts differ from parsed hunk counts.
-- [ ] Confirm the target document remains unchanged after the malformed diff is rejected.
+- [x] Add a focused regression test where `patch_doc` receives a unified diff whose hunk header declares more old/new lines than the hunk body contains.
+- [x] Assert that the failure is produced during diff parsing, before target mismatch checks and before file writes.
+- [x] Include the original failure shape in the test fixture or assertion message: declared hunk counts differ from parsed hunk counts.
+- [x] Confirm the target document remains unchanged after the malformed diff is rejected.
 
 ### 3.2. Phase B — Improve Runtime Diagnostics
 
