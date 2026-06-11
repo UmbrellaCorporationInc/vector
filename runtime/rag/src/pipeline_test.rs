@@ -1,4 +1,4 @@
-#![allow(clippy::panic, clippy::unwrap_used)]
+#![allow(clippy::unwrap_used)]
 
 use crate::{
     Embedder, EmbeddingError, EmbeddingVector, MarkdownChunkingConfig,
@@ -37,7 +37,7 @@ async fn test_chunk_markdown_extraction_wires_extraction_to_chunking_for_workspa
     );
 
     let MarkdownChunkingPipelineOutcome::Chunked(batch) = outcome else {
-        panic!("expected extracted workspace document to chunk");
+        unreachable!("expected extracted workspace document to chunk");
     };
     assert_eq!(batch.package, None);
     assert_eq!(batch.document_stem, "spec-00011-rag-plan-implementation");
@@ -65,7 +65,7 @@ async fn test_chunk_markdown_extraction_uses_same_semantics_for_package_document
     );
 
     let MarkdownChunkingPipelineOutcome::Chunked(batch) = outcome else {
-        panic!("expected extracted package document to chunk");
+        unreachable!("expected extracted package document to chunk");
     };
     assert_eq!(batch.package.as_deref(), Some("shared-docs"));
     assert_eq!(batch.document_stem, "rfc-00034-markdown-chunking");
@@ -95,7 +95,7 @@ async fn test_embed_markdown_extraction_embeds_generated_chunks_as_one_text_batc
     );
 
     let MarkdownEmbeddingPipelineOutcome::Embedded(batch) = outcome else {
-        panic!("expected extracted workspace document to chunk and embed");
+        unreachable!("expected extracted workspace document to chunk and embed");
     };
     assert_eq!(batch.package, None);
     assert_eq!(batch.document_stem, "rfc-00036-phase-5-embedder");
@@ -135,7 +135,7 @@ async fn test_embed_markdown_extraction_returns_embedding_failures_with_document
     );
 
     let MarkdownEmbeddingPipelineOutcome::Failed(failure) = outcome else {
-        panic!("expected embedding dimension mismatch to fail");
+        unreachable!("expected embedding dimension mismatch to fail");
     };
     assert_eq!(failure.package.as_deref(), Some("shared-docs"));
     assert_eq!(failure.document_stem, "rfc-00036-phase-5-embedder");
@@ -168,7 +168,7 @@ async fn test_chunk_markdown_extraction_returns_malformed_extraction_errors() {
     );
 
     let MarkdownChunkingPipelineOutcome::Failed(failure) = outcome else {
-        panic!("expected malformed extraction input to fail");
+        unreachable!("expected malformed extraction input to fail");
     };
     assert_eq!(failure.document_stem, "task-00063-implement-rfc-00034-markdown-chunking");
     assert!(matches!(
@@ -188,7 +188,7 @@ async fn test_chunk_markdown_extraction_returns_unsupported_structure_errors() {
     )
     .await;
     let MarkdownExtractionOutcome::Failed(mut failure) = fixture.extraction else {
-        panic!("expected fixture extraction to fail");
+        unreachable!("expected fixture extraction to fail");
     };
     failure.error.kind = "unsupported_markdown_structure".to_owned();
     failure.error.message =
@@ -205,7 +205,7 @@ async fn test_chunk_markdown_extraction_returns_unsupported_structure_errors() {
     );
 
     let MarkdownChunkingPipelineOutcome::Failed(failure) = outcome else {
-        panic!("expected unsupported Markdown structure to fail");
+        unreachable!("expected unsupported Markdown structure to fail");
     };
     assert_eq!(failure.package.as_deref(), Some("shared-docs"));
     assert!(matches!(
@@ -233,7 +233,7 @@ async fn test_chunk_markdown_extraction_returns_unsplittable_oversized_block_err
     );
 
     let MarkdownChunkingPipelineOutcome::Failed(failure) = outcome else {
-        panic!("expected oversized code block to fail");
+        unreachable!("expected oversized code block to fail");
     };
     assert_eq!(failure.document_stem, "rfc-00034-markdown-chunking");
     assert!(matches!(

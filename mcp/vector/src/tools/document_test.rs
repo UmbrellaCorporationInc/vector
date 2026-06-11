@@ -934,13 +934,78 @@ fn create_patch_doc_test_project() -> (tempfile::TempDir, std::path::PathBuf) {
 /// Verifies that `PatchDocParams` deserializes correctly from JSON input.
 #[test]
 fn patch_doc_params_deserializes_correctly() {
-    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "git_diff": "--- a/x.md\n+++ b/x.md\n"}"#;
+    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "format": "unified", "patch": "--- a/x.md\n+++ b/x.md\n"}"#;
     let params: super::PatchDocParams =
         serde_json::from_str(raw).expect("must deserialize PatchDocParams");
+    assert_eq!(params.package, "", "package must default to empty string");
     assert_eq!(params.root_dir, "/tmp/p");
     assert_eq!(params.doc_type, "rfc");
     assert_eq!(params.code, 42);
-    assert!(!params.git_diff.is_empty(), "git_diff must be deserialized");
+    assert_eq!(params.format.as_deref(), Some("unified"));
+    assert!(params.patch.as_ref().is_some_and(|patch| !patch.is_empty()));
+    assert!(params.git_diff.is_none());
+}
+
+/// Verifies that deprecated `git_diff` payloads remain accepted as a transition alias.
+#[test]
+fn patch_doc_params_deserializes_deprecated_git_diff_alias() {
+    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "git_diff": "--- a/x.md\n+++ b/x.md\n"}"#;
+    let params: super::PatchDocParams =
+        serde_json::from_str(raw).expect("must deserialize PatchDocParams with git_diff");
+    assert!(params.patch.is_none());
+    assert!(params.format.is_none());
+    assert!(params.git_diff.as_ref().is_some_and(|git_diff| !git_diff.is_empty()));
+}
+
+#[test]
+fn patch_doc_input_from_params_defaults_omitted_format_to_apply_patch() {
+    let input = super::patch_doc_input_from_params(super::PatchDocParams {
+        package: String::new(),
+        root_dir: "/tmp/p".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 42,
+        format: None,
+        patch: Some("*** Begin Patch\n*** End Patch\n".to_string()),
+        git_diff: None,
+    })
+    .expect("omitted format must default successfully");
+
+    assert_eq!(input.format, runtime_doc::operations::PatchDocFormat::ApplyPatch);
+}
+
+#[test]
+fn patch_doc_input_from_params_rejects_unknown_format() {
+    let err = super::patch_doc_input_from_params(super::PatchDocParams {
+        package: String::new(),
+        root_dir: "/tmp/p".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 42,
+        format: Some("context".to_string()),
+        patch: Some("patch".to_string()),
+        git_diff: None,
+    })
+    .expect_err("unknown format must be rejected");
+
+    assert!(err.contains("unknown patch format 'context'"), "{err}");
+    assert!(err.contains("Supported values: unified, apply_patch"), "{err}");
+}
+
+#[test]
+fn patch_doc_input_from_params_maps_git_diff_alias_to_unified() {
+    let input = super::patch_doc_input_from_params(super::PatchDocParams {
+        package: "pkg".to_string(),
+        root_dir: "/tmp/p".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 42,
+        format: None,
+        patch: None,
+        git_diff: Some("--- a/x.md\n+++ b/x.md\n".to_string()),
+    })
+    .expect("git_diff alias must map to unified format");
+
+    assert_eq!(input.package, "pkg");
+    assert_eq!(input.format, runtime_doc::operations::PatchDocFormat::Unified);
+    assert_eq!(input.patch, "--- a/x.md\n+++ b/x.md\n");
 }
 
 /// Verifies that the `patch_doc` tool applies a valid unified diff and returns the patched content.
@@ -955,10 +1020,13 @@ async fn patch_doc_tool_applies_valid_diff_and_returns_content() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff,
+            format: Some("unified".to_string()),
+            patch: Some(git_diff),
+            git_diff: None,
         }))
         .await
         .expect("patch_doc must succeed for a valid diff");
@@ -979,6 +1047,50 @@ async fn patch_doc_tool_applies_valid_diff_and_returns_content() {
     );
 }
 
+/// Verifies that the `patch_doc` tool defaults omitted `format` payloads to `apply_patch`.
+#[tokio::test]
+async fn patch_doc_tool_applies_omitted_format_apply_patch_and_returns_content() {
+    let (dir, root) = create_patch_doc_test_project();
+    let rfc_path = dir.path().join("doc").join("rfc").join("draft").join("rfc-00042-my-rfc.md");
+    let patch = "\
+*** Begin Patch
+*** Update File: doc/rfc/draft/rfc-00042-my-rfc.md
+@@
+-Original line.
++Updated through apply_patch.
+*** End Patch
+"
+    .to_string();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            format: None,
+            patch: Some(patch),
+            git_diff: None,
+        }))
+        .await
+        .expect("patch_doc must succeed for an omitted-format apply_patch payload");
+
+    let expected_path =
+        dunce::canonicalize(&rfc_path).expect("canonicalize").to_string_lossy().to_string();
+    assert!(
+        result.contains(&format!("path: {expected_path}")),
+        "result must contain the canonicalized path; got: {result}"
+    );
+    assert!(
+        result.contains("Updated through apply_patch."),
+        "result must contain the patched content; got: {result}"
+    );
+
+    let on_disk = std::fs::read_to_string(&rfc_path).expect("read patched doc");
+    assert_eq!(on_disk, "Updated through apply_patch.\n");
+}
+
 /// Verifies that the `patch_doc` tool returns an error when the document does not exist.
 #[tokio::test]
 async fn patch_doc_tool_returns_error_for_missing_document() {
@@ -987,11 +1099,15 @@ async fn patch_doc_tool_returns_error_for_missing_document() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 999,
-            git_diff: "--- a/rfc-00999-x.md\n+++ b/rfc-00999-x.md\n@@ -1 +1 @@\n-old\n+new\n"
-                .to_string(),
+            format: None,
+            patch: None,
+            git_diff: Some(
+                "--- a/rfc-00999-x.md\n+++ b/rfc-00999-x.md\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
+            ),
         }))
         .await;
 
@@ -1011,10 +1127,13 @@ async fn patch_doc_tool_returns_error_for_malformed_diff() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff: "this is not a valid unified diff".to_string(),
+            format: None,
+            patch: None,
+            git_diff: Some("this is not a valid unified diff".to_string()),
         }))
         .await;
 
@@ -1023,6 +1142,10 @@ async fn patch_doc_tool_returns_error_for_malformed_diff() {
     assert!(
         err.contains("patch_doc failed:"),
         "error must carry the operation prefix; got: {err:?}"
+    );
+    assert!(
+        err.contains("format: \"unified\""),
+        "malformed unified diff errors must identify the active format; got: {err:?}"
     );
 }
 
@@ -1057,10 +1180,13 @@ async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff,
+            format: Some("unified".to_string()),
+            patch: Some(git_diff),
+            git_diff: None,
         }))
         .await;
 
@@ -1069,6 +1195,10 @@ async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
     assert!(
         err.starts_with("patch_doc failed:"),
         "error must keep the MCP operation prefix; got: {err:?}"
+    );
+    assert!(
+        err.contains("format: \"unified\""),
+        "error must identify the active patch format; got: {err:?}"
     );
     assert!(
         err.contains("hunk line-count mismatch"),
@@ -1092,7 +1222,7 @@ async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
         "hunk count mismatch must fail during preflight before target mismatch checks; got: {err:?}"
     );
     assert!(
-        err.len() <= 600,
+        err.len() <= 640,
         "error should stay compact enough for agent feedback loops; length={} err={err:?}",
         err.len()
     );
@@ -1112,12 +1242,16 @@ async fn patch_doc_tool_returns_error_for_target_mismatch() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff:
+            format: None,
+            patch: None,
+            git_diff: Some(
                 "--- a/rfc-00001-other.md\n+++ b/rfc-00001-other.md\n@@ -1 +1 @@\n-old\n+new\n"
                     .to_string(),
+            ),
         }))
         .await;
 
@@ -1130,6 +1264,182 @@ async fn patch_doc_tool_returns_error_for_target_mismatch() {
         err.contains("patch_doc failed:"),
         "error must carry the operation prefix; got: {err:?}"
     );
+    assert!(
+        err.contains("format: \"unified\""),
+        "target mismatch errors must identify the active format; got: {err:?}"
+    );
+    assert!(
+        err.contains("patch targets"),
+        "target mismatch errors must preserve the existing actionable diagnostic; got: {err:?}"
+    );
+}
+
+// ── replace_doc tool helpers ──────────────────────────────────────────────────
+
+fn create_replace_doc_test_project() -> (tempfile::TempDir, std::path::PathBuf) {
+    use std::fs;
+    let dir = tempfile::tempdir().expect("temp dir");
+
+    let vector_dir = dir.path().join(".vector");
+    fs::create_dir_all(&vector_dir).expect("create .vector dir");
+
+    let config = "doc-type: {template: t, prompt-template: pt, prompt: p, create-document-type-form: f}\ndocument-types:\n  rfc:\n    layout: status\n    code-width: 5\n    prompt: prompts-00001-create-rfc\n    create-document-form: form-00001\n    statuses: [draft]";
+    fs::write(vector_dir.join("document-types.yaml"), config).expect("write config");
+
+    let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&rfc_dir).expect("create rfc dir");
+
+    let initial_content = "---\nid: rfc-00042-my-rfc\ntype: rfc\ncode: \"00042\"\nslug: my-rfc\n---\n\n# Placeholder\n";
+    fs::write(rfc_dir.join("rfc-00042-my-rfc.md"), initial_content).expect("write doc");
+
+    let root = dir.path().to_path_buf();
+    (dir, root)
+}
+
+/// Verifies that `ReplaceDocParams` deserializes correctly with all fields present.
+#[test]
+fn replace_doc_params_deserializes_correctly() {
+    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "content": "body"}"#;
+    let params: super::ReplaceDocParams =
+        serde_json::from_str(raw).expect("must deserialize ReplaceDocParams");
+    assert_eq!(params.root_dir, "/tmp/p");
+    assert_eq!(params.doc_type, "rfc");
+    assert_eq!(params.code, 42);
+    assert_eq!(params.content, "body");
+    assert_eq!(params.package, "", "package must default to empty string when absent");
+}
+
+/// Verifies that `ReplaceDocParams` deserializes correctly when `package` is explicitly provided.
+#[test]
+fn replace_doc_params_accepts_optional_package_field() {
+    let raw = r#"{"package": "my-pkg", "root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "content": "body"}"#;
+    let params: super::ReplaceDocParams =
+        serde_json::from_str(raw).expect("must deserialize ReplaceDocParams with package");
+    assert_eq!(params.package, "my-pkg");
+}
+
+/// Verifies that the `replace_doc` tool writes the replacement content and returns path and content.
+#[tokio::test]
+async fn replace_doc_tool_returns_path_and_content_for_valid_replacement() {
+    let (dir, root) = create_replace_doc_test_project();
+    let rfc_path = dir.path().join("doc").join("rfc").join("draft").join("rfc-00042-my-rfc.md");
+
+    let replacement = "---\nid: rfc-00042-my-rfc\ntype: rfc\ncode: \"00042\"\nslug: my-rfc\n---\n\n# Replaced Content\n\nThis is the fully authored document.\n";
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .replace_doc(Parameters(super::ReplaceDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            content: replacement.to_string(),
+        }))
+        .await
+        .expect("replace_doc must succeed for valid replacement content");
+
+    let expected_path =
+        dunce::canonicalize(&rfc_path).expect("canonicalize").to_string_lossy().to_string();
+    assert!(
+        result.contains(&format!("path: {expected_path}")),
+        "result must contain the canonicalized path; got: {result}"
+    );
+    assert!(
+        result.contains("Replaced Content"),
+        "result must contain the replacement content; got: {result}"
+    );
+    assert!(
+        !result.contains("Placeholder"),
+        "result must not contain the original placeholder content; got: {result}"
+    );
+
+    let on_disk = std::fs::read_to_string(&rfc_path).expect("read replaced doc");
+    assert_eq!(on_disk, replacement, "on-disk content must match the replacement payload");
+}
+
+/// Verifies that the `replace_doc` tool returns an error when the document does not exist.
+#[tokio::test]
+async fn replace_doc_tool_returns_error_when_document_not_found() {
+    let (_dir, root) = create_replace_doc_test_project();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .replace_doc(Parameters(super::ReplaceDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 999,
+            content: "---\nid: rfc-00999-missing\ntype: rfc\ncode: \"00999\"\nslug: missing\n---\n"
+                .to_string(),
+        }))
+        .await;
+
+    assert!(result.is_err(), "replace_doc must return an error when the document does not exist");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("replace_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+}
+
+/// Verifies that the `replace_doc` tool returns an error when the replacement content has mismatched identity.
+#[tokio::test]
+async fn replace_doc_tool_returns_error_for_mismatched_identity() {
+    let (_dir, root) = create_replace_doc_test_project();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .replace_doc(Parameters(super::ReplaceDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            content:
+                "---\nid: rfc-00001-wrong-id\ntype: rfc\ncode: \"00001\"\nslug: wrong-id\n---\n"
+                    .to_string(),
+        }))
+        .await;
+
+    assert!(
+        result.is_err(),
+        "replace_doc must return an error when replacement identity does not match the resolved document"
+    );
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("replace_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+    assert!(
+        err.contains("id") || err.contains("identity") || err.contains("match"),
+        "error must reference the identity mismatch; got: {err:?}"
+    );
+}
+
+/// Verifies that the `replace_doc` tool returns an error when the replacement content has a BOM.
+#[tokio::test]
+async fn replace_doc_tool_returns_error_for_bom_content() {
+    let (_dir, root) = create_replace_doc_test_project();
+
+    let bom_content = "\u{FEFF}---\nid: rfc-00042-my-rfc\ntype: rfc\ncode: \"00042\"\nslug: my-rfc\n---\n\n# BOM Content\n";
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .replace_doc(Parameters(super::ReplaceDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            content: bom_content.to_string(),
+        }))
+        .await;
+
+    assert!(result.is_err(), "replace_doc must return an error when content contains a BOM");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("replace_doc failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+    assert!(err.contains("BOM"), "error must mention BOM for remediation guidance; got: {err:?}");
 }
 
 /// Verifies that the `patch_doc` tool returns an error when the diff would produce BOM content.
@@ -1146,10 +1456,13 @@ async fn patch_doc_tool_returns_error_for_bom_content() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff,
+            format: Some("unified".to_string()),
+            patch: Some(git_diff),
+            git_diff: None,
         }))
         .await;
 
@@ -1158,6 +1471,10 @@ async fn patch_doc_tool_returns_error_for_bom_content() {
     assert!(
         err.contains("patch_doc failed:"),
         "error must carry the operation prefix; got: {err:?}"
+    );
+    assert!(
+        err.contains("format: \"unified\""),
+        "BOM errors must identify the active format; got: {err:?}"
     );
     assert!(err.contains("BOM"), "error must mention BOM to guide remediation; got: {err:?}");
 }

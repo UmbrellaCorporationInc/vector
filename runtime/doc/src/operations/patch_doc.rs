@@ -1,16 +1,67 @@
-//! Plugin operation for applying a unified diff to a governed document.
+//! Plugin operation for applying a patch to a governed document.
 
 use patcher::{Patch, PatchAlgorithm, Patcher};
 use runtime_core::{FlowOperation, RuntimeResult, declare_plugin_operations, plugin::PluginSender};
 use runtime_io::path::IoPath;
 use std::fmt::Display;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::operations::find_doc::{FindDocInput, FindDocOp, FindDocOutput};
 use crate::operations::support::CapturingSender;
 
 const UTF8_BOM: &[u8] = b"\xef\xbb\xbf";
+const SUPPORTED_PATCH_FORMATS: [&str; 2] = ["unified", "apply_patch"];
+
+/// Patch payload formats supported by the `patch_doc` operation contract.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatchDocFormat {
+    /// Standard unified diff syntax.
+    Unified,
+    /// Agent-oriented `apply_patch` syntax.
+    ApplyPatch,
+}
+
+impl PatchDocFormat {
+    /// Return the wire-format value for this patch format.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Unified => "unified",
+            Self::ApplyPatch => "apply_patch",
+        }
+    }
+
+    /// Parse an optional wire-format value.
+    ///
+    /// An omitted format defaults to `apply_patch`; `git_diff` compatibility callers should
+    /// explicitly select `unified` before constructing runtime input.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the explicit value is not one of the supported patch formats.
+    pub fn parse_optional(value: Option<&str>) -> Result<Self, String> {
+        match value {
+            None | Some("apply_patch") => Ok(Self::ApplyPatch),
+            Some("unified") => Ok(Self::Unified),
+            Some(other) => Err(unknown_patch_format_message(other)),
+        }
+    }
+
+    /// Supported wire-format values.
+    #[must_use]
+    pub const fn supported_values() -> &'static [&'static str; 2] {
+        &SUPPORTED_PATCH_FORMATS
+    }
+}
+
+fn unknown_patch_format_message(value: &str) -> String {
+    format!(
+        "unknown patch format '{value}'. Supported values: {}. Omit format to use 'apply_patch'.",
+        SUPPORTED_PATCH_FORMATS.join(", ")
+    )
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct HunkLineCounts {
@@ -66,12 +117,19 @@ struct InProgressHunkContext {
 pub struct PatchDocInput {
     /// The root directory of the project.
     pub root_dir: IoPath,
+    /// Optional synchronized package name for package-qualified lookup.
+    ///
+    /// When empty, the document is resolved within `root_dir`.
+    /// When set, the document is resolved inside `.vector-database/packages/{package}/`.
+    pub package: String,
     /// The document type identifier (e.g. "rfc", "task").
     pub doc_type: String,
     /// The numeric code of the document to patch.
     pub code: u32,
-    /// The unified diff to apply to the document.
-    pub git_diff: String,
+    /// The patch payload format.
+    pub format: PatchDocFormat,
+    /// The patch payload to apply to the document.
+    pub patch: String,
 }
 
 /// Output for the `patch_doc` operation.
@@ -135,6 +193,14 @@ fn patch_parse_error_message(error: impl Display) -> String {
     }
 
     format!("patch is not a valid unified diff: {parser_error}")
+}
+
+fn unified_format_error_message(error: impl Display) -> String {
+    format!("format: \"unified\": {error}")
+}
+
+fn unified_operation_error(error: impl Display) -> runtime_core::RuntimeError {
+    runtime_core::RuntimeError::operation(unified_format_error_message(error))
 }
 
 fn parse_hunk_range(range: &str, prefix: char) -> Option<HunkRange> {
@@ -403,6 +469,105 @@ fn validate_hunk_contexts(
     Ok(())
 }
 
+fn governed_root_dir(root_dir: &IoPath, package: &str) -> IoPath {
+    if package.is_empty() {
+        root_dir.clone()
+    } else {
+        root_dir.join(".vector-database").join("packages").join(package)
+    }
+}
+
+fn canonical_governed_doc_dir(
+    root_dir: &IoPath,
+    package: &str,
+) -> Result<PathBuf, runtime_core::RuntimeError> {
+    dunce::canonicalize(governed_root_dir(root_dir, package).as_path().join("doc")).map_err(|e| {
+        runtime_core::RuntimeError::operation(format!("failed to resolve doc/ directory: {e}"))
+    })
+}
+
+fn apply_unified_patch(
+    abs_path: &str,
+    existing_content: &str,
+    patch_payload: &str,
+) -> RuntimeResult<String> {
+    let canonical_document =
+        canonicalize_document_content(existing_content).map_err(unified_operation_error)?;
+
+    // Normalize and parse the diff
+    let normalized = normalize_diff(patch_payload);
+    preflight_hunk_line_counts(&normalized).map_err(unified_operation_error)?;
+
+    let patch = Patch::parse(&normalized)
+        .map_err(|e| unified_operation_error(patch_parse_error_message(e)))?;
+
+    // Reject delete patches (new_file == /dev/null)
+    if patch.new_file == "/dev/null" {
+        return Err(unified_operation_error(
+            "patch would delete the document; delete operations are not supported",
+        ));
+    }
+
+    // Reject create patches (old_file == /dev/null)
+    if patch.old_file == "/dev/null" {
+        return Err(unified_operation_error(
+            "patch would create a new file; use create_doc for new documents",
+        ));
+    }
+
+    // Reject rename patches (old_file != new_file)
+    if patch.old_file != patch.new_file {
+        return Err(unified_operation_error(format!(
+            "patch renames '{}' to '{}'; rename operations are not supported",
+            patch.old_file, patch.new_file
+        )));
+    }
+
+    // Target mismatch: patch filename must match the resolved document filename
+    let resolved_name = Path::new(abs_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| unified_operation_error("resolved document path has no filename"))?;
+
+    let patch_name = Path::new(&patch.old_file)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(patch.old_file.as_str());
+
+    if patch_name != resolved_name {
+        return Err(unified_operation_error(format!(
+            "patch targets '{}' but the resolved document is '{}'",
+            patch.old_file, resolved_name
+        )));
+    }
+
+    validate_hunk_contexts(
+        &normalized,
+        &canonical_document.content,
+        canonical_document.newline_mode,
+    )
+    .map_err(unified_operation_error)?;
+
+    // Apply the patch against the canonical LF representation, then restore the file's newline mode.
+    let patcher = Patcher::new(patch);
+    let patched_canonical = patcher.apply(&canonical_document.content, false).map_err(|e| {
+        unified_operation_error(format!(
+            "failed to apply patch after newline normalization; newline mode: {}; {e}",
+            newline_mode_description(canonical_document.newline_mode)
+        ))
+    })?;
+    let new_content = restore_newline_mode(&patched_canonical, canonical_document.newline_mode);
+
+    // BOM check: resulting content must not contain a UTF-8 BOM
+    if new_content.as_bytes().starts_with(UTF8_BOM) {
+        return Err(unified_operation_error(
+            "resulting content contains a UTF-8 BOM (\\xEF\\xBB\\xBF); remove the BOM and retry",
+        ));
+    }
+
+    Ok(new_content)
+}
+
 async fn patch_doc(
     input: PatchDocInput,
     output: &mut impl PluginSender<PatchDocOutput>,
@@ -410,7 +575,7 @@ async fn patch_doc(
     // Locate the governed document
     let find_input = FindDocInput::new(
         input.root_dir.clone(),
-        String::new(),
+        input.package.clone(),
         input.doc_type.clone(),
         input.code,
     );
@@ -426,13 +591,9 @@ async fn patch_doc(
 
     let abs_path = found.path;
     let existing_content = found.content;
-    let canonical_document = canonicalize_document_content(&existing_content)
-        .map_err(runtime_core::RuntimeError::operation)?;
 
     // Scope check: the resolved path must be inside doc/
-    let doc_dir = dunce::canonicalize(input.root_dir.as_path().join("doc")).map_err(|e| {
-        runtime_core::RuntimeError::operation(format!("failed to resolve doc/ directory: {e}"))
-    })?;
+    let doc_dir = canonical_governed_doc_dir(&input.root_dir, &input.package)?;
 
     if !Path::new(&abs_path).starts_with(&doc_dir) {
         return Err(runtime_core::RuntimeError::operation(
@@ -440,76 +601,16 @@ async fn patch_doc(
         ));
     }
 
-    // Normalize and parse the diff
-    let normalized = normalize_diff(&input.git_diff);
-    preflight_hunk_line_counts(&normalized).map_err(runtime_core::RuntimeError::operation)?;
-
-    let patch = Patch::parse(&normalized)
-        .map_err(|e| runtime_core::RuntimeError::operation(patch_parse_error_message(e)))?;
-
-    // Reject delete patches (new_file == /dev/null)
-    if patch.new_file == "/dev/null" {
-        return Err(runtime_core::RuntimeError::operation(
-            "patch would delete the document; delete operations are not supported",
-        ));
-    }
-
-    // Reject create patches (old_file == /dev/null)
-    if patch.old_file == "/dev/null" {
-        return Err(runtime_core::RuntimeError::operation(
-            "patch would create a new file; use create_doc for new documents",
-        ));
-    }
-
-    // Reject rename patches (old_file != new_file)
-    if patch.old_file != patch.new_file {
-        return Err(runtime_core::RuntimeError::operation(format!(
-            "patch renames '{}' to '{}'; rename operations are not supported",
-            patch.old_file, patch.new_file
-        )));
-    }
-
-    // Target mismatch: patch filename must match the resolved document filename
-    let resolved_name =
-        Path::new(&abs_path).file_name().and_then(|n| n.to_str()).ok_or_else(|| {
-            runtime_core::RuntimeError::operation("resolved document path has no filename")
-        })?;
-
-    let patch_name = Path::new(&patch.old_file)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(patch.old_file.as_str());
-
-    if patch_name != resolved_name {
-        return Err(runtime_core::RuntimeError::operation(format!(
-            "patch targets '{}' but the resolved document is '{}'",
-            patch.old_file, resolved_name
-        )));
-    }
-
-    validate_hunk_contexts(
-        &normalized,
-        &canonical_document.content,
-        canonical_document.newline_mode,
-    )
-    .map_err(runtime_core::RuntimeError::operation)?;
-
-    // Apply the patch against the canonical LF representation, then restore the file's newline mode.
-    let patcher = Patcher::new(patch);
-    let patched_canonical = patcher.apply(&canonical_document.content, false).map_err(|e| {
-        runtime_core::RuntimeError::operation(format!(
-            "failed to apply patch after newline normalization; newline mode: {}; {e}",
-            newline_mode_description(canonical_document.newline_mode)
-        ))
-    })?;
-    let new_content = restore_newline_mode(&patched_canonical, canonical_document.newline_mode);
-
-    // BOM check: resulting content must not contain a UTF-8 BOM
-    if new_content.as_bytes().starts_with(UTF8_BOM) {
-        return Err(runtime_core::RuntimeError::operation(
-            "resulting content contains a UTF-8 BOM (\\xEF\\xBB\\xBF); remove the BOM and retry",
-        ));
-    }
+    let new_content = match input.format {
+        PatchDocFormat::Unified => apply_unified_patch(&abs_path, &existing_content, &input.patch)?,
+        PatchDocFormat::ApplyPatch => apply_patch::apply_apply_patch_format(
+            &abs_path,
+            &input.root_dir,
+            &input.package,
+            &existing_content,
+            &input.patch,
+        )?,
+    };
 
     // Write the patched content back to disk
     fs::write(&abs_path, new_content.as_bytes()).map_err(|e| {
@@ -525,10 +626,30 @@ declare_plugin_operations! {
 }
 
 impl PatchDocInput {
-    /// Construct a new `PatchDocInput`.
+    /// Construct a backward-compatible unified-diff `PatchDocInput`.
     #[must_use]
-    pub const fn new(root_dir: IoPath, doc_type: String, code: u32, git_diff: String) -> Self {
-        Self { root_dir, doc_type, code, git_diff }
+    pub const fn new(root_dir: IoPath, doc_type: String, code: u32, patch: String) -> Self {
+        Self {
+            root_dir,
+            package: String::new(),
+            doc_type,
+            code,
+            format: PatchDocFormat::Unified,
+            patch,
+        }
+    }
+
+    /// Construct a `PatchDocInput` with explicit package, format, and patch payload.
+    #[must_use]
+    pub const fn with_format(
+        root_dir: IoPath,
+        package: String,
+        doc_type: String,
+        code: u32,
+        format: PatchDocFormat,
+        patch: String,
+    ) -> Self {
+        Self { root_dir, package, doc_type, code, format, patch }
     }
 }
 
@@ -545,6 +666,9 @@ impl Default for PatchDocOp {
         Self::new()
     }
 }
+
+#[path = "patch_doc_apply_patch.rs"]
+mod apply_patch;
 
 #[cfg(test)]
 #[path = "patch_doc_test.rs"]

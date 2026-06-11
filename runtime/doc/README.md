@@ -20,7 +20,58 @@ This crate provides transport-agnostic documentation governance operations for M
 
 ### Authoring
 
-- **`patch_doc`**: Applies a unified diff to a governed document identified by `doc_type` and `code`. Resolves the document path, enforces that the target is inside the repository `doc/` directory, normalizes agent-produced patch wrappers (e.g. Markdown code fences, prose preamble) to raw unified diff, rejects unsupported patch shapes (create, delete, rename, or target mismatch), applies the diff using `patcher`, verifies the resulting content is UTF-8 without BOM, writes the file, and returns `path` and `content`. Malformed hunk line-counts are rejected before any write with an actionable diagnostic that compares declared `@@ -a,b +c,d @@` counts to the parsed hunk body. Any BOM in the result aborts the write and returns an explicit remediation error.
+- **`patch_doc`**: Applies a patch to a governed document identified by `doc_type`, `code`, and optional `package`. Supported formats are `unified` and `apply_patch`; omitted `format` defaults to `apply_patch`. The operation resolves the document path, enforces that the patch target matches the resolved governed document, applies the selected format, verifies the resulting content is UTF-8 without BOM, writes the file, and returns `path` and `content`. Unified-diff payloads preserve malformed hunk line-count diagnostics that compare declared `@@ -a,b +c,d @@` counts to the parsed hunk body. `apply_patch` payloads support `*** Update File:` for the resolved document and reject add, delete, move, ambiguous context, missing-boundary, and target-mismatch cases with format-specific diagnostics. Any BOM in the result aborts the write and returns an explicit remediation error.
+
+Unified diff example:
+
+```rust
+use runtime_doc::operations::{PatchDocFormat, PatchDocInput};
+use runtime_io::path::IoPath;
+
+let input = PatchDocInput::with_format(
+    IoPath::new("/path/to/project"),
+    String::new(),
+    "rfc".to_string(),
+    37,
+    PatchDocFormat::Unified,
+    "--- a/doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n+++ b/doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
+);
+```
+
+Omitted-format `apply_patch` example:
+
+```rust
+use runtime_doc::operations::{PatchDocFormat, PatchDocInput};
+use runtime_io::path::IoPath;
+
+let format = PatchDocFormat::parse_optional(None).expect("omitted format defaults to apply_patch");
+let input = PatchDocInput::with_format(
+    IoPath::new("/path/to/project"),
+    String::new(),
+    "rfc".to_string(),
+    37,
+    format,
+    "*** Begin Patch\n*** Update File: doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n@@\n-old\n+new\n*** End Patch\n".to_string(),
+);
+```
+
+- **`replace_doc`**: Replaces a governed document with complete content identified by `doc_type`, `code`, and optional `package`. The caller provides the full replacement text; the document path is resolved from governed metadata. The operation rejects UTF-8 BOM content, verifies that the `id`, `type`, `code`, and `slug` front matter fields match the resolved document identity, writes the content, and returns `path` and `content`. Use `replace_doc` after `create_doc` to author the complete document without generating a patch against the placeholder template.
+
+Bootstrap example:
+
+```rust
+use runtime_doc::operations::ReplaceDocInput;
+use runtime_io::path::IoPath;
+
+let content = "---\nid: rfc-00037-extend-patch-doc-formats\ntype: rfc\ncode: \"00037\"\nslug: extend-patch-doc-formats\n---\n\n# RFC 00037\n\n...\n".to_string();
+let input = ReplaceDocInput::new(
+    IoPath::new("/path/to/project"),
+    String::new(),
+    "rfc".to_string(),
+    37,
+    content,
+);
+```
 
 ### Discovery
 
@@ -37,7 +88,7 @@ This crate provides transport-agnostic documentation governance operations for M
 
 - `runtime-core` — plugin primitives
 - `runtime-io` — file and text operations
-- `patcher` — embedded unified-diff engine used by `patch_doc`
+- `patcher` — embedded unified-diff engine used by `patch_doc` when `format` is `unified`
 - `serde`, `serde_yaml` — configuration parsing
 - `walkdir` — directory traversal
 - `regex` — pattern matching

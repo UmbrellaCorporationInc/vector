@@ -305,6 +305,60 @@ fn vector_server_create_doc_type_prompt_tool_schema_is_correct() {
     );
 }
 
+/// Verifies that the generated `patch_doc` tool metadata exposes the Phase D MCP shape.
+#[test]
+fn vector_server_patch_doc_tool_schema_documents_patch_formats() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("patch_doc").expect("VectorServer must expose patch_doc");
+    let description = tool.description.as_ref().expect("patch_doc tool must expose a description");
+
+    assert!(
+        description.contains("format") && description.contains("patch"),
+        "patch_doc description must document the format and patch fields; got: {description}"
+    );
+    assert!(
+        description.contains("unified") && description.contains("apply_patch"),
+        "patch_doc description must list supported patch formats; got: {description}"
+    );
+    assert!(
+        description.contains("Omit `format`") && description.contains("apply_patch"),
+        "patch_doc description must explain the default format; got: {description}"
+    );
+
+    let required =
+        tool.input_schema["required"].as_array().expect("required must be an array of field names");
+    assert!(required.iter().any(|v| v == "root_dir"), "patch_doc schema must require root_dir");
+    assert!(required.iter().any(|v| v == "doc_type"), "patch_doc schema must require doc_type");
+    assert!(required.iter().any(|v| v == "code"), "patch_doc schema must require code");
+    assert!(
+        !required.iter().any(|v| v == "format"),
+        "patch_doc schema must leave format optional so omitted format defaults to apply_patch"
+    );
+
+    let properties = tool
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .expect("patch_doc schema must expose input properties");
+    assert!(properties.contains_key("format"), "patch_doc schema must expose format");
+    assert!(properties.contains_key("patch"), "patch_doc schema must expose patch");
+    assert!(
+        properties.contains_key("git_diff"),
+        "patch_doc schema must expose the deprecated git_diff transition alias"
+    );
+    let format_description = properties["format"]["description"]
+        .as_str()
+        .expect("format property must expose a generated description");
+    assert!(
+        format_description.contains("unified") && format_description.contains("apply_patch"),
+        "format property description must list supported values; got: {format_description}"
+    );
+    assert!(
+        format_description.contains("omitted") && format_description.contains("apply_patch"),
+        "format property description must explain the omitted default; got: {format_description}"
+    );
+}
+
 /// Verifies that `ProjectTools` continue to expose `create_project` alongside the document tools.
 #[test]
 fn vector_server_project_tool_group_remains_intact() {
