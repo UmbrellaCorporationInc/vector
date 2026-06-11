@@ -5,7 +5,7 @@ code: "00065"
 slug: improve-patch-doc-hunk-count-diagnostics
 title: Improve patch_doc Hunk Count Diagnostics
 description: Make patch_doc failures for unified-diff hunk count mismatches actionable for agents.
-status: in-progress
+status: done
 created: 2026-06-11
 updated: 2026-06-11
 tags:

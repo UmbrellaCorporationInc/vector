@@ -76,6 +76,67 @@ async fn test_patch_doc_valid_patch_succeeds() {
     assert_eq!(written, "new content\n");
 }
 
+#[tokio::test]
+async fn test_patch_doc_rejects_find_doc_content_patch_when_hunk_counts_overstate_body_lines() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "line one\nline two\nline three\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let mut find_sender = CapturingSender::<FindDocOutput>::new();
+    FindDocOp::new()
+        .run(
+            FindDocInput::new(root.clone(), String::new(), "task".to_string(), 1),
+            &mut find_sender,
+        )
+        .await
+        .unwrap();
+    let found = find_sender.into_output().expect("find_doc must return document content");
+    assert!(
+        found.content.contains("line one\nline two\nline three\n"),
+        "Phase A setup must generate the patch from the content returned by find_doc"
+    );
+
+    let mut lines = found.content.lines();
+    let first_line = lines.next().expect("document must have a first line");
+    let second_line = lines.next().expect("document must have a second line");
+    let diff = format!(
+        "\
+--- a/{filename}
++++ b/{filename}
+@@ -1,3 +1,3 @@
+-{first_line}
+-{second_line}
++LINE ONE
++LINE TWO
+"
+    );
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff);
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(
+        result.is_err(),
+        "Phase A regression path must reproduce: patch_doc rejects a unified diff generated from find_doc content when the hunk header overstates the body line counts"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("hunk line-count mismatch"),
+        "Phase A localized failing path: rejection is caused by hunk line-count mismatch during preflight, not trailing newline handling, CRLF normalization, context offset drift, or patcher.apply matching; got: {err}"
+    );
+    assert!(err.contains("Hunk header declares (-3, +3)"), "{err}");
+    assert!(err.contains("hunk body contains (-2, +2)"), "{err}");
+    assert!(sender.outputs.is_empty(), "rejected patches must not emit patched content");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when hunk count preflight fails");
+}
+
 // ── missing document ─────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -268,6 +329,124 @@ async fn test_patch_doc_valid_multi_hunk_diff_survives_hunk_count_preflight() {
         sender.outputs[0].content,
         "LINE ONE\nline two\nline three\nline four\nLINE FIVE\nline six\n"
     );
+}
+
+#[tokio::test]
+async fn test_patch_doc_applies_lf_diff_to_crlf_document_and_preserves_crlf() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(&temp, "task", filename, "old content\r\nsecond line\r\n");
+
+    let diff = "\
+--- a/task-00001-foo.md
++++ b/task-00001-foo.md
+@@ -1,2 +1,2 @@
+-old content
++new content
+ second line
+";
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff.to_string());
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs.len(), 1);
+    assert_eq!(sender.outputs[0].content, "new content\r\nsecond line\r\n");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let written = fs::read(&doc_path).unwrap();
+    assert_eq!(written, b"new content\r\nsecond line\r\n");
+}
+
+#[tokio::test]
+async fn test_patch_doc_applies_crlf_formatted_diff_to_lf_document() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(&temp, "task", filename, "old content\nsecond line\n");
+
+    let diff = format!(
+        "--- a/{filename}\r\n+++ b/{filename}\r\n@@ -1,2 +1,2 @@\r\n-old content\r\n+new content\r\n second line\r\n"
+    );
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff);
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs[0].content, "new content\nsecond line\n");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let written = fs::read(&doc_path).unwrap();
+    assert_eq!(written, b"new content\nsecond line\n");
+}
+
+#[tokio::test]
+async fn test_patch_doc_preserves_absent_final_newline_when_patch_marks_no_newline() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(&temp, "task", filename, "old content");
+
+    let diff = format!(
+        "--- a/{filename}\n+++ b/{filename}\n@@ -1,1 +1,1 @@\n-old content\n\\ No newline at end of file\n+new content\n\\ No newline at end of file\n"
+    );
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff);
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs[0].content, "new content");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let written = fs::read(&doc_path).unwrap();
+    assert_eq!(written, b"new content");
+}
+
+#[tokio::test]
+async fn test_patch_doc_context_mismatch_error_includes_hunk_context_and_newline_mode() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "actual one\r\nactual two\r\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let diff = "\
+--- a/task-00001-foo.md
++++ b/task-00001-foo.md
+@@ -1,2 +1,2 @@
+-expected one
+-expected two
++new one
++new two
+";
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff.to_string());
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(result.is_err(), "expected context mismatch rejection");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("hunk 1 context mismatch"), "{err}");
+    assert!(err.contains("@@ -1,2 +1,2 @@"), "{err}");
+    assert!(err.contains("Expected context: [\"expected one\", \"expected two\"]"), "{err}");
+    assert!(
+        err.contains("Observed context at document line 1: [\"actual one\", \"actual two\"]"),
+        "{err}"
+    );
+    assert!(err.contains("Newline mode: CRLF normalized to LF"), "{err}");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when hunk context fails");
 }
 
 // ── BOM rejection ─────────────────────────────────────────────────────────────

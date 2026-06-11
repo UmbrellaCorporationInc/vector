@@ -5,9 +5,9 @@ code: "00062"
 slug: fix-patch-doc-or-find-doc
 title: Fix patch_doc Rejections and Markdown Hygiene
 description: Make governed document patching reliable and enforce canonical Markdown hygiene.
-status: todo
+status: done
 created: 2026-06-10
-updated: 2026-06-10
+updated: 2026-06-11
 tags:
   - mcp
   - patching
@@ -40,6 +40,7 @@ The proposed idea is to change `find_doc` so it returns only the package and pat
 That change may reduce one class of content mismatch when the target document is local and readable from the agent environment. It also weakens the `find_doc` contract, removes useful context from a lookup tool, and may break package-qualified or remote-like document flows where the caller cannot safely assume direct filesystem access.
 
 The recommended path is to keep `find_doc` content-compatible and fix the authoritative mutation path in `patch_doc`.
+No optional path-only or metadata-only mode is planned for this task; `find_doc` keeps its current default response shape.
 
 ### 2.2. Target Behavior
 
@@ -73,9 +74,9 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Add or identify a failing regression case where `patch_doc` rejects a patch generated from `find_doc` content.
-- [ ] Confirm whether the rejection is caused by trailing newline handling, CRLF normalization, hunk context mismatch, offset drift, or another parser issue.
-- [ ] Document the exact failing path in the test name or assertion message.
+- [x] Add or identify a failing regression case where `patch_doc` rejects a patch generated from `find_doc` content.
+- [x] Confirm whether the rejection is caused by trailing newline handling, CRLF normalization, hunk context mismatch, offset drift, or another parser issue.
+- [x] Document the exact failing path in the test name or assertion message.
 
 ### 3.2. Phase B - Stabilize patch_doc
 
@@ -89,11 +90,11 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Make `patch_doc` patch against a canonical representation that preserves enough information to write the final file correctly.
-- [ ] Normalize only newline differences that are safe and reversible for governed Markdown documents.
-- [ ] Preserve existing frontmatter and validation semantics.
-- [ ] Improve rejection diagnostics for failed hunks.
-- [ ] Keep `find_doc` backward-compatible unless implementation evidence proves the contract itself is the root cause.
+- [x] Make `patch_doc` patch against a canonical representation that preserves enough information to write the final file correctly.
+- [x] Normalize only newline differences that are safe and reversible for governed Markdown documents.
+- [x] Preserve existing frontmatter and validation semantics.
+- [x] Improve rejection diagnostics for failed hunks.
+- [x] Keep `find_doc` backward-compatible unless implementation evidence proves the contract itself is the root cause.
 
 ### 3.3. Phase C - Enforce Markdown Encoding and Line Endings
 
@@ -107,13 +108,13 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Add a validation check that rejects CRLF line endings in all governed Markdown files, including templates.
-- [ ] Add a `validate_fix` repair that rewrites all governed Markdown files to LF line endings, including templates.
-- [ ] Preserve a final newline when present and avoid introducing unrelated content changes during LF normalization.
-- [ ] Confirm `validate` rejects UTF-8 BOM files and invalid UTF-8 files.
-- [ ] Confirm `validate_fix` removes UTF-8 BOM files, including templates, and still fails invalid UTF-8 files without rewriting them.
-- [ ] Add flow-level tests proving `validate` fails and `validate_fix` repairs BOM and CRLF cases where repair is safe.
-- [ ] Add tests proving invalid UTF-8 is reported by both `validate` and `validate_fix`.
+- [x] Add a validation check that rejects CRLF line endings in all governed Markdown files, including templates.
+- [x] Add a `validate_fix` repair that rewrites all governed Markdown files to LF line endings, including templates.
+- [x] Preserve a final newline when present and avoid introducing unrelated content changes during LF normalization.
+- [x] Confirm `validate` rejects UTF-8 BOM files and invalid UTF-8 files.
+- [x] Confirm `validate_fix` removes UTF-8 BOM files, including templates, and still fails invalid UTF-8 files without rewriting them.
+- [x] Add flow-level tests proving `validate` fails and `validate_fix` repairs BOM and CRLF cases where repair is safe.
+- [x] Add tests proving invalid UTF-8 is reported by both `validate` and `validate_fix`.
 
 ### 3.4. Phase D - Normalize Governed Document References
 
@@ -127,31 +128,15 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Build a document stem index from configured document types and known governed document files.
-- [ ] Detect bare stems in Markdown body content only, excluding frontmatter.
-- [ ] Support both local stems like `task-00062-fix-patch-doc-or-find-doc` and package-qualified stems like `package-name/task-00062-fix-patch-doc-or-find-doc`.
-- [ ] Make `validate` report bare governed document stems with the expected wikilink replacement.
-- [ ] Make `validate_fix` rewrite bare governed document stems to wikilinks without touching already-correct wikilinks.
-- [ ] Avoid rewriting filenames, URLs, fenced code blocks, or inline code unless there is an explicit product decision to enforce references inside code spans too.
-- [ ] Add tests for frontmatter exclusion, body rewrite, already-valid wikilinks, package-qualified stems, and false-positive avoidance.
+- [x] Build a document stem index from configured document types and known governed document files.
+- [x] Detect bare stems in Markdown body content only, excluding frontmatter.
+- [x] Support both local stems like `task-00062-fix-patch-doc-or-find-doc` and package-qualified stems like `package-name/task-00062-fix-patch-doc-or-find-doc`.
+- [x] Make `validate` report bare governed document stems with the expected wikilink replacement.
+- [x] Make `validate_fix` rewrite bare governed document stems to wikilinks without touching already-correct wikilinks.
+- [x] Avoid rewriting filenames, URLs, fenced code blocks, or inline code unless there is an explicit product decision to enforce references inside code spans too.
+- [x] Add tests for frontmatter exclusion, body rewrite, already-valid wikilinks, package-qualified stems, and false-positive avoidance.
 
-### 3.5. Phase E - Evaluate Optional API Refinement
-
-```vector-agent-action
-label: Execute Phase in Agent
-profile: code
-prompt: prompts-00004-execute-task-phase
-input:
-  task: task 00062
-  phase: Phase E
-  language: Rust, Markdown
-```
-
-- [ ] Decide whether `find_doc` should add an optional path-only or metadata-only mode instead of removing content from the default response.
-- [ ] If a new mode is added, keep the default response compatible for existing agents.
-- [ ] Add tests for both default lookup and any new optional lookup mode.
-
-### 3.6. Phase Z - Wrap-up
+### 3.5. Phase Z - Wrap-up
 
 ```vector-agent-action
 label: Execute Phase in Agent
@@ -163,6 +148,6 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Run the relevant unit and integration tests.
-- [ ] Run governed document validation.
-- [ ] Update README files only if user-facing tool behavior changes.
+- [x] Run the relevant unit and integration tests.
+- [x] Run governed document validation.
+- [x] Update README files only if user-facing tool behavior changes.
