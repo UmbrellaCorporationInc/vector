@@ -127,13 +127,13 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Build a document stem index from configured document types and known governed document files.
-- [ ] Detect bare stems in Markdown body content only, excluding frontmatter.
-- [ ] Support both local stems like `task-00062-fix-patch-doc-or-find-doc` and package-qualified stems like `package-name/task-00062-fix-patch-doc-or-find-doc`.
-- [ ] Make `validate` report bare governed document stems with the expected wikilink replacement.
-- [ ] Make `validate_fix` rewrite bare governed document stems to wikilinks without touching already-correct wikilinks.
-- [ ] Avoid rewriting filenames, URLs, fenced code blocks, or inline code unless there is an explicit product decision to enforce references inside code spans too.
-- [ ] Add tests for frontmatter exclusion, body rewrite, already-valid wikilinks, package-qualified stems, and false-positive avoidance.
+- [x] Build a document stem index from configured document types and known governed document files.
+- [x] Detect bare stems in Markdown body content only, excluding frontmatter.
+- [x] Support both local stems like `task-00062-fix-patch-doc-or-find-doc` and package-qualified stems like `package-name/task-00062-fix-patch-doc-or-find-doc`.
+- [x] Make `validate` report bare governed document stems with the expected wikilink replacement.
+- [x] Make `validate_fix` rewrite bare governed document stems to wikilinks without touching already-correct wikilinks.
+- [x] Avoid rewriting filenames, URLs, fenced code blocks, or inline code unless there is an explicit product decision to enforce references inside code spans too.
+- [x] Add tests for frontmatter exclusion, body rewrite, already-valid wikilinks, package-qualified stems, and false-positive avoidance.
 
 ### 3.5. Phase E - Evaluate Optional API Refinement
 

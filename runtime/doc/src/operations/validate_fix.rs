@@ -7,12 +7,13 @@ use std::sync::LazyLock;
 use crate::types::{DocumentTypeConfig, DocumentTypesConfig};
 
 use super::validate::{
-    FixResult, ScanResult, governed_markdown_files, parse_frontmatter, scan_governed_files,
-    status_folder_names,
+    DocumentStemIndex, FixResult, ScanResult, build_document_stem_index, find_bare_governed_stems,
+    governed_markdown_files, parse_frontmatter, scan_governed_files, status_folder_names,
 };
 
 pub(super) type FixScanResult = (ScanResult, Vec<FixResult>);
 type WikilinkFix = (String, FixResult);
+type GovernedReferenceFix = (String, FixResult);
 type HeadingFix = (String, FixResult);
 static WIKILINK_EXTENSION_REGEX: LazyLock<Result<regex::Regex, regex::Error>> =
     LazyLock::new(|| regex::Regex::new(r"\[\[([^\]]+)\.md\]\]"));
@@ -199,6 +200,35 @@ fn fix_wikilinks(path_str: &str, content: &str) -> Option<WikilinkFix> {
     ))
 }
 
+fn fix_bare_governed_references(
+    path_str: &str,
+    content: &str,
+    stem_index: &DocumentStemIndex,
+) -> Option<GovernedReferenceFix> {
+    let matches = find_bare_governed_stems(content, stem_index);
+    if matches.is_empty() {
+        return None;
+    }
+
+    let mut new_content = String::with_capacity(content.len() + matches.len() * 4);
+    let mut previous_end = 0;
+    for bare_match in matches {
+        new_content.push_str(&content[previous_end..bare_match.start()]);
+        new_content.push_str(bare_match.replacement());
+        previous_end = bare_match.end();
+    }
+    new_content.push_str(&content[previous_end..]);
+
+    Some((
+        new_content,
+        FixResult {
+            path: path_str.to_string(),
+            fix_type: "normalize_governed_references".to_string(),
+            detail: "Wrapped bare governed document stems in wikilinks".to_string(),
+        },
+    ))
+}
+
 fn extract_content_after_frontmatter(content: &str) -> &str {
     content
         .find("---")
@@ -241,6 +271,7 @@ fn fix_governed_file(
     doc_type: &str,
     type_config: &DocumentTypeConfig,
     status_folders: &[&str],
+    stem_index: &DocumentStemIndex,
 ) -> Vec<FixResult> {
     let mut fixes = Vec::new();
     let path_str = path.to_string_lossy().to_string();
@@ -300,6 +331,13 @@ fn fix_governed_file(
         fixes.push(fix);
     }
 
+    if let Some((fixed_content, fix)) =
+        fix_bare_governed_references(&path_str, new_content.as_ref(), stem_index)
+    {
+        new_content = Cow::Owned(fixed_content);
+        fixes.push(fix);
+    }
+
     if let Some((fixed_content, fix)) = fix_heading_if_needed(&path_str, new_content.as_ref()) {
         new_content = Cow::Owned(fixed_content);
         fixes.push(fix);
@@ -328,14 +366,21 @@ pub(super) fn scan_and_fix_governed_files(
     let mut fixes = Vec::new();
 
     let status_folders = status_folder_names(doc_config);
+    let stem_index = build_document_stem_index(root_dir, doc_config);
 
     for doc_type in doc_config.document_types.keys() {
         let Some(type_config) = doc_config.document_types.get(doc_type) else {
             continue;
         };
         for path in governed_markdown_files(root_dir, doc_type) {
-            let file_fixes =
-                fix_governed_file(&path, doc_config, doc_type, type_config, &status_folders);
+            let file_fixes = fix_governed_file(
+                &path,
+                doc_config,
+                doc_type,
+                type_config,
+                &status_folders,
+                &stem_index,
+            );
             fixes.extend(file_fixes);
         }
     }

@@ -113,6 +113,31 @@ status: draft\n\
     .to_string()
 }
 
+fn create_valid_rfc_doc_for(code: &str, slug: &str, title: &str) -> String {
+    format!(
+        "---\n\
+id: rfc-{code}-{slug}\n\
+type: rfc\n\
+code: \"{code}\"\n\
+slug: {slug}\n\
+title: {title}\n\
+description: A test RFC document\n\
+created: 2026-01-01\n\
+tags:\n  - test\n\
+status: draft\n\
+---\n\n\
+# {title}\n"
+    )
+}
+
+fn write_rfc_doc(temp_dir: &TempDir, code: &str, slug: &str, content: &str) -> std::path::PathBuf {
+    let draft_dir = temp_dir.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&draft_dir).unwrap();
+    let path = draft_dir.join(format!("rfc-{code}-{slug}.md"));
+    fs::write(&path, content).unwrap();
+    path
+}
+
 #[tokio::test]
 async fn test_validate_with_valid_document() {
     let (temp_dir, root) = create_test_project();
@@ -130,6 +155,184 @@ async fn test_validate_with_valid_document() {
 
     let output = sender.output.unwrap();
     assert!(output.valid, "Expected valid=true, got errors: {:?}", output.errors);
+}
+
+#[tokio::test]
+async fn test_validate_reports_bare_governed_document_stem_with_expected_wikilink() {
+    let (temp_dir, root) = create_test_project();
+    let source = create_valid_rfc_doc_for("00001", "source-rfc", "Source RFC")
+        + "\nSee rfc-00002-target-rfc for details.\n";
+    let target = create_valid_rfc_doc_for("00002", "target-rfc", "Target RFC");
+    write_rfc_doc(&temp_dir, "00001", "source-rfc", &source);
+    write_rfc_doc(&temp_dir, "00002", "target-rfc", &target);
+
+    let output = run_validate(&root, false).await;
+
+    assert!(!output.valid, "Expected bare governed stem to fail validation");
+    assert!(
+        output.errors.iter().any(|error| error.error.contains("rfc-00002-target-rfc")
+            && error.error.contains("[[rfc-00002-target-rfc]]")),
+        "Expected bare-stem error with wikilink replacement, got: {:?}",
+        output.errors
+    );
+}
+
+#[tokio::test]
+async fn test_validate_fix_rewrites_bare_governed_document_stem_in_body_only() {
+    let (temp_dir, root) = create_test_project();
+    let source = create_valid_rfc_doc_for("00001", "source-rfc", "Source RFC")
+        + "\nSee rfc-00002-target-rfc for details.\n";
+    let target = create_valid_rfc_doc_for("00002", "target-rfc", "Target RFC");
+    let source_path = write_rfc_doc(&temp_dir, "00001", "source-rfc", &source);
+    write_rfc_doc(&temp_dir, "00002", "target-rfc", &target);
+
+    let output = run_validate(&root, true).await;
+
+    assert!(
+        output.valid,
+        "Expected validate_fix to repair bare governed stem, got errors: {:?}",
+        output.errors
+    );
+    assert!(
+        output.fixes.iter().any(|fix| fix.fix_type == "normalize_governed_references"),
+        "Expected governed-reference fix, got: {:?}",
+        output.fixes
+    );
+    let written = fs::read_to_string(source_path).unwrap();
+    assert!(written.contains("[[rfc-00002-target-rfc]]"));
+    assert!(!written.contains("See rfc-00002-target-rfc for details."));
+}
+
+#[tokio::test]
+async fn test_validate_excludes_frontmatter_from_bare_stem_enforcement() {
+    let (temp_dir, root) = create_test_project();
+    let source = "---\n\
+id: rfc-00001-source-rfc\n\
+type: rfc\n\
+code: \"00001\"\n\
+slug: source-rfc\n\
+title: Source RFC\n\
+description: A test RFC document\n\
+created: 2026-01-01\n\
+tags:\n  - test\n\
+status: draft\n\
+related:\n  - rfc-00002-target-rfc\n\
+---\n\n\
+# Source RFC\n";
+    let target = create_valid_rfc_doc_for("00002", "target-rfc", "Target RFC");
+    write_rfc_doc(&temp_dir, "00001", "source-rfc", source);
+    write_rfc_doc(&temp_dir, "00002", "target-rfc", &target);
+
+    let output = run_validate(&root, false).await;
+
+    assert!(
+        output.valid,
+        "Expected bare stem in frontmatter to be accepted, got errors: {:?}",
+        output.errors
+    );
+}
+
+#[tokio::test]
+async fn test_validate_fix_does_not_touch_already_valid_wikilinks() {
+    let (temp_dir, root) = create_test_project();
+    let source = create_valid_rfc_doc_for("00001", "source-rfc", "Source RFC")
+        + "\nSee [[rfc-00002-target-rfc]] for details.\n";
+    let target = create_valid_rfc_doc_for("00002", "target-rfc", "Target RFC");
+    let source_path = write_rfc_doc(&temp_dir, "00001", "source-rfc", &source);
+    write_rfc_doc(&temp_dir, "00002", "target-rfc", &target);
+
+    let output = run_validate(&root, true).await;
+
+    assert!(
+        output.valid,
+        "Expected existing wikilink to remain valid, got errors: {:?}",
+        output.errors
+    );
+    assert!(
+        output.fixes.iter().all(|fix| fix.fix_type != "normalize_governed_references"),
+        "Expected no governed-reference fix, got: {:?}",
+        output.fixes
+    );
+    assert_eq!(fs::read_to_string(source_path).unwrap(), source);
+}
+
+#[tokio::test]
+async fn test_validate_supports_package_qualified_bare_stems() {
+    let (temp_dir, root) = create_test_project();
+    let source = create_valid_rfc_doc_for("00001", "source-rfc", "Source RFC")
+        + "\nSee my-package/rfc-00002-package-rfc for details.\n";
+    let source_path = write_rfc_doc(&temp_dir, "00001", "source-rfc", &source);
+
+    let package_root = temp_dir.path().join(".vector-database").join("packages").join("my-package");
+    fs::create_dir_all(package_root.join(".vector")).unwrap();
+    fs::create_dir_all(package_root.join("doc").join("rfc").join("draft")).unwrap();
+    fs::write(
+        package_root.join(".vector").join("document-types.yaml"),
+        "doc-type: {template: t, prompt-template: pt, prompt: p, create-document-type-form: f}
+document-types:
+  rfc:
+    layout: status
+    code-width: 5
+    create-document-form: form-00001
+    statuses:
+      - draft
+",
+    )
+    .unwrap();
+    fs::write(
+        package_root.join("doc").join("rfc").join("draft").join("rfc-00002-package-rfc.md"),
+        create_valid_rfc_doc_for("00002", "package-rfc", "Package RFC"),
+    )
+    .unwrap();
+
+    let validate_output = run_validate(&root, false).await;
+    assert!(!validate_output.valid, "Expected package-qualified bare stem to fail validation");
+    assert!(
+        validate_output
+            .errors
+            .iter()
+            .any(|error| error.error.contains("[[my-package/rfc-00002-package-rfc]]")),
+        "Expected package-qualified replacement, got: {:?}",
+        validate_output.errors
+    );
+
+    let fix_output = run_validate(&root, true).await;
+    assert!(
+        fix_output.valid,
+        "Expected validate_fix to repair package-qualified bare stem, got errors: {:?}",
+        fix_output.errors
+    );
+    let written = fs::read_to_string(source_path).unwrap();
+    assert!(written.contains("[[my-package/rfc-00002-package-rfc]]"));
+}
+
+#[tokio::test]
+async fn test_validate_avoids_false_positive_bare_stems_in_code_urls_and_filenames() {
+    let (temp_dir, root) = create_test_project();
+    let source = create_valid_rfc_doc_for("00001", "source-rfc", "Source RFC")
+        + "\nFilename rfc-00002-target-rfc.md should stay literal.\n\
+URL https://example.test/docs/rfc-00002-target-rfc should stay literal.\n\
+Inline `rfc-00002-target-rfc` should stay literal.\n\
+```markdown\n\
+rfc-00002-target-rfc\n\
+```\n";
+    let target = create_valid_rfc_doc_for("00002", "target-rfc", "Target RFC");
+    let source_path = write_rfc_doc(&temp_dir, "00001", "source-rfc", &source);
+    write_rfc_doc(&temp_dir, "00002", "target-rfc", &target);
+
+    let output = run_validate(&root, true).await;
+
+    assert!(
+        output.valid,
+        "Expected false-positive contexts to be accepted, got errors: {:?}",
+        output.errors
+    );
+    assert!(
+        output.fixes.iter().all(|fix| fix.fix_type != "normalize_governed_references"),
+        "Expected no governed-reference fix, got: {:?}",
+        output.fixes
+    );
+    assert_eq!(fs::read_to_string(source_path).unwrap(), source);
 }
 
 #[tokio::test]
