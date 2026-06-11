@@ -324,7 +324,6 @@ fn validate_wikilinks(path_str: &str, content: &str) -> Vec<ValidationError> {
     errors
 }
 
-
 fn validate_governed_document_references(
     path_str: &str,
     content: &str,

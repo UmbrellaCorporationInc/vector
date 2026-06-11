@@ -5,7 +5,7 @@ code: "00037"
 slug: extend-patch-doc-formats
 title: Extend Document Patch and Replacement Operations
 description: Proposes extending patch_doc to support explicit patch formats and adding replace_doc for full governed document replacement.
-status: accepted
+status: implemented
 created: 2026-06-11
 updated: 2026-06-11
 authors: []
@@ -131,24 +131,24 @@ The primary use case is document bootstrap: `create_doc_prompt` creates the targ
 
 ## 5. Acceptance Criteria
 
-- [ ] `patch_doc` accepts `format: "unified"` and applies a valid unified diff to the resolved governed document.
-- [ ] `patch_doc` accepts an omitted `format` and applies a valid `apply_patch`-style patch to the resolved governed document.
-- [ ] `patch_doc` rejects unknown `format` values with an actionable error that lists supported values.
-- [ ] `patch_doc` rejects patches whose target file does not match the governed document resolved by `doc_type`, `code`, and optional `package`.
-- [ ] Unified diff parsing preserves existing behavior when `format: "unified"` is provided.
-- [ ] `apply_patch`-style parsing supports `Update File` for the resolved document.
-- [ ] `apply_patch`-style parsing rejects `Add File`, `Delete File`, and `Move to` unless those operations are explicitly added to the governed document contract in a future RFC.
-- [ ] Error messages identify the active format and the reason parsing or application failed.
-- [ ] Documentation includes one working example for `format: "unified"` and one working example for omitted `format`.
-- [ ] The implementation includes tests for both formats, omitted default behavior, unknown formats, and target-file mismatch rejection.
-- [ ] `replace_doc` exists as a `runtime-doc` operation that resolves the target governed document by `doc_type`, `code`, and optional `package`.
-- [ ] The MCP server exposes a thin `replace_doc` tool with `root_dir`, `doc_type`, `code`, optional `package`, and `content`.
-- [ ] `replace_doc` writes the complete replacement content when the governed front matter identity matches the resolved document.
-- [ ] `replace_doc` rejects content with missing or mismatched governed identity fields: `id`, `type`, `code`, or `slug`.
-- [ ] `replace_doc` rejects BOM content and any target outside the governed document tree.
-- [ ] `replace_doc` returns the resolved path and final content after a successful write.
-- [ ] Documentation includes one working `replace_doc` bootstrap example.
-- [ ] The implementation includes runtime and MCP tests for successful replacement, missing document, mismatched identity, BOM rejection, and exposed tool parameter handling.
+- [x] `patch_doc` accepts `format: "unified"` and applies a valid unified diff to the resolved governed document.
+- [x] `patch_doc` accepts an omitted `format` and applies a valid `apply_patch`-style patch to the resolved governed document.
+- [x] `patch_doc` rejects unknown `format` values with an actionable error that lists supported values.
+- [x] `patch_doc` rejects patches whose target file does not match the governed document resolved by `doc_type`, `code`, and optional `package`.
+- [x] Unified diff parsing preserves existing behavior when `format: "unified"` is provided.
+- [x] `apply_patch`-style parsing supports `Update File` for the resolved document.
+- [x] `apply_patch`-style parsing rejects `Add File`, `Delete File`, and `Move to` unless those operations are explicitly added to the governed document contract in a future RFC.
+- [x] Error messages identify the active format and the reason parsing or application failed.
+- [x] Documentation includes one working example for `format: "unified"` and one working example for omitted `format`.
+- [x] The implementation includes tests for both formats, omitted default behavior, unknown formats, and target-file mismatch rejection.
+- [x] `replace_doc` exists as a `runtime-doc` operation that resolves the target governed document by `doc_type`, `code`, and optional `package`.
+- [x] The MCP server exposes a thin `replace_doc` tool with `root_dir`, `doc_type`, `code`, optional `package`, and `content`.
+- [x] `replace_doc` writes the complete replacement content when the governed front matter identity matches the resolved document.
+- [x] `replace_doc` rejects content with missing or mismatched governed identity fields: `id`, `type`, `code`, or `slug`.
+- [x] `replace_doc` rejects BOM content and any target outside the governed document tree.
+- [x] `replace_doc` returns the resolved path and final content after a successful write.
+- [x] Documentation includes one working `replace_doc` bootstrap example.
+- [x] The implementation includes runtime and MCP tests for successful replacement, missing document, mismatched identity, BOM rejection, and exposed tool parameter handling.
 
 ## 6. Open Questions
 

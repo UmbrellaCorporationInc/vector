@@ -5,8 +5,7 @@ use runtime_io::IoPath;
 use std::path::PathBuf;
 
 fn tmp_doc(name: &str, content: &str) -> (PathBuf, IoPath) {
-    let doc_path =
-        std::env::temp_dir().join(format!("vector-patch-apply-patch-test-{name}.md"));
+    let doc_path = std::env::temp_dir().join(format!("vector-patch-apply-patch-test-{name}.md"));
     std::fs::write(&doc_path, content).unwrap();
     let root = doc_path.parent().unwrap().to_path_buf();
     (doc_path, IoPath::new(root))
@@ -24,13 +23,8 @@ fn test_apply_patch_format_replaces_matching_context_lines() {
     let target = abs_path.to_string_lossy().replace('\\', "/");
     let payload = make_payload(&target, " Line one\n-Line two\n+Line TWO\n Line three\n");
 
-    let result = apply_apply_patch_format(
-        &abs_path.to_string_lossy(),
-        &root,
-        "",
-        original,
-        &payload,
-    );
+    let result =
+        apply_apply_patch_format(&abs_path.to_string_lossy(), &root, "", original, &payload);
 
     std::fs::remove_file(&doc_path).ok();
     let patched = result.unwrap();
@@ -46,13 +40,8 @@ fn test_apply_patch_format_returns_error_for_missing_begin_boundary() {
     let target = abs_path.to_string_lossy().replace('\\', "/");
     let bad_payload = format!("*** Update File: {target}\n@@\n Content\n*** End Patch\n");
 
-    let result = apply_apply_patch_format(
-        &abs_path.to_string_lossy(),
-        &root,
-        "",
-        original,
-        &bad_payload,
-    );
+    let result =
+        apply_apply_patch_format(&abs_path.to_string_lossy(), &root, "", original, &bad_payload);
 
     std::fs::remove_file(&doc_path).ok();
     assert!(result.is_err(), "missing Begin Patch boundary should fail");
@@ -68,13 +57,8 @@ fn test_apply_patch_format_returns_error_for_ambiguous_hunk_context() {
     let target = abs_path.to_string_lossy().replace('\\', "/");
     let payload = make_payload(&target, " A\n-B\n+X\n");
 
-    let result = apply_apply_patch_format(
-        &abs_path.to_string_lossy(),
-        &root,
-        "",
-        original,
-        &payload,
-    );
+    let result =
+        apply_apply_patch_format(&abs_path.to_string_lossy(), &root, "", original, &payload);
 
     std::fs::remove_file(&doc_path).ok();
     assert!(result.is_err(), "ambiguous context should fail");
@@ -84,10 +68,8 @@ fn test_apply_patch_format_returns_error_for_ambiguous_hunk_context() {
 
 #[test]
 fn test_apply_patch_hunk_struct_holds_expected_lines() {
-    let hunk = ApplyPatchHunk {
-        old_lines: vec!["old".to_owned()],
-        new_lines: vec!["new".to_owned()],
-    };
+    let hunk =
+        ApplyPatchHunk { old_lines: vec!["old".to_owned()], new_lines: vec!["new".to_owned()] };
     assert_eq!(hunk.old_lines, vec!["old"]);
     assert_eq!(hunk.new_lines, vec!["new"]);
 }

@@ -5,7 +5,7 @@ code: "00066"
 slug: implement-rfc-00037-extend-patch-doc-formats
 title: Implement RFC 00037 Document Patch and Replacement Operations
 description: Extend patch_doc to support explicit patch formats and add replace_doc for full governed document replacement.
-status: in-progress
+status: done
 created: 2026-06-11
 updated: 2026-06-11
 tags:
@@ -175,10 +175,10 @@ input:
   language: rust
 ```
 
-- [ ] Run `cargo fmt`.
-- [ ] Run the repository Rust quality gate relevant to the touched crates.
-- [ ] Update README files on packages modified.
-- [ ] Move this task to `done` only after every acceptance criterion in [[rfc-00037-extend-patch-doc-formats]] is satisfied.
+- [x] Run `cargo fmt`.
+- [x] Run the repository Rust quality gate relevant to the touched crates.
+- [x] Update README files on packages modified.
+- [x] Move this task to `done` only after every acceptance criterion in [[rfc-00037-extend-patch-doc-formats]] is satisfied.
 
 ## 4. Gaps, Flaws, and Tradeoffs
 

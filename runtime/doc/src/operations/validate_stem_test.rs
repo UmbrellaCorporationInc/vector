@@ -1,6 +1,8 @@
 #![allow(clippy::unwrap_used)]
 
-use super::{DocumentStemIndex, BareStemMatch, find_bare_governed_stems, protected_ranges_for_line};
+use super::{
+    BareStemMatch, DocumentStemIndex, find_bare_governed_stems, protected_ranges_for_line,
+};
 
 #[test]
 fn test_find_bare_governed_stems_detects_unlinked_stem_in_body() {
@@ -31,8 +33,7 @@ fn test_find_bare_governed_stems_skips_stem_in_code_span() {
 #[test]
 fn test_find_bare_governed_stems_skips_stem_in_fenced_code_block() {
     let index = DocumentStemIndex { stems: vec!["rfc-00001-example".to_owned()] };
-    let content =
-        "---\ntitle: Test\n---\n\n```\nrfc-00001-example\n```\n\nSome normal text.\n";
+    let content = "---\ntitle: Test\n---\n\n```\nrfc-00001-example\n```\n\nSome normal text.\n";
     let matches = find_bare_governed_stems(content, &index);
     assert!(matches.is_empty(), "stem inside fenced code block should not be flagged");
 }
