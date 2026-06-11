@@ -1099,6 +1099,10 @@ async fn patch_doc_tool_returns_error_for_malformed_diff() {
         err.contains("patch_doc failed:"),
         "error must carry the operation prefix; got: {err:?}"
     );
+    assert!(
+        err.contains("format: \"unified\""),
+        "malformed unified diff errors must identify the active format; got: {err:?}"
+    );
 }
 
 /// Verifies that malformed hunk counts surface the runtime diagnostic through the MCP prefix.
@@ -1149,6 +1153,10 @@ async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
         "error must keep the MCP operation prefix; got: {err:?}"
     );
     assert!(
+        err.contains("format: \"unified\""),
+        "error must identify the active patch format; got: {err:?}"
+    );
+    assert!(
         err.contains("hunk line-count mismatch"),
         "error must identify the malformed hunk counts; got: {err:?}"
     );
@@ -1170,7 +1178,7 @@ async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
         "hunk count mismatch must fail during preflight before target mismatch checks; got: {err:?}"
     );
     assert!(
-        err.len() <= 600,
+        err.len() <= 640,
         "error should stay compact enough for agent feedback loops; length={} err={err:?}",
         err.len()
     );
@@ -1212,6 +1220,14 @@ async fn patch_doc_tool_returns_error_for_target_mismatch() {
         err.contains("patch_doc failed:"),
         "error must carry the operation prefix; got: {err:?}"
     );
+    assert!(
+        err.contains("format: \"unified\""),
+        "target mismatch errors must identify the active format; got: {err:?}"
+    );
+    assert!(
+        err.contains("patch targets"),
+        "target mismatch errors must preserve the existing actionable diagnostic; got: {err:?}"
+    );
 }
 
 /// Verifies that the `patch_doc` tool returns an error when the diff would produce BOM content.
@@ -1243,6 +1259,10 @@ async fn patch_doc_tool_returns_error_for_bom_content() {
     assert!(
         err.contains("patch_doc failed:"),
         "error must carry the operation prefix; got: {err:?}"
+    );
+    assert!(
+        err.contains("format: \"unified\""),
+        "BOM errors must identify the active format; got: {err:?}"
     );
     assert!(err.contains("BOM"), "error must mention BOM to guide remediation; got: {err:?}");
 }

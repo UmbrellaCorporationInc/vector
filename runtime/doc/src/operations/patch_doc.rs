@@ -195,6 +195,14 @@ fn patch_parse_error_message(error: impl Display) -> String {
     format!("patch is not a valid unified diff: {parser_error}")
 }
 
+fn unified_format_error_message(error: impl Display) -> String {
+    format!("format: \"unified\": {error}")
+}
+
+fn unified_operation_error(error: impl Display) -> runtime_core::RuntimeError {
+    runtime_core::RuntimeError::operation(unified_format_error_message(error))
+}
+
 fn parse_hunk_range(range: &str, prefix: char) -> Option<HunkRange> {
     let raw_range = range.strip_prefix(prefix)?;
     let (start, count) = raw_range.split_once(',').unwrap_or((raw_range, "1"));
@@ -478,6 +486,88 @@ fn canonical_governed_doc_dir(
     })
 }
 
+fn apply_unified_patch(
+    abs_path: &str,
+    existing_content: &str,
+    patch_payload: &str,
+) -> RuntimeResult<String> {
+    let canonical_document =
+        canonicalize_document_content(existing_content).map_err(unified_operation_error)?;
+
+    // Normalize and parse the diff
+    let normalized = normalize_diff(patch_payload);
+    preflight_hunk_line_counts(&normalized).map_err(unified_operation_error)?;
+
+    let patch = Patch::parse(&normalized)
+        .map_err(|e| unified_operation_error(patch_parse_error_message(e)))?;
+
+    // Reject delete patches (new_file == /dev/null)
+    if patch.new_file == "/dev/null" {
+        return Err(unified_operation_error(
+            "patch would delete the document; delete operations are not supported",
+        ));
+    }
+
+    // Reject create patches (old_file == /dev/null)
+    if patch.old_file == "/dev/null" {
+        return Err(unified_operation_error(
+            "patch would create a new file; use create_doc for new documents",
+        ));
+    }
+
+    // Reject rename patches (old_file != new_file)
+    if patch.old_file != patch.new_file {
+        return Err(unified_operation_error(format!(
+            "patch renames '{}' to '{}'; rename operations are not supported",
+            patch.old_file, patch.new_file
+        )));
+    }
+
+    // Target mismatch: patch filename must match the resolved document filename
+    let resolved_name = Path::new(abs_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| unified_operation_error("resolved document path has no filename"))?;
+
+    let patch_name = Path::new(&patch.old_file)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(patch.old_file.as_str());
+
+    if patch_name != resolved_name {
+        return Err(unified_operation_error(format!(
+            "patch targets '{}' but the resolved document is '{}'",
+            patch.old_file, resolved_name
+        )));
+    }
+
+    validate_hunk_contexts(
+        &normalized,
+        &canonical_document.content,
+        canonical_document.newline_mode,
+    )
+    .map_err(unified_operation_error)?;
+
+    // Apply the patch against the canonical LF representation, then restore the file's newline mode.
+    let patcher = Patcher::new(patch);
+    let patched_canonical = patcher.apply(&canonical_document.content, false).map_err(|e| {
+        unified_operation_error(format!(
+            "failed to apply patch after newline normalization; newline mode: {}; {e}",
+            newline_mode_description(canonical_document.newline_mode)
+        ))
+    })?;
+    let new_content = restore_newline_mode(&patched_canonical, canonical_document.newline_mode);
+
+    // BOM check: resulting content must not contain a UTF-8 BOM
+    if new_content.as_bytes().starts_with(UTF8_BOM) {
+        return Err(unified_operation_error(
+            "resulting content contains a UTF-8 BOM (\\xEF\\xBB\\xBF); remove the BOM and retry",
+        ));
+    }
+
+    Ok(new_content)
+}
+
 async fn patch_doc(
     input: PatchDocInput,
     output: &mut impl PluginSender<PatchDocOutput>,
@@ -501,8 +591,6 @@ async fn patch_doc(
 
     let abs_path = found.path;
     let existing_content = found.content;
-    let canonical_document = canonicalize_document_content(&existing_content)
-        .map_err(runtime_core::RuntimeError::operation)?;
 
     // Scope check: the resolved path must be inside doc/
     let doc_dir = canonical_governed_doc_dir(&input.root_dir, &input.package)?;
@@ -524,76 +612,7 @@ async fn patch_doc(
         }
     }
 
-    // Normalize and parse the diff
-    let normalized = normalize_diff(&input.patch);
-    preflight_hunk_line_counts(&normalized).map_err(runtime_core::RuntimeError::operation)?;
-
-    let patch = Patch::parse(&normalized)
-        .map_err(|e| runtime_core::RuntimeError::operation(patch_parse_error_message(e)))?;
-
-    // Reject delete patches (new_file == /dev/null)
-    if patch.new_file == "/dev/null" {
-        return Err(runtime_core::RuntimeError::operation(
-            "patch would delete the document; delete operations are not supported",
-        ));
-    }
-
-    // Reject create patches (old_file == /dev/null)
-    if patch.old_file == "/dev/null" {
-        return Err(runtime_core::RuntimeError::operation(
-            "patch would create a new file; use create_doc for new documents",
-        ));
-    }
-
-    // Reject rename patches (old_file != new_file)
-    if patch.old_file != patch.new_file {
-        return Err(runtime_core::RuntimeError::operation(format!(
-            "patch renames '{}' to '{}'; rename operations are not supported",
-            patch.old_file, patch.new_file
-        )));
-    }
-
-    // Target mismatch: patch filename must match the resolved document filename
-    let resolved_name =
-        Path::new(&abs_path).file_name().and_then(|n| n.to_str()).ok_or_else(|| {
-            runtime_core::RuntimeError::operation("resolved document path has no filename")
-        })?;
-
-    let patch_name = Path::new(&patch.old_file)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(patch.old_file.as_str());
-
-    if patch_name != resolved_name {
-        return Err(runtime_core::RuntimeError::operation(format!(
-            "patch targets '{}' but the resolved document is '{}'",
-            patch.old_file, resolved_name
-        )));
-    }
-
-    validate_hunk_contexts(
-        &normalized,
-        &canonical_document.content,
-        canonical_document.newline_mode,
-    )
-    .map_err(runtime_core::RuntimeError::operation)?;
-
-    // Apply the patch against the canonical LF representation, then restore the file's newline mode.
-    let patcher = Patcher::new(patch);
-    let patched_canonical = patcher.apply(&canonical_document.content, false).map_err(|e| {
-        runtime_core::RuntimeError::operation(format!(
-            "failed to apply patch after newline normalization; newline mode: {}; {e}",
-            newline_mode_description(canonical_document.newline_mode)
-        ))
-    })?;
-    let new_content = restore_newline_mode(&patched_canonical, canonical_document.newline_mode);
-
-    // BOM check: resulting content must not contain a UTF-8 BOM
-    if new_content.as_bytes().starts_with(UTF8_BOM) {
-        return Err(runtime_core::RuntimeError::operation(
-            "resulting content contains a UTF-8 BOM (\\xEF\\xBB\\xBF); remove the BOM and retry",
-        ));
-    }
+    let new_content = apply_unified_patch(&abs_path, &existing_content, &input.patch)?;
 
     // Write the patched content back to disk
     fs::write(&abs_path, new_content.as_bytes()).map_err(|e| {

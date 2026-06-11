@@ -157,6 +157,32 @@ async fn test_patch_doc_valid_patch_succeeds() {
 }
 
 #[tokio::test]
+async fn test_patch_doc_explicit_unified_format_uses_existing_unified_diff_path() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(&temp, "task", filename, "old content\n");
+
+    let diff = make_diff(filename, "old content", "new content");
+
+    let input = PatchDocInput::with_format(
+        root,
+        String::new(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::Unified,
+        diff,
+    );
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs.len(), 1);
+    assert_eq!(sender.outputs[0].content, "new content\n");
+}
+
+#[tokio::test]
 async fn test_patch_doc_uses_package_document_root_when_package_is_provided() {
     let temp = TempDir::new().unwrap();
     let root = IoPath::new(temp.path());
@@ -243,6 +269,7 @@ async fn test_patch_doc_rejects_find_doc_content_patch_when_hunk_counts_overstat
         "Phase A regression path must reproduce: patch_doc rejects a unified diff generated from find_doc content when the hunk header overstates the body line counts"
     );
     let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"unified\""), "{err}");
     assert!(
         err.contains("hunk line-count mismatch"),
         "Phase A localized failing path: rejection is caused by hunk line-count mismatch during preflight, not trailing newline handling, CRLF normalization, context offset drift, or patcher.apply matching; got: {err}"
@@ -294,6 +321,7 @@ async fn test_patch_doc_target_mismatch_rejected() {
 
     assert!(result.is_err(), "expected error for target mismatch");
     let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"unified\""), "{err}");
     assert!(err.contains("main.rs") || err.contains("task-00001"), "{err}");
 }
 
@@ -392,6 +420,7 @@ async fn test_patch_doc_hunk_count_mismatch_rejected_during_preflight_without_wr
 
     assert!(result.is_err(), "expected hunk count mismatch to be rejected during preflight");
     let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"unified\""), "{err}");
     assert!(err.contains("patch is not a valid unified diff"), "{err}");
     assert!(err.contains("hunk line-count mismatch"), "{err}");
     assert!(err.contains("Hunk header declares (-10, +10)"), "{err}");
@@ -505,6 +534,47 @@ async fn test_patch_doc_applies_crlf_formatted_diff_to_lf_document() {
 }
 
 #[tokio::test]
+async fn test_patch_doc_explicit_unified_newline_normalization_error_identifies_format() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "old content\r\nsecond line\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let diff = "\
+--- a/task-00001-foo.md
++++ b/task-00001-foo.md
+@@ -1,2 +1,2 @@
+-old content
++new content
+ second line
+";
+
+    let input = PatchDocInput::with_format(
+        root,
+        String::new(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::Unified,
+        diff.to_string(),
+    );
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(result.is_err(), "expected mixed newline rejection");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"unified\""), "{err}");
+    assert!(err.contains("mixed LF and CRLF line endings"), "{err}");
+    assert!(sender.outputs.is_empty(), "newline normalization failures must not emit output");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when newline normalization fails");
+}
+
+#[tokio::test]
 async fn test_patch_doc_preserves_absent_final_newline_when_patch_marks_no_newline() {
     let temp = TempDir::new().unwrap();
     let root = IoPath::new(temp.path());
@@ -554,6 +624,7 @@ async fn test_patch_doc_context_mismatch_error_includes_hunk_context_and_newline
 
     assert!(result.is_err(), "expected context mismatch rejection");
     let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"unified\""), "{err}");
     assert!(err.contains("hunk 1 context mismatch"), "{err}");
     assert!(err.contains("@@ -1,2 +1,2 @@"), "{err}");
     assert!(err.contains("Expected context: [\"expected one\", \"expected two\"]"), "{err}");
@@ -587,12 +658,20 @@ async fn test_patch_doc_bom_in_result_rejected_without_write() {
         "--- a/{filename}\n+++ b/{filename}\n@@ -1,1 +1,1 @@\n-original content\n+{bom_line}\n"
     );
 
-    let input = PatchDocInput::new(root, "task".to_string(), 1, diff);
+    let input = PatchDocInput::with_format(
+        root,
+        String::new(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::Unified,
+        diff,
+    );
     let mut sender = MockSender::new();
     let result = patch_doc(input, &mut sender).await;
 
     assert!(result.is_err(), "expected BOM rejection");
     let err = result.unwrap_err().to_string();
+    assert!(err.contains("format: \"unified\""), "{err}");
     assert!(err.contains("BOM") || err.contains("bom") || err.contains("\\xEF"), "{err}");
 
     // File must not have been written

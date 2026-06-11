@@ -65,9 +65,9 @@ input:
   language: rust
 ```
 
-- [ ] Route `format: "unified"` through the existing unified-diff parser and application path.
-- [ ] Keep existing hunk-count, newline normalization, BOM rejection, and target-mismatch protections for unified diffs.
-- [ ] Update unified-diff error messages so they identify `format: "unified"` and keep the existing actionable diagnostics.
+- [x] Route `format: "unified"` through the existing unified-diff parser and application path.
+- [x] Keep existing hunk-count, newline normalization, BOM rejection, and target-mismatch protections for unified diffs.
+- [x] Update unified-diff error messages so they identify `format: "unified"` and keep the existing actionable diagnostics.
 
 ### 3.3. Phase C - Add apply_patch-Style Updates
 
