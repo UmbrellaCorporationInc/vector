@@ -153,15 +153,15 @@ input:
   language: rust
 ```
 
-- [ ] Add runtime tests for explicit unified diffs, omitted-format `apply_patch` updates, unknown formats, unsupported `apply_patch` operations, and target-file mismatch rejection.
-- [ ] Add MCP tool tests for parameter deserialization, explicit unified diffs, omitted-format `apply_patch`, unknown formats, and target-file mismatch rejection.
-- [ ] Add runtime `replace_doc` tests for successful replacement, missing document, mismatched identity, BOM rejection, and returned content.
-- [ ] Add MCP `replace_doc` tests for parameter deserialization, successful replacement, runtime error propagation, and returned content.
-- [ ] Keep regression coverage for malformed unified-diff hunk counts.
-- [ ] Run `cargo test -p runtime-doc patch_doc`.
-- [ ] Run `cargo test -p runtime-doc replace_doc`.
-- [ ] Run MCP document tool tests that cover `patch_doc`.
-- [ ] Run MCP document tool tests that cover `replace_doc`.
+- [x] Add runtime tests for explicit unified diffs, omitted-format `apply_patch` updates, unknown formats, unsupported `apply_patch` operations, and target-file mismatch rejection.
+- [x] Add MCP tool tests for parameter deserialization, explicit unified diffs, omitted-format `apply_patch`, unknown formats, and target-file mismatch rejection.
+- [x] Add runtime `replace_doc` tests for successful replacement, missing document, mismatched identity, BOM rejection, and returned content.
+- [x] Add MCP `replace_doc` tests for parameter deserialization, successful replacement, runtime error propagation, and returned content.
+- [x] Keep regression coverage for malformed unified-diff hunk counts.
+- [x] Run `cargo test -p runtime-doc patch_doc`.
+- [x] Run `cargo test -p runtime-doc replace_doc`.
+- [x] Run MCP document tool tests that cover `patch_doc`.
+- [x] Run MCP document tool tests that cover `replace_doc`.
 
 ### 3.8. Phase Z - Wrap-up
 
