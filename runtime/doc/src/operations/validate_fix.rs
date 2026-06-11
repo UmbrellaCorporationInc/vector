@@ -7,8 +7,8 @@ use std::sync::LazyLock;
 use crate::types::{DocumentTypeConfig, DocumentTypesConfig};
 
 use super::validate::{
-    FixResult, ScanResult, Utf8ValidationError, category_folder_names, check_utf8_without_bom,
-    governed_markdown_files, parse_frontmatter, status_folder_names, validate_governed_file,
+    FixResult, ScanResult, governed_markdown_files, parse_frontmatter, scan_governed_files,
+    status_folder_names,
 };
 
 pub(super) type FixScanResult = (ScanResult, Vec<FixResult>);
@@ -18,14 +18,13 @@ static WIKILINK_EXTENSION_REGEX: LazyLock<Result<regex::Regex, regex::Error>> =
     LazyLock::new(|| regex::Regex::new(r"\[\[([^\]]+)\.md\]\]"));
 
 pub(super) fn fix_bom_if_present(path: &Path) -> Option<FixResult> {
-    match check_utf8_without_bom(path) {
-        Err(Utf8ValidationError::Utf8Bom) => {}
-        Err(Utf8ValidationError::Io { .. }) | Ok(()) => return None,
-    }
     let Ok(mut content) = std::fs::read(path) else {
         return None;
     };
     if !content.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        return None;
+    }
+    if std::str::from_utf8(&content[3..]).is_err() {
         return None;
     }
     content = content[3..].to_vec();
@@ -34,6 +33,40 @@ pub(super) fn fix_bom_if_present(path: &Path) -> Option<FixResult> {
             path: path.to_string_lossy().to_string(),
             fix_type: "remove_bom".to_string(),
             detail: "Removed UTF-8 BOM".to_string(),
+        })
+    } else {
+        None
+    }
+}
+
+pub(super) fn fix_crlf_line_endings_if_present(path: &Path) -> Option<FixResult> {
+    let Ok(content) = std::fs::read(path) else {
+        return None;
+    };
+    if !content.windows(2).any(|window| window == b"\r\n") {
+        return None;
+    }
+    if std::str::from_utf8(&content).is_err() {
+        return None;
+    }
+
+    let mut normalized = Vec::with_capacity(content.len());
+    let mut index = 0;
+    while index < content.len() {
+        if content.get(index..index + 2) == Some(b"\r\n") {
+            normalized.push(b'\n');
+            index += 2;
+        } else {
+            normalized.push(content[index]);
+            index += 1;
+        }
+    }
+
+    if std::fs::write(path, &normalized).is_ok() {
+        Some(FixResult {
+            path: path.to_string_lossy().to_string(),
+            fix_type: "normalize_line_endings".to_string(),
+            detail: "Converted CRLF line endings to LF".to_string(),
         })
     } else {
         None
@@ -212,13 +245,17 @@ fn fix_governed_file(
     let mut fixes = Vec::new();
     let path_str = path.to_string_lossy().to_string();
 
-    // Template files are governed by placeholder content — skip fix logic.
-    if doc_type == "template" {
-        return fixes;
-    }
-
     if let Some(fix) = fix_bom_if_present(path) {
         fixes.push(fix);
+    }
+
+    if let Some(fix) = fix_crlf_line_endings_if_present(path) {
+        fixes.push(fix);
+    }
+
+    // Template files are governed by placeholder content — skip content-level fix logic.
+    if doc_type == "template" {
+        return fixes;
     }
 
     let Ok(content) = std::fs::read_to_string(path) else {
@@ -291,28 +328,20 @@ pub(super) fn scan_and_fix_governed_files(
     let mut fixes = Vec::new();
 
     let status_folders = status_folder_names(doc_config);
-    let category_folders = category_folder_names(root_dir);
 
     for doc_type in doc_config.document_types.keys() {
         let Some(type_config) = doc_config.document_types.get(doc_type) else {
             continue;
         };
         for path in governed_markdown_files(root_dir, doc_type) {
-            let file_errors = validate_governed_file(
-                &path,
-                doc_config,
-                doc_type,
-                type_config,
-                &status_folders,
-                &category_folders,
-            );
-            errors.extend(file_errors);
-
             let file_fixes =
                 fix_governed_file(&path, doc_config, doc_type, type_config, &status_folders);
             fixes.extend(file_fixes);
         }
     }
+
+    let (post_fix_errors, _) = scan_governed_files(root_dir, doc_config);
+    errors.extend(post_fix_errors);
 
     ((errors, warnings), fixes)
 }

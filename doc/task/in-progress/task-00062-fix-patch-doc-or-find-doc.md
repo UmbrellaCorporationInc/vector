@@ -107,13 +107,13 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Add a validation check that rejects CRLF line endings in all governed Markdown files, including templates.
-- [ ] Add a `validate_fix` repair that rewrites all governed Markdown files to LF line endings, including templates.
-- [ ] Preserve a final newline when present and avoid introducing unrelated content changes during LF normalization.
-- [ ] Confirm `validate` rejects UTF-8 BOM files and invalid UTF-8 files.
-- [ ] Confirm `validate_fix` removes UTF-8 BOM files, including templates, and still fails invalid UTF-8 files without rewriting them.
-- [ ] Add flow-level tests proving `validate` fails and `validate_fix` repairs BOM and CRLF cases where repair is safe.
-- [ ] Add tests proving invalid UTF-8 is reported by both `validate` and `validate_fix`.
+- [x] Add a validation check that rejects CRLF line endings in all governed Markdown files, including templates.
+- [x] Add a `validate_fix` repair that rewrites all governed Markdown files to LF line endings, including templates.
+- [x] Preserve a final newline when present and avoid introducing unrelated content changes during LF normalization.
+- [x] Confirm `validate` rejects UTF-8 BOM files and invalid UTF-8 files.
+- [x] Confirm `validate_fix` removes UTF-8 BOM files, including templates, and still fails invalid UTF-8 files without rewriting them.
+- [x] Add flow-level tests proving `validate` fails and `validate_fix` repairs BOM and CRLF cases where repair is safe.
+- [x] Add tests proving invalid UTF-8 is reported by both `validate` and `validate_fix`.
 
 ### 3.4. Phase D - Normalize Governed Document References
 

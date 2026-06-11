@@ -25,6 +25,13 @@ pub(crate) type ScanResult = (Vec<ValidationError>, Vec<String>);
 pub(crate) enum Utf8ValidationError {
     #[error("File contains UTF-8 BOM")]
     Utf8Bom,
+    #[error("File contains CRLF line endings; governed Markdown files must use LF line endings")]
+    CrlfLineEndings,
+    #[error("Cannot read file as UTF-8: {source}")]
+    InvalidUtf8 {
+        #[source]
+        source: std::str::Utf8Error,
+    },
     #[error("Cannot read file bytes: {source}")]
     Io {
         #[source]
@@ -157,6 +164,10 @@ pub(crate) fn check_utf8_without_bom(path: &Path) -> Result<(), Utf8ValidationEr
     let content = std::fs::read(path).map_err(|source| Utf8ValidationError::Io { source })?;
     if content.len() >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
         return Err(Utf8ValidationError::Utf8Bom);
+    }
+    std::str::from_utf8(&content).map_err(|source| Utf8ValidationError::InvalidUtf8 { source })?;
+    if content.windows(2).any(|window| window == b"\r\n") {
+        return Err(Utf8ValidationError::CrlfLineEndings);
     }
     Ok(())
 }
@@ -447,7 +458,10 @@ fn validate_config_create_forms(doc_config: &DocumentTypesConfig) -> Vec<Validat
     errors
 }
 
-fn scan_governed_files(root_dir: &Path, doc_config: &DocumentTypesConfig) -> ValidationResult {
+pub(super) fn scan_governed_files(
+    root_dir: &Path,
+    doc_config: &DocumentTypesConfig,
+) -> ValidationResult {
     let mut errors = Vec::new();
     let warnings = Vec::new();
 
