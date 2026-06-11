@@ -76,6 +76,67 @@ async fn test_patch_doc_valid_patch_succeeds() {
     assert_eq!(written, "new content\n");
 }
 
+#[tokio::test]
+async fn test_patch_doc_rejects_find_doc_content_patch_when_hunk_counts_overstate_body_lines() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "line one\nline two\nline three\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let mut find_sender = CapturingSender::<FindDocOutput>::new();
+    FindDocOp::new()
+        .run(
+            FindDocInput::new(root.clone(), String::new(), "task".to_string(), 1),
+            &mut find_sender,
+        )
+        .await
+        .unwrap();
+    let found = find_sender.into_output().expect("find_doc must return document content");
+    assert!(
+        found.content.contains("line one\nline two\nline three\n"),
+        "Phase A setup must generate the patch from the content returned by find_doc"
+    );
+
+    let mut lines = found.content.lines();
+    let first_line = lines.next().expect("document must have a first line");
+    let second_line = lines.next().expect("document must have a second line");
+    let diff = format!(
+        "\
+--- a/{filename}
++++ b/{filename}
+@@ -1,3 +1,3 @@
+-{first_line}
+-{second_line}
++LINE ONE
++LINE TWO
+"
+    );
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff);
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(
+        result.is_err(),
+        "Phase A regression path must reproduce: patch_doc rejects a unified diff generated from find_doc content when the hunk header overstates the body line counts"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("hunk line-count mismatch"),
+        "Phase A localized failing path: rejection is caused by hunk line-count mismatch during preflight, not trailing newline handling, CRLF normalization, context offset drift, or patcher.apply matching; got: {err}"
+    );
+    assert!(err.contains("Hunk header declares (-3, +3)"), "{err}");
+    assert!(err.contains("hunk body contains (-2, +2)"), "{err}");
+    assert!(sender.outputs.is_empty(), "rejected patches must not emit patched content");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when hunk count preflight fails");
+}
+
 // ── missing document ─────────────────────────────────────────────────────────
 
 #[tokio::test]

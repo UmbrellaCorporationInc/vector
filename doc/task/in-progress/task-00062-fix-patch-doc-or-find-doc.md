@@ -7,7 +7,7 @@ title: Fix patch_doc Rejections and Markdown Hygiene
 description: Make governed document patching reliable and enforce canonical Markdown hygiene.
 status: in-progress
 created: 2026-06-10
-updated: 2026-06-10
+updated: 2026-06-11
 tags:
   - mcp
   - patching
@@ -73,9 +73,9 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Add or identify a failing regression case where `patch_doc` rejects a patch generated from `find_doc` content.
-- [ ] Confirm whether the rejection is caused by trailing newline handling, CRLF normalization, hunk context mismatch, offset drift, or another parser issue.
-- [ ] Document the exact failing path in the test name or assertion message.
+- [x] Add or identify a failing regression case where `patch_doc` rejects a patch generated from `find_doc` content.
+- [x] Confirm whether the rejection is caused by trailing newline handling, CRLF normalization, hunk context mismatch, offset drift, or another parser issue.
+- [x] Document the exact failing path in the test name or assertion message.
 
 ### 3.2. Phase B - Stabilize patch_doc
 
