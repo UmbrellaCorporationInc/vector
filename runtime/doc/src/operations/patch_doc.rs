@@ -3,6 +3,7 @@
 use patcher::{Patch, PatchAlgorithm, Patcher};
 use runtime_core::{FlowOperation, RuntimeResult, declare_plugin_operations, plugin::PluginSender};
 use runtime_io::path::IoPath;
+use std::fmt::Display;
 use std::fs;
 use std::path::Path;
 
@@ -77,6 +78,19 @@ fn normalize_diff(raw: &str) -> String {
     if result.is_empty() { stripped } else { result }
 }
 
+fn patch_parse_error_message(error: impl Display) -> String {
+    let parser_error = error.to_string();
+    if parser_error.contains("Chunk line count mismatch") {
+        return format!(
+            "patch is not a valid unified diff: hunk line-count mismatch. \
+             Make the @@ -a,b +c,d @@ counts match the number of old-side lines \
+             and new-side lines in the hunk body. Original parser error: {parser_error}"
+        );
+    }
+
+    format!("patch is not a valid unified diff: {parser_error}")
+}
+
 async fn patch_doc(
     input: PatchDocInput,
     output: &mut impl PluginSender<PatchDocOutput>,
@@ -115,9 +129,8 @@ async fn patch_doc(
     // Normalize and parse the diff
     let normalized = normalize_diff(&input.git_diff);
 
-    let patch = Patch::parse(&normalized).map_err(|e| {
-        runtime_core::RuntimeError::operation(format!("patch is not a valid unified diff: {e}"))
-    })?;
+    let patch = Patch::parse(&normalized)
+        .map_err(|e| runtime_core::RuntimeError::operation(patch_parse_error_message(e)))?;
 
     // Reject delete patches (new_file == /dev/null)
     if patch.new_file == "/dev/null" {

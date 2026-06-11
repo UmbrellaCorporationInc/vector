@@ -76,10 +76,10 @@ input:
   language: Rust
 ```
 
-- [ ] Add a small diagnostic adapter around `Patch::parse` errors in `runtime/doc/src/operations/patch_doc.rs`.
-- [ ] Detect hunk line-count mismatch messages and return an actionable `patch_doc` error that explains the likely fix: make the `@@ -a,b +c,d @@` counts match the number of old-side and new-side lines in the hunk body.
-- [ ] Preserve the original parser error text as supporting detail.
-- [ ] Keep all existing rejection behavior for create, delete, rename, target mismatch, BOM, and malformed non-diff inputs.
+- [x] Add a small diagnostic adapter around `Patch::parse` errors in `runtime/doc/src/operations/patch_doc.rs`.
+- [x] Detect hunk line-count mismatch messages and return an actionable `patch_doc` error that explains the likely fix: make the `@@ -a,b +c,d @@` counts match the number of old-side and new-side lines in the hunk body.
+- [x] Preserve the original parser error text as supporting detail.
+- [x] Keep all existing rejection behavior for create, delete, rename, target mismatch, BOM, and malformed non-diff inputs.
 
 ### 3.3. Phase C — Improve MCP Surface
 

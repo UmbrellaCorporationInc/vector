@@ -213,6 +213,10 @@ async fn test_patch_doc_hunk_count_mismatch_rejected_during_parse_without_write(
     assert!(result.is_err(), "expected hunk count mismatch to be rejected during diff parsing");
     let err = result.unwrap_err().to_string();
     assert!(err.contains("patch is not a valid unified diff"), "{err}");
+    assert!(err.contains("hunk line-count mismatch"), "{err}");
+    assert!(err.contains("Make the @@ -a,b +c,d @@ counts match"), "{err}");
+    assert!(err.contains("old-side lines and new-side lines"), "{err}");
+    assert!(err.contains("Original parser error:"), "{err}");
     assert!(err.contains("Chunk line count mismatch"), "{err}");
     assert!(err.contains("Header expected (-10, +10)"), "{err}");
     assert!(err.contains("Parsed content counts (-7, +7)"), "{err}");
