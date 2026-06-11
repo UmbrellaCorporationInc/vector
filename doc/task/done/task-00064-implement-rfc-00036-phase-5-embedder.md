@@ -5,7 +5,7 @@ code: "00064"
 slug: implement-rfc-00036-phase-5-embedder
 title: Implement RFC 00036 Phase 5 Embedder
 description: Implement the local embedding boundary and first fastembed-backed embedder for the RAG pipeline.
-status: in-progress
+status: done
 created: 2026-06-10
 updated: 2026-06-10
 tags:

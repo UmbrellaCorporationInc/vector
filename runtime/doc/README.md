@@ -20,7 +20,7 @@ This crate provides transport-agnostic documentation governance operations for M
 
 ### Authoring
 
-- **`patch_doc`**: Applies a unified diff to a governed document identified by `doc_type` and `code`. Resolves the document path, enforces that the target is inside the repository `doc/` directory, normalizes agent-produced patch wrappers (e.g. Markdown code fences, prose preamble) to raw unified diff, rejects unsupported patch shapes (create, delete, rename, or target mismatch), applies the diff using `patcher`, verifies the resulting content is UTF-8 without BOM, writes the file, and returns `path` and `content`. Any BOM in the result aborts the write and returns an explicit remediation error.
+- **`patch_doc`**: Applies a unified diff to a governed document identified by `doc_type` and `code`. Resolves the document path, enforces that the target is inside the repository `doc/` directory, normalizes agent-produced patch wrappers (e.g. Markdown code fences, prose preamble) to raw unified diff, rejects unsupported patch shapes (create, delete, rename, or target mismatch), applies the diff using `patcher`, verifies the resulting content is UTF-8 without BOM, writes the file, and returns `path` and `content`. Malformed hunk line-counts are rejected before any write with an actionable diagnostic that compares declared `@@ -a,b +c,d @@` counts to the parsed hunk body. Any BOM in the result aborts the write and returns an explicit remediation error.
 
 ### Discovery
 

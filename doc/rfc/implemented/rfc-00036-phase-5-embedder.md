@@ -5,7 +5,7 @@ code: "00036"
 slug: phase-5-embedder
 title: Phase 5 Embedder
 description: Proposes the local embedding boundary and first CPU-efficient fastembed implementation for the RAG pipeline.
-status: accepted
+status: implemented
 created: 2026-06-10
 updated: 2026-06-10
 authors: []

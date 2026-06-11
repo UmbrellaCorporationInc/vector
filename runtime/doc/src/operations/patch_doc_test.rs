@@ -176,6 +176,100 @@ async fn test_patch_doc_malformed_diff_rejected() {
     assert!(result.is_err(), "expected error for malformed diff");
 }
 
+#[tokio::test]
+async fn test_patch_doc_hunk_count_mismatch_rejected_during_preflight_without_write() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "line one\nline two\nline three\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let diff = "\
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -37,10 +37,10 @@ input:
+-old one
+-old two
+-old three
+-old four
+-old five
+-old six
+-old seven
++new one
++new two
++new three
++new four
++new five
++new six
++new seven
+";
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff.to_string());
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(result.is_err(), "expected hunk count mismatch to be rejected during preflight");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("patch is not a valid unified diff"), "{err}");
+    assert!(err.contains("hunk line-count mismatch"), "{err}");
+    assert!(err.contains("Hunk header declares (-10, +10)"), "{err}");
+    assert!(err.contains("hunk body contains (-7, +7)"), "{err}");
+    assert!(err.contains("Make the @@ -a,b +c,d @@ counts match"), "{err}");
+    assert!(err.contains("old-side lines and new-side lines"), "{err}");
+    assert!(err.contains("Preflight detail:"), "{err}");
+    assert!(err.contains("Header expected (-10, +10)"), "{err}");
+    assert!(err.contains("Parsed content counts (-7, +7)"), "{err}");
+    assert!(
+        !err.contains("patch targets"),
+        "malformed hunk counts must fail during preflight before target mismatch checks: {err}"
+    );
+    assert!(sender.outputs.is_empty(), "preflight failures must not emit patched content");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when preflight fails");
+}
+
+#[tokio::test]
+async fn test_patch_doc_valid_multi_hunk_diff_survives_hunk_count_preflight() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(
+        &temp,
+        "task",
+        filename,
+        "line one\nline two\nline three\nline four\nline five\nline six\n",
+    );
+
+    let diff = "\
+--- a/task-00001-foo.md
++++ b/task-00001-foo.md
+@@ -1,2 +1,2 @@
+-line one
++LINE ONE
+ line two
+@@ -4,2 +4,2 @@
+ line four
+-line five
++LINE FIVE
+";
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff.to_string());
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs.len(), 1);
+    assert_eq!(
+        sender.outputs[0].content,
+        "LINE ONE\nline two\nline three\nline four\nLINE FIVE\nline six\n"
+    );
+}
+
 // ── BOM rejection ─────────────────────────────────────────────────────────────
 
 #[tokio::test]

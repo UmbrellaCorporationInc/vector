@@ -5,7 +5,7 @@ code: "00065"
 slug: improve-patch-doc-hunk-count-diagnostics
 title: Improve patch_doc Hunk Count Diagnostics
 description: Make patch_doc failures for unified-diff hunk count mismatches actionable for agents.
-status: todo
+status: in-progress
 created: 2026-06-11
 updated: 2026-06-11
 tags:
@@ -59,10 +59,10 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Add a focused regression test where `patch_doc` receives a unified diff whose hunk header declares more old/new lines than the hunk body contains.
-- [ ] Assert that the failure is produced during diff parsing, before target mismatch checks and before file writes.
-- [ ] Include the original failure shape in the test fixture or assertion message: declared hunk counts differ from parsed hunk counts.
-- [ ] Confirm the target document remains unchanged after the malformed diff is rejected.
+- [x] Add a focused regression test where `patch_doc` receives a unified diff whose hunk header declares more old/new lines than the hunk body contains.
+- [x] Assert that the failure is produced during diff parsing, before target mismatch checks and before file writes.
+- [x] Include the original failure shape in the test fixture or assertion message: declared hunk counts differ from parsed hunk counts.
+- [x] Confirm the target document remains unchanged after the malformed diff is rejected.
 
 ### 3.2. Phase B — Improve Runtime Diagnostics
 
@@ -76,10 +76,10 @@ input:
   language: Rust
 ```
 
-- [ ] Add a small diagnostic adapter around `Patch::parse` errors in `runtime/doc/src/operations/patch_doc.rs`.
-- [ ] Detect hunk line-count mismatch messages and return an actionable `patch_doc` error that explains the likely fix: make the `@@ -a,b +c,d @@` counts match the number of old-side and new-side lines in the hunk body.
-- [ ] Preserve the original parser error text as supporting detail.
-- [ ] Keep all existing rejection behavior for create, delete, rename, target mismatch, BOM, and malformed non-diff inputs.
+- [x] Add a small diagnostic adapter around `Patch::parse` errors in `runtime/doc/src/operations/patch_doc.rs`.
+- [x] Detect hunk line-count mismatch messages and return an actionable `patch_doc` error that explains the likely fix: make the `@@ -a,b +c,d @@` counts match the number of old-side and new-side lines in the hunk body.
+- [x] Preserve the original parser error text as supporting detail.
+- [x] Keep all existing rejection behavior for create, delete, rename, target mismatch, BOM, and malformed non-diff inputs.
 
 ### 3.3. Phase C — Improve MCP Surface
 
@@ -93,9 +93,9 @@ input:
   language: Rust
 ```
 
-- [ ] Ensure the MCP `patch_doc` tool returns the improved diagnostic without losing the `patch_doc failed:` prefix used by callers.
-- [ ] Add or update MCP tool tests for malformed hunk count diagnostics.
-- [ ] Verify the improved diagnostic is short enough to be useful in agent feedback loops.
+- [x] Ensure the MCP `patch_doc` tool returns the improved diagnostic without losing the `patch_doc failed:` prefix used by callers.
+- [x] Add or update MCP tool tests for malformed hunk count diagnostics.
+- [x] Verify the improved diagnostic is short enough to be useful in agent feedback loops.
 
 ### 3.4. Phase D — Evaluate Safe Preflight Validation
 
@@ -109,10 +109,10 @@ input:
   language: Rust
 ```
 
-- [ ] Decide whether `patch_doc` should preflight hunk headers before calling `Patch::parse`.
-- [ ] If preflight is added, keep it diagnostic-only unless there is an explicit product decision to auto-correct malformed hunk counts.
-- [ ] Avoid silently rewriting agent diffs because incorrect hunk counts may indicate missing context lines or truncated content.
-- [ ] Add tests proving valid multi-hunk diffs are not rejected by the preflight path.
+- [x] Decide whether `patch_doc` should preflight hunk headers before calling `Patch::parse`.
+- [x] If preflight is added, keep it diagnostic-only unless there is an explicit product decision to auto-correct malformed hunk counts.
+- [x] Avoid silently rewriting agent diffs because incorrect hunk counts may indicate missing context lines or truncated content.
+- [x] Add tests proving valid multi-hunk diffs are not rejected by the preflight path.
 
 ### 3.5. Phase Z — Wrap-up
 
@@ -126,8 +126,8 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Run `cargo test -p runtime-doc patch_doc`.
-- [ ] Run MCP document tool tests that cover `patch_doc`.
-- [ ] Run the Rust quality gate.
-- [ ] Run governed document validation.
-- [ ] Update `runtime/doc/README.md` or `mcp/vector/README.md` only if the user-facing `patch_doc` behavior changes.
+- [x] Run `cargo test -p runtime-doc patch_doc`.
+- [x] Run MCP document tool tests that cover `patch_doc`.
+- [x] Run the Rust quality gate.
+- [x] Run governed document validation.
+- [x] Update `runtime/doc/README.md` or `mcp/vector/README.md` only if the user-facing `patch_doc` behavior changes.
