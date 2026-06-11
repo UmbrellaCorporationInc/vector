@@ -5,8 +5,10 @@
 
 pub mod chunking;
 pub mod defaults;
+pub mod embedding;
 pub mod pipeline;
 
 pub use chunking::*;
 pub use defaults::*;
+pub use embedding::*;
 pub use pipeline::*;

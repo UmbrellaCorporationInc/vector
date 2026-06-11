@@ -46,10 +46,10 @@ input:
   language: Rust
 ```
 
-- [ ] Define an `Embedder` boundary that exposes `model_id`, `dimension`, and batch embedding operations.
-- [ ] Define embedded chunk output that carries chunk content plus `embedding_model` and `embedding_dimension`.
-- [ ] Add dimension validation that rejects vectors whose length differs from the embedder dimension before downstream writes can occur.
-- [ ] Cover empty batches, single input chunks, multiple input chunks, and dimension mismatch failures with tests.
+- [x] Define an `Embedder` boundary that exposes `model_id`, `dimension`, and batch embedding operations.
+- [x] Define embedded chunk output that carries chunk content plus `embedding_model` and `embedding_dimension`.
+- [x] Add dimension validation that rejects vectors whose length differs from the embedder dimension before downstream writes can occur.
+- [x] Cover empty batches, single input chunks, multiple input chunks, and dimension mismatch failures with tests.
 
 ### 3.2. Phase B — Fastembed Implementation
 
