@@ -1,4 +1,4 @@
-#![allow(clippy::panic, clippy::unwrap_used)]
+#![allow(clippy::unwrap_used)]
 
 use super::*;
 use runtime_io::{IoPath, hash_file_content};
@@ -615,9 +615,9 @@ async fn fixture(
     let extraction = match extract_markdown_source(&record, &source) {
         MarkdownExtractionOutcome::Extracted(extraction) => extraction,
         MarkdownExtractionOutcome::Failed(failure) => {
-            panic!("fixture {name} extraction failed: {}", failure.error.message);
+            unreachable!("fixture {name} extraction failed: {}", failure.error.message);
         }
-        _ => panic!("fixture {name} returned an unsupported extraction outcome"),
+        _ => unreachable!("fixture {name} returned an unsupported extraction outcome"),
     };
     let _ = fs::remove_file(path.as_path()).await;
 

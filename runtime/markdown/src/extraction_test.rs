@@ -1,4 +1,4 @@
-#![allow(clippy::panic, clippy::unwrap_used)]
+#![allow(clippy::unwrap_used)]
 
 use super::*;
 use crate::MarkdownDiscoveryRecord;
@@ -47,7 +47,7 @@ Reference: [Research][local-rag].
 
     let outcome = extract_markdown_file(&record).await.unwrap();
     let MarkdownExtractionOutcome::Extracted(extraction) = outcome else {
-        panic!("expected successful extraction");
+        unreachable!("expected successful extraction");
     };
 
     assert_eq!(extraction.package, None);
@@ -115,7 +115,7 @@ async fn test_extract_markdown_file_preserves_package_identity() {
 
     let outcome = extract_markdown_file(&record).await.unwrap();
     let MarkdownExtractionOutcome::Extracted(extraction) = outcome else {
-        panic!("expected successful extraction");
+        unreachable!("expected successful extraction");
     };
 
     assert_eq!(extraction.package.as_deref(), Some("shared"));
@@ -150,12 +150,12 @@ async fn test_extract_markdown_file_parses_toml_and_json_frontmatter() {
     let MarkdownExtractionOutcome::Extracted(toml) =
         extract_markdown_file(&toml_record).await.unwrap()
     else {
-        panic!("expected toml extraction");
+        unreachable!("expected toml extraction");
     };
     let MarkdownExtractionOutcome::Extracted(json) =
         extract_markdown_file(&json_record).await.unwrap()
     else {
-        panic!("expected json extraction");
+        unreachable!("expected json extraction");
     };
 
     assert_eq!(toml.frontmatter.unwrap().format, MarkdownFrontmatterFormat::Toml);
@@ -173,7 +173,7 @@ async fn test_extract_markdown_file_returns_file_scoped_error_for_malformed_fron
 
     let outcome = extract_markdown_file(&record).await.unwrap();
     let MarkdownExtractionOutcome::Failed(failure) = outcome else {
-        panic!("expected file-scoped extraction failure");
+        unreachable!("expected file-scoped extraction failure");
     };
 
     assert_eq!(failure.package.as_deref(), Some("shared-docs"));
@@ -195,7 +195,7 @@ async fn test_extract_markdown_file_warns_for_unresolved_reference_links() {
 
     let outcome = extract_markdown_file(&record).await.unwrap();
     let MarkdownExtractionOutcome::Extracted(extraction) = outcome else {
-        panic!("expected successful extraction");
+        unreachable!("expected successful extraction");
     };
 
     assert!(
