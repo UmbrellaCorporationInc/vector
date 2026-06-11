@@ -40,6 +40,7 @@ The proposed idea is to change `find_doc` so it returns only the package and pat
 That change may reduce one class of content mismatch when the target document is local and readable from the agent environment. It also weakens the `find_doc` contract, removes useful context from a lookup tool, and may break package-qualified or remote-like document flows where the caller cannot safely assume direct filesystem access.
 
 The recommended path is to keep `find_doc` content-compatible and fix the authoritative mutation path in `patch_doc`.
+No optional path-only or metadata-only mode is planned for this task; `find_doc` keeps its current default response shape.
 
 ### 2.2. Target Behavior
 
@@ -135,23 +136,7 @@ input:
 - [x] Avoid rewriting filenames, URLs, fenced code blocks, or inline code unless there is an explicit product decision to enforce references inside code spans too.
 - [x] Add tests for frontmatter exclusion, body rewrite, already-valid wikilinks, package-qualified stems, and false-positive avoidance.
 
-### 3.5. Phase E - Evaluate Optional API Refinement
-
-```vector-agent-action
-label: Execute Phase in Agent
-profile: code
-prompt: prompts-00004-execute-task-phase
-input:
-  task: task 00062
-  phase: Phase E
-  language: Rust, Markdown
-```
-
-- [ ] Decide whether `find_doc` should add an optional path-only or metadata-only mode instead of removing content from the default response.
-- [ ] If a new mode is added, keep the default response compatible for existing agents.
-- [ ] Add tests for both default lookup and any new optional lookup mode.
-
-### 3.6. Phase Z - Wrap-up
+### 3.5. Phase Z - Wrap-up
 
 ```vector-agent-action
 label: Execute Phase in Agent
