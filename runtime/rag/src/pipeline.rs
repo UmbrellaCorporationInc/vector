@@ -1,8 +1,9 @@
 //! RAG pipeline orchestration boundaries.
 
 use crate::{
-    MarkdownChunkDocument, MarkdownChunkRecord, MarkdownChunkingConfig, MarkdownChunkingError,
-    MarkdownTokenCounter, chunk_markdown_document,
+    EmbeddedMarkdownChunkRecord, Embedder, EmbeddingError, MarkdownChunkDocument,
+    MarkdownChunkRecord, MarkdownChunkingConfig, MarkdownChunkingError, MarkdownTokenCounter,
+    chunk_markdown_document, embed_markdown_chunks,
 };
 use runtime_markdown::{
     MarkdownExtractionError, MarkdownExtractionErrorRecord, MarkdownExtractionOutcome,
@@ -50,6 +51,48 @@ pub struct MarkdownChunkingFailureRecord {
     pub document_hash: String,
     /// Actionable failure details.
     pub error: MarkdownChunkingPipelineError,
+}
+
+/// Embedded chunks emitted for one extracted Markdown document before storage.
+///
+/// # DTO(embedding-to-storage boundary consumed by later RAG phases)
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct EmbeddedMarkdownChunkBatch {
+    /// Package identity, or `None` for workspace-local documents.
+    pub package: Option<String>,
+    /// Governed document stem.
+    pub document_stem: String,
+    /// Source document content hash from discovery.
+    pub document_hash: String,
+    /// Ordered chunks carrying embedding vectors and model metadata.
+    pub chunks: Vec<EmbeddedMarkdownChunkRecord>,
+}
+
+/// File-scoped extraction, chunking, and embedding pipeline outcome.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum MarkdownEmbeddingPipelineOutcome {
+    /// Extraction, chunking, and embedding succeeded.
+    Embedded(EmbeddedMarkdownChunkBatch),
+    /// The document could not be embedded, but unrelated documents can continue.
+    Failed(MarkdownEmbeddingFailureRecord),
+}
+
+/// File-scoped embedding pipeline failure record.
+///
+/// # DTO(indexing diagnostic boundary consumed by later RAG phases)
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MarkdownEmbeddingFailureRecord {
+    /// Package identity, or `None` for workspace-local documents.
+    pub package: Option<String>,
+    /// Governed document stem.
+    pub document_stem: String,
+    /// Source document content hash from discovery.
+    pub document_hash: String,
+    /// Actionable failure details.
+    pub error: MarkdownEmbeddingPipelineError,
 }
 
 /// Actionable extraction-to-chunking failure.
@@ -102,6 +145,27 @@ impl std::fmt::Display for MarkdownChunkingPipelineError {
 }
 
 impl std::error::Error for MarkdownChunkingPipelineError {}
+
+/// Actionable extraction-to-embedding failure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MarkdownEmbeddingPipelineError {
+    /// The Markdown input could not be extracted or chunked.
+    Chunking(MarkdownChunkingPipelineError),
+    /// The chunk batch could not be embedded.
+    Embedding(EmbeddingError),
+}
+
+impl std::fmt::Display for MarkdownEmbeddingPipelineError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Chunking(error) => write!(formatter, "Markdown chunking failed: {error}"),
+            Self::Embedding(error) => write!(formatter, "Markdown embedding failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for MarkdownEmbeddingPipelineError {}
 
 /// Run chunking immediately after normalized Markdown extraction.
 ///
@@ -158,6 +222,50 @@ pub fn chunk_markdown_extraction(
                 details: BTreeMap::new(),
             },
         }),
+    }
+}
+
+/// Run embedding immediately after governed Markdown chunk generation.
+///
+/// Embedding receives the full chunk text batch for the document, preserving
+/// model metadata and vector shape validation before later storage phases.
+#[must_use]
+pub fn embed_markdown_extraction(
+    outcome: &MarkdownExtractionOutcome,
+    source: &str,
+    config: MarkdownChunkingConfig,
+    token_counter: &impl MarkdownTokenCounter,
+    embedder: &impl Embedder,
+) -> MarkdownEmbeddingPipelineOutcome {
+    match chunk_markdown_extraction(outcome, source, config, token_counter) {
+        MarkdownChunkingPipelineOutcome::Chunked(batch) => {
+            match embed_markdown_chunks(embedder, &batch.chunks) {
+                Ok(chunks) => {
+                    MarkdownEmbeddingPipelineOutcome::Embedded(EmbeddedMarkdownChunkBatch {
+                        package: batch.package,
+                        document_stem: batch.document_stem,
+                        document_hash: batch.document_hash,
+                        chunks,
+                    })
+                }
+                Err(error) => {
+                    MarkdownEmbeddingPipelineOutcome::Failed(MarkdownEmbeddingFailureRecord {
+                        package: batch.package,
+                        document_stem: batch.document_stem,
+                        document_hash: batch.document_hash,
+                        error: MarkdownEmbeddingPipelineError::Embedding(error),
+                    })
+                }
+            }
+        }
+        MarkdownChunkingPipelineOutcome::Failed(failure) => {
+            MarkdownEmbeddingPipelineOutcome::Failed(MarkdownEmbeddingFailureRecord {
+                package: failure.package,
+                document_stem: failure.document_stem,
+                document_hash: failure.document_hash,
+                error: MarkdownEmbeddingPipelineError::Chunking(failure.error),
+            })
+        }
     }
 }
 

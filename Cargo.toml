@@ -24,6 +24,7 @@ walkdir = "2"
 regex = "1"
 chrono = "0.4"
 dunce = "1"
+fastembed = { version = "5.16.0", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries-rustls-tls"] }
 patcher = "0.2"
 mcp-vector = { path = "mcp/vector" }
 terminal_size = "0.4"
