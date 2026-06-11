@@ -109,10 +109,10 @@ input:
   language: Rust
 ```
 
-- [ ] Decide whether `patch_doc` should preflight hunk headers before calling `Patch::parse`.
-- [ ] If preflight is added, keep it diagnostic-only unless there is an explicit product decision to auto-correct malformed hunk counts.
-- [ ] Avoid silently rewriting agent diffs because incorrect hunk counts may indicate missing context lines or truncated content.
-- [ ] Add tests proving valid multi-hunk diffs are not rejected by the preflight path.
+- [x] Decide whether `patch_doc` should preflight hunk headers before calling `Patch::parse`.
+- [x] If preflight is added, keep it diagnostic-only unless there is an explicit product decision to auto-correct malformed hunk counts.
+- [x] Avoid silently rewriting agent diffs because incorrect hunk counts may indicate missing context lines or truncated content.
+- [x] Add tests proving valid multi-hunk diffs are not rejected by the preflight path.
 
 ### 3.5. Phase Z — Wrap-up
 

@@ -1079,8 +1079,8 @@ async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
         "error must explain how to repair the hunk header; got: {err:?}"
     );
     assert!(
-        err.contains("Original parser error:"),
-        "error must preserve parser detail for debugging; got: {err:?}"
+        err.contains("Preflight detail:"),
+        "error must include preflight detail for debugging; got: {err:?}"
     );
     assert!(
         err.contains("Header expected (-10, +10)")
@@ -1089,7 +1089,7 @@ async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
     );
     assert!(
         !err.contains("patch targets"),
-        "hunk count mismatch must fail during parsing before target mismatch checks; got: {err:?}"
+        "hunk count mismatch must fail during preflight before target mismatch checks; got: {err:?}"
     );
     assert!(
         err.len() <= 600,

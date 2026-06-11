@@ -12,6 +12,12 @@ use crate::operations::support::CapturingSender;
 
 const UTF8_BOM: &[u8] = b"\xef\xbb\xbf";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HunkLineCounts {
+    old: usize,
+    new: usize,
+}
+
 /// Input for the `patch_doc` operation.
 ///
 /// # DTO(Plugin operation input contracts use public fields for ergonomic data transfer)
@@ -91,6 +97,95 @@ fn patch_parse_error_message(error: impl Display) -> String {
     format!("patch is not a valid unified diff: {parser_error}")
 }
 
+fn parse_hunk_range_count(range: &str, prefix: char) -> Option<usize> {
+    let raw_range = range.strip_prefix(prefix)?;
+    let (_start, count) = raw_range.split_once(',').unwrap_or((raw_range, "1"));
+    count.parse().ok()
+}
+
+fn parse_hunk_header_counts(line: &str) -> Option<HunkLineCounts> {
+    if !line.starts_with("@@ ") {
+        return None;
+    }
+
+    let mut parts = line.strip_prefix("@@ ")?.split_whitespace();
+    let old = parse_hunk_range_count(parts.next()?, '-')?;
+    let new = parse_hunk_range_count(parts.next()?, '+')?;
+    let closing_marker = parts.next()?;
+    if closing_marker != "@@" {
+        return None;
+    }
+
+    Some(HunkLineCounts { old, new })
+}
+
+fn hunk_count_mismatch_message(
+    header: &str,
+    expected: HunkLineCounts,
+    actual: HunkLineCounts,
+) -> String {
+    format!(
+        "patch is not a valid unified diff: hunk line-count mismatch. \
+         Hunk header declares (-{}, +{}) but the hunk body contains (-{}, +{}). \
+         Make the @@ -a,b +c,d @@ counts match the number of old-side lines \
+         and new-side lines in the hunk body. Preflight detail: Header expected (-{}, +{}), \
+         Parsed content counts (-{}, +{}). Hunk header: {header}",
+        expected.old,
+        expected.new,
+        actual.old,
+        actual.new,
+        expected.old,
+        expected.new,
+        actual.old,
+        actual.new
+    )
+}
+
+fn validate_completed_hunk_count(
+    header: &str,
+    expected: HunkLineCounts,
+    actual: HunkLineCounts,
+) -> Result<(), String> {
+    if expected == actual {
+        Ok(())
+    } else {
+        Err(hunk_count_mismatch_message(header, expected, actual))
+    }
+}
+
+fn preflight_hunk_line_counts(diff: &str) -> Result<(), String> {
+    let mut current_hunk: Option<(String, HunkLineCounts, HunkLineCounts)> = None;
+
+    for line in diff.lines() {
+        if let Some(expected) = parse_hunk_header_counts(line) {
+            if let Some((header, previous_expected, actual)) = current_hunk.take() {
+                validate_completed_hunk_count(&header, previous_expected, actual)?;
+            }
+
+            current_hunk = Some((line.to_string(), expected, HunkLineCounts { old: 0, new: 0 }));
+            continue;
+        }
+
+        if let Some((_header, _expected, actual)) = current_hunk.as_mut() {
+            match line.as_bytes().first().copied() {
+                Some(b' ') => {
+                    actual.old += 1;
+                    actual.new += 1;
+                }
+                Some(b'-') => actual.old += 1,
+                Some(b'+') => actual.new += 1,
+                _ => {}
+            }
+        }
+    }
+
+    if let Some((header, expected, actual)) = current_hunk {
+        validate_completed_hunk_count(&header, expected, actual)?;
+    }
+
+    Ok(())
+}
+
 async fn patch_doc(
     input: PatchDocInput,
     output: &mut impl PluginSender<PatchDocOutput>,
@@ -128,6 +223,7 @@ async fn patch_doc(
 
     // Normalize and parse the diff
     let normalized = normalize_diff(&input.git_diff);
+    preflight_hunk_line_counts(&normalized).map_err(runtime_core::RuntimeError::operation)?;
 
     let patch = Patch::parse(&normalized)
         .map_err(|e| runtime_core::RuntimeError::operation(patch_parse_error_message(e)))?;
