@@ -1026,6 +1026,84 @@ async fn patch_doc_tool_returns_error_for_malformed_diff() {
     );
 }
 
+/// Verifies that malformed hunk counts surface the runtime diagnostic through the MCP prefix.
+#[tokio::test]
+async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
+    let (dir, root) = create_patch_doc_test_project();
+    let rfc_path = dir.path().join("doc").join("rfc").join("draft").join("rfc-00042-my-rfc.md");
+    let original_content = std::fs::read_to_string(&rfc_path).expect("read original doc");
+
+    let git_diff = "\
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -37,10 +37,10 @@ input:
+-old one
+-old two
+-old three
+-old four
+-old five
+-old six
+-old seven
++new one
++new two
++new three
++new four
++new five
++new six
++new seven
+"
+    .to_string();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            git_diff,
+        }))
+        .await;
+
+    assert!(result.is_err(), "patch_doc must reject malformed hunk line counts");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.starts_with("patch_doc failed:"),
+        "error must keep the MCP operation prefix; got: {err:?}"
+    );
+    assert!(
+        err.contains("hunk line-count mismatch"),
+        "error must identify the malformed hunk counts; got: {err:?}"
+    );
+    assert!(
+        err.contains("Make the @@ -a,b +c,d @@ counts match"),
+        "error must explain how to repair the hunk header; got: {err:?}"
+    );
+    assert!(
+        err.contains("Original parser error:"),
+        "error must preserve parser detail for debugging; got: {err:?}"
+    );
+    assert!(
+        err.contains("Header expected (-10, +10)")
+            && err.contains("Parsed content counts (-7, +7)"),
+        "error must expose declared and parsed hunk counts; got: {err:?}"
+    );
+    assert!(
+        !err.contains("patch targets"),
+        "hunk count mismatch must fail during parsing before target mismatch checks; got: {err:?}"
+    );
+    assert!(
+        err.len() <= 600,
+        "error should stay compact enough for agent feedback loops; length={} err={err:?}",
+        err.len()
+    );
+
+    let on_disk = std::fs::read_to_string(&rfc_path).expect("read doc after rejected patch");
+    assert_eq!(
+        on_disk, original_content,
+        "malformed diff rejection must not modify the target document"
+    );
+}
+
 /// Verifies that the `patch_doc` tool returns an error for a diff that targets a different file.
 #[tokio::test]
 async fn patch_doc_tool_returns_error_for_target_mismatch() {

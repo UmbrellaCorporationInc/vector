@@ -93,9 +93,9 @@ input:
   language: Rust
 ```
 
-- [ ] Ensure the MCP `patch_doc` tool returns the improved diagnostic without losing the `patch_doc failed:` prefix used by callers.
-- [ ] Add or update MCP tool tests for malformed hunk count diagnostics.
-- [ ] Verify the improved diagnostic is short enough to be useful in agent feedback loops.
+- [x] Ensure the MCP `patch_doc` tool returns the improved diagnostic without losing the `patch_doc failed:` prefix used by callers.
+- [x] Add or update MCP tool tests for malformed hunk count diagnostics.
+- [x] Verify the improved diagnostic is short enough to be useful in agent feedback loops.
 
 ### 3.4. Phase D — Evaluate Safe Preflight Validation
 
