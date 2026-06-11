@@ -80,10 +80,10 @@ input:
   language: Rust
 ```
 
-- [ ] Integrate embedding after governed Markdown chunk generation in the RAG pipeline.
-- [ ] Ensure embedding accepts batches of chunk text rather than requiring per-chunk calls.
-- [ ] Add a deterministic fake embedder for unit tests and pipeline tests.
-- [ ] Ensure unit and pipeline tests do not require network access, credentials, or real model downloads.
+- [x] Integrate embedding after governed Markdown chunk generation in the RAG pipeline.
+- [x] Ensure embedding accepts batches of chunk text rather than requiring per-chunk calls.
+- [x] Add a deterministic fake embedder for unit tests and pipeline tests.
+- [x] Ensure unit and pipeline tests do not require network access, credentials, or real model downloads.
 
 ### 3.4. Phase Z — Wrap-up
 

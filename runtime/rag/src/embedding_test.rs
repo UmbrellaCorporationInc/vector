@@ -4,7 +4,7 @@ use super::*;
 
 #[test]
 fn test_embed_markdown_chunks_accepts_empty_batches() {
-    let model = DeterministicEmbedder::new("test-model", 2);
+    let model = DeterministicFakeEmbedder::new("test-model", 2);
 
     let records = embed_markdown_chunks(&model, &[]).unwrap();
 
@@ -13,7 +13,7 @@ fn test_embed_markdown_chunks_accepts_empty_batches() {
 
 #[test]
 fn test_embed_markdown_chunks_adds_model_metadata_for_single_chunk() {
-    let model = DeterministicEmbedder::new("test-model", 2);
+    let model = DeterministicFakeEmbedder::new("test-model", 2);
     let chunks = vec![chunk("chunk-0000", 0, "alpha beta")];
 
     let records = embed_markdown_chunks(&model, &chunks).unwrap();
@@ -27,7 +27,7 @@ fn test_embed_markdown_chunks_adds_model_metadata_for_single_chunk() {
 
 #[test]
 fn test_embed_markdown_chunks_preserves_multiple_input_chunks_in_order() {
-    let model = DeterministicEmbedder::new("test-model", 2);
+    let model = DeterministicFakeEmbedder::new("test-model", 2);
     let chunks = vec![
         chunk("chunk-0000", 0, "first chunk"),
         chunk("chunk-0001", 1, "second chunk with more words"),
@@ -117,18 +117,18 @@ fn test_fastembed_bge_small_en_v15_embedder_rejects_invalid_runtime_dimensions()
 }
 
 #[derive(Debug, Clone)]
-struct DeterministicEmbedder {
+struct DeterministicFakeEmbedder {
     model_id: String,
     dimension: usize,
 }
 
-impl DeterministicEmbedder {
+impl DeterministicFakeEmbedder {
     fn new(model_id: &str, dimension: usize) -> Self {
         Self { model_id: model_id.to_owned(), dimension }
     }
 }
 
-impl Embedder for DeterministicEmbedder {
+impl Embedder for DeterministicFakeEmbedder {
     fn model_id(&self) -> &str {
         &self.model_id
     }
