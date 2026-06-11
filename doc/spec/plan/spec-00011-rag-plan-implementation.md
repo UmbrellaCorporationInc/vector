@@ -96,6 +96,7 @@ Acceptance criteria:
 ### Phase 4: Build Heading-Aware Chunking
 
 Implement chunking that respects Markdown structure.
+See [[rfc-00034-markdown-chunking]] for the implemented heading-aware chunking contract, output shape, and acceptance criteria for this phase.
 
 - Keep headings with their section content.
 - Avoid splitting fenced code blocks.
@@ -113,6 +114,7 @@ Acceptance criteria:
 ### Phase 5: Add Embedding Boundary
 
 Introduce a narrow embedding abstraction and a first local implementation.
+See [[rfc-00036-phase-5-embedder]] for the proposed embedder boundary, baseline model, and CPU-first implementation constraints for this phase.
 
 - Define an `Embedder` boundary with model identifier, dimension, and batch embedding operations.
 - Implement the first embedder with `fastembed`.
