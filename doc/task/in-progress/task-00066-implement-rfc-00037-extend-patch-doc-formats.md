@@ -47,11 +47,11 @@ input:
   language: rust
 ```
 
-- [ ] Add a typed patch format contract for `patch_doc` with supported values `unified` and the omitted default `apply_patch`.
-- [ ] Rename the runtime payload concept from `git_diff` to `patch` internally where practical without breaking existing call sites unnecessarily.
-- [ ] Decide whether the MCP input should keep `git_diff` as a deprecated alias for explicit `format: "unified"` during the transition.
-- [ ] Reject unknown format values with an actionable error that lists supported values.
-- [ ] Preserve target document resolution from `doc_type`, `code`, and optional `package` as the authority for all formats.
+- [x] Add a typed patch format contract for `patch_doc` with supported values `unified` and the omitted default `apply_patch`.
+- [x] Rename the runtime payload concept from `git_diff` to `patch` internally where practical without breaking existing call sites unnecessarily.
+- [x] Decide whether the MCP input should keep `git_diff` as a deprecated alias for explicit `format: "unified"` during the transition.
+- [x] Reject unknown format values with an actionable error that lists supported values.
+- [x] Preserve target document resolution from `doc_type`, `code`, and optional `package` as the authority for all formats.
 
 ### 3.2. Phase B - Preserve Explicit Unified Diff Behavior
 

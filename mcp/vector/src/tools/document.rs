@@ -9,7 +9,7 @@ use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_doc::operations::{
     CreateDocInput, CreateDocOp, CreateDocTypeInput, CreateDocTypeOp, FindDocInput, FindDocOp,
-    PatchDocInput, PatchDocOp, ValidateInput, ValidateOp,
+    PatchDocFormat, PatchDocInput, PatchDocOp, ValidateInput, ValidateOp,
 };
 use runtime_io::path::IoPath;
 use serde::{Deserialize, Serialize};
@@ -130,14 +130,30 @@ pub struct CreateDocTypeParams {
 #[non_exhaustive]
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct PatchDocParams {
+    /// Optional synchronized package name for package-qualified lookup.
+    ///
+    /// When empty, the document is resolved within the active workspace at `root_dir`.
+    /// When set, the document is resolved inside `.vector-database/packages/{package}/`.
+    #[serde(default)]
+    pub package: String,
     /// Absolute or relative path to the root directory of the project.
     pub root_dir: String,
     /// The document type identifier (e.g. "rfc", "task").
     pub doc_type: String,
     /// The numeric code of the document to patch.
     pub code: u32,
-    /// The unified diff to apply to the document.
-    pub git_diff: String,
+    /// Patch format. Supported values are `unified` and `apply_patch`.
+    /// When omitted, the format defaults to `apply_patch`.
+    #[serde(default)]
+    pub format: Option<String>,
+    /// The patch payload to apply to the document.
+    #[serde(default)]
+    pub patch: Option<String>,
+    /// Deprecated alias for a unified-diff patch payload.
+    ///
+    /// If this field is used, it is interpreted as `format: "unified"`.
+    #[serde(default)]
+    pub git_diff: Option<String>,
 }
 
 /// MCP tool group for document operations.
@@ -197,6 +213,45 @@ async fn run_validate(input: ValidateInput) -> Result<String, String> {
     }
 
     Ok(lines.join("\n"))
+}
+
+fn patch_doc_input_from_params(
+    PatchDocParams { package, root_dir, doc_type, code, format, patch, git_diff }: PatchDocParams,
+) -> Result<PatchDocInput, String> {
+    let root_dir = IoPath::new(root_dir);
+
+    if let Some(git_diff) = git_diff {
+        if patch.is_some() {
+            return Err(
+                "patch_doc accepts either 'patch' or deprecated 'git_diff', not both".to_string()
+            );
+        }
+
+        if let Some(format) = format
+            && format != PatchDocFormat::Unified.as_str()
+        {
+            return Err(format!(
+                "git_diff is a deprecated alias for format: \"unified\"; received format: \
+                 \"{format}\". Use 'patch' for other formats."
+            ));
+        }
+
+        return Ok(PatchDocInput::with_format(
+            root_dir,
+            package,
+            doc_type,
+            code,
+            PatchDocFormat::Unified,
+            git_diff,
+        ));
+    }
+
+    let patch = patch.ok_or_else(|| {
+        "patch_doc requires 'patch' unless deprecated 'git_diff' is provided".to_string()
+    })?;
+    let format = PatchDocFormat::parse_optional(format.as_deref())?;
+
+    Ok(PatchDocInput::with_format(root_dir, package, doc_type, code, format, patch))
 }
 
 #[tool_router]
@@ -352,21 +407,19 @@ impl DocumentTools {
         }
     }
 
-    /// Apply a unified diff to a governed document and return the final content.
+    /// Apply a patch to a governed document and return the final content.
     ///
     /// Executes `PatchDocOp` through the standard dispatcher path.
     /// All patching logic, path authorization, and encoding enforcement live in `runtime-doc`;
     /// this method only maps MCP params to the runtime input and returns the patched content.
     #[tool(
-        description = "Apply a unified diff to a governed document and return the final patched content or a structured validation error"
+        description = "Apply a patch to a governed document and return the final patched content or a structured validation error. Supported formats are `unified` and `apply_patch`; omitted format defaults to `apply_patch`. `git_diff` is a deprecated alias for `format: \"unified\"`."
     )]
     async fn patch_doc(
         &self,
-        Parameters(PatchDocParams { root_dir, doc_type, code, git_diff }): Parameters<
-            PatchDocParams,
-        >,
+        Parameters(params): Parameters<PatchDocParams>,
     ) -> Result<String, String> {
-        let input = PatchDocInput::new(IoPath::new(root_dir), doc_type, code, git_diff);
+        let input = patch_doc_input_from_params(params)?;
 
         let (_cancel, mut receiver) = PluginDispatcher::new(PatchDocOp::new())
             .input(input)

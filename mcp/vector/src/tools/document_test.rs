@@ -934,13 +934,78 @@ fn create_patch_doc_test_project() -> (tempfile::TempDir, std::path::PathBuf) {
 /// Verifies that `PatchDocParams` deserializes correctly from JSON input.
 #[test]
 fn patch_doc_params_deserializes_correctly() {
-    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "git_diff": "--- a/x.md\n+++ b/x.md\n"}"#;
+    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "format": "unified", "patch": "--- a/x.md\n+++ b/x.md\n"}"#;
     let params: super::PatchDocParams =
         serde_json::from_str(raw).expect("must deserialize PatchDocParams");
+    assert_eq!(params.package, "", "package must default to empty string");
     assert_eq!(params.root_dir, "/tmp/p");
     assert_eq!(params.doc_type, "rfc");
     assert_eq!(params.code, 42);
-    assert!(!params.git_diff.is_empty(), "git_diff must be deserialized");
+    assert_eq!(params.format.as_deref(), Some("unified"));
+    assert!(params.patch.as_ref().is_some_and(|patch| !patch.is_empty()));
+    assert!(params.git_diff.is_none());
+}
+
+/// Verifies that deprecated `git_diff` payloads remain accepted as a transition alias.
+#[test]
+fn patch_doc_params_deserializes_deprecated_git_diff_alias() {
+    let raw = r#"{"root_dir": "/tmp/p", "doc_type": "rfc", "code": 42, "git_diff": "--- a/x.md\n+++ b/x.md\n"}"#;
+    let params: super::PatchDocParams =
+        serde_json::from_str(raw).expect("must deserialize PatchDocParams with git_diff");
+    assert!(params.patch.is_none());
+    assert!(params.format.is_none());
+    assert!(params.git_diff.as_ref().is_some_and(|git_diff| !git_diff.is_empty()));
+}
+
+#[test]
+fn patch_doc_input_from_params_defaults_omitted_format_to_apply_patch() {
+    let input = super::patch_doc_input_from_params(super::PatchDocParams {
+        package: String::new(),
+        root_dir: "/tmp/p".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 42,
+        format: None,
+        patch: Some("*** Begin Patch\n*** End Patch\n".to_string()),
+        git_diff: None,
+    })
+    .expect("omitted format must default successfully");
+
+    assert_eq!(input.format, runtime_doc::operations::PatchDocFormat::ApplyPatch);
+}
+
+#[test]
+fn patch_doc_input_from_params_rejects_unknown_format() {
+    let err = super::patch_doc_input_from_params(super::PatchDocParams {
+        package: String::new(),
+        root_dir: "/tmp/p".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 42,
+        format: Some("context".to_string()),
+        patch: Some("patch".to_string()),
+        git_diff: None,
+    })
+    .expect_err("unknown format must be rejected");
+
+    assert!(err.contains("unknown patch format 'context'"), "{err}");
+    assert!(err.contains("Supported values: unified, apply_patch"), "{err}");
+}
+
+#[test]
+fn patch_doc_input_from_params_maps_git_diff_alias_to_unified() {
+    let input = super::patch_doc_input_from_params(super::PatchDocParams {
+        package: "pkg".to_string(),
+        root_dir: "/tmp/p".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 42,
+        format: None,
+        patch: None,
+        git_diff: Some("--- a/x.md\n+++ b/x.md\n".to_string()),
+    })
+    .expect("git_diff alias must map to unified format");
+
+    assert_eq!(input.package, "pkg");
+    assert_eq!(input.format, runtime_doc::operations::PatchDocFormat::Unified);
+    assert_eq!(input.patch, "--- a/x.md\n+++ b/x.md\n");
 }
 
 /// Verifies that the `patch_doc` tool applies a valid unified diff and returns the patched content.
@@ -955,10 +1020,13 @@ async fn patch_doc_tool_applies_valid_diff_and_returns_content() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff,
+            format: Some("unified".to_string()),
+            patch: Some(git_diff),
+            git_diff: None,
         }))
         .await
         .expect("patch_doc must succeed for a valid diff");
@@ -987,11 +1055,15 @@ async fn patch_doc_tool_returns_error_for_missing_document() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 999,
-            git_diff: "--- a/rfc-00999-x.md\n+++ b/rfc-00999-x.md\n@@ -1 +1 @@\n-old\n+new\n"
-                .to_string(),
+            format: None,
+            patch: None,
+            git_diff: Some(
+                "--- a/rfc-00999-x.md\n+++ b/rfc-00999-x.md\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
+            ),
         }))
         .await;
 
@@ -1011,10 +1083,13 @@ async fn patch_doc_tool_returns_error_for_malformed_diff() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff: "this is not a valid unified diff".to_string(),
+            format: None,
+            patch: None,
+            git_diff: Some("this is not a valid unified diff".to_string()),
         }))
         .await;
 
@@ -1057,10 +1132,13 @@ async fn patch_doc_tool_returns_actionable_error_for_hunk_count_mismatch() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff,
+            format: Some("unified".to_string()),
+            patch: Some(git_diff),
+            git_diff: None,
         }))
         .await;
 
@@ -1112,12 +1190,16 @@ async fn patch_doc_tool_returns_error_for_target_mismatch() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff:
+            format: None,
+            patch: None,
+            git_diff: Some(
                 "--- a/rfc-00001-other.md\n+++ b/rfc-00001-other.md\n@@ -1 +1 @@\n-old\n+new\n"
                     .to_string(),
+            ),
         }))
         .await;
 
@@ -1146,10 +1228,13 @@ async fn patch_doc_tool_returns_error_for_bom_content() {
     let tools = super::DocumentTools::new();
     let result = tools
         .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
             root_dir: root.display().to_string(),
             doc_type: "rfc".to_string(),
             code: 42,
-            git_diff,
+            format: Some("unified".to_string()),
+            patch: Some(git_diff),
+            git_diff: None,
         }))
         .await;
 

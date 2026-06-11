@@ -46,8 +46,88 @@ fn create_doc_file(temp: &TempDir, doc_type: &str, filename: &str, content: &str
     fs::write(dir.join(filename), content).unwrap();
 }
 
+fn write_package_doc_config(temp: &TempDir, package: &str, doc_type: &str) {
+    let package_root = temp.path().join(".vector-database").join("packages").join(package);
+    let vector_dir = package_root.join(".vector");
+    fs::create_dir_all(&vector_dir).unwrap();
+    fs::write(
+        vector_dir.join("document-types.yaml"),
+        format!(
+            "doc-type: {{template: t, prompt-template: pt, prompt: p}}\ndocument-types:\n  {doc_type}:\n    layout: status\n    code-width: 5\n    prompt: p\n    statuses: [draft]"
+        ),
+    )
+    .unwrap();
+}
+
+fn create_package_doc_file(
+    temp: &TempDir,
+    package: &str,
+    doc_type: &str,
+    filename: &str,
+    content: &str,
+) {
+    let dir = temp
+        .path()
+        .join(".vector-database")
+        .join("packages")
+        .join(package)
+        .join("doc")
+        .join(doc_type)
+        .join("draft");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join(filename), content).unwrap();
+}
+
 fn make_diff(filename: &str, old_line: &str, new_line: &str) -> String {
     format!("--- a/{filename}\n+++ b/{filename}\n@@ -1,1 +1,1 @@\n-{old_line}\n+{new_line}\n")
+}
+
+#[test]
+fn test_patch_doc_format_contract_defaults_to_apply_patch() {
+    let format = PatchDocFormat::parse_optional(None).unwrap();
+    assert_eq!(format, PatchDocFormat::ApplyPatch);
+    assert_eq!(format.as_str(), "apply_patch");
+    assert_eq!(PatchDocFormat::supported_values(), &["unified", "apply_patch"]);
+}
+
+#[test]
+fn test_patch_doc_format_contract_rejects_unknown_values() {
+    let err = PatchDocFormat::parse_optional(Some("context")).unwrap_err();
+    assert!(err.contains("unknown patch format 'context'"), "{err}");
+    assert!(err.contains("Supported values: unified, apply_patch"), "{err}");
+    assert!(err.contains("Omit format to use 'apply_patch'"), "{err}");
+}
+
+#[tokio::test]
+async fn test_patch_doc_apply_patch_format_is_recognized_but_not_applied_in_phase_a() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "old content\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let input = PatchDocInput::with_format(
+        root,
+        String::new(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::ApplyPatch,
+        "*** Begin Patch\n*** End Patch\n".to_string(),
+    );
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(result.is_err(), "Phase A only recognizes the apply_patch format contract");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("format 'apply_patch' is recognized"), "{err}");
+    assert!(err.contains("not implemented until Phase C"), "{err}");
+    assert!(sender.outputs.is_empty(), "unapplied formats must not emit patched content");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified before apply_patch is implemented");
 }
 
 // ── happy path ───────────────────────────────────────────────────────────────
@@ -72,6 +152,45 @@ async fn test_patch_doc_valid_patch_succeeds() {
 
     // Verify file was written
     let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let written = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(written, "new content\n");
+}
+
+#[tokio::test]
+async fn test_patch_doc_uses_package_document_root_when_package_is_provided() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_package_doc_config(&temp, "my-package", "task");
+    let filename = "task-00001-foo.md";
+    create_package_doc_file(&temp, "my-package", "task", filename, "old content\n");
+
+    let diff = make_diff(filename, "old content", "new content");
+
+    let input = PatchDocInput::with_format(
+        root,
+        "my-package".to_string(),
+        "task".to_string(),
+        1,
+        PatchDocFormat::Unified,
+        diff,
+    );
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs.len(), 1);
+    assert_eq!(sender.outputs[0].content, "new content\n");
+    assert!(sender.outputs[0].path.contains(".vector-database/packages/my-package/doc"));
+
+    let doc_path = temp
+        .path()
+        .join(".vector-database")
+        .join("packages")
+        .join("my-package")
+        .join("doc")
+        .join("task")
+        .join("draft")
+        .join(filename);
     let written = fs::read_to_string(&doc_path).unwrap();
     assert_eq!(written, "new content\n");
 }
