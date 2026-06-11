@@ -63,7 +63,7 @@
 | `find_doc`              | Document          | Locate a governed document by type and numeric code; returns `path`, `package` (if resolved from a package), and `content` |
 | `create_doc_prompt`     | Document          | Create a governed document and return the resolved authoring prompt |
 | `create_doc_type_prompt`| Document          | Create a governed document type and return the resolved authoring prompt |
-| `patch_doc`             | Document          | Apply a unified diff to a governed document; enforces doc/ scope, returns actionable malformed-hunk diagnostics, rejects BOM-encoded output, and returns the final patched content |
+| `patch_doc`             | Document          | Apply a patch to a governed document; supports `format: "unified"` and omitted-format `apply_patch`, enforces target matching, returns format-specific diagnostics, rejects BOM-encoded output, and returns the final patched content |
 | `language_quality_gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
 | `language_best_practices` | Language        | Resolve and concatenate governed best-practices prompt bodies for a language list |
 
@@ -85,6 +85,33 @@ Example JSON response:
 ```
 
 The `package` input parameter is used for package-qualified document lookup. When set to a package name (e.g., `"my-pkg"`), the document is resolved against the synchronized package at `.vector-database/packages/{package}/` instead of the active workspace. If the package is resolved from a synchronized package location, the output `package` field echoes the package name; otherwise, it is empty. Callers must handle both workspace-local and package-qualified lookup results; see RFC 00030.
+
+### `patch_doc` input contract
+
+`patch_doc` resolves the writable document from `root_dir`, `doc_type`, `code`, and optional `package`; callers do not provide a write path. Send patch content in `patch` and select the syntax with `format`. Supported format values are `unified` and `apply_patch`. When `format` is omitted, `patch` is parsed as `apply_patch`. The deprecated `git_diff` field remains a transition alias for `format: "unified"`.
+
+Explicit unified diff example:
+
+```json
+{
+  "root_dir": "/path/to/project",
+  "doc_type": "rfc",
+  "code": 37,
+  "format": "unified",
+  "patch": "--- a/doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n+++ b/doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n@@ -1 +1 @@\n-old\n+new\n"
+}
+```
+
+Omitted-format `apply_patch` example:
+
+```json
+{
+  "root_dir": "/path/to/project",
+  "doc_type": "rfc",
+  "code": 37,
+  "patch": "*** Begin Patch\n*** Update File: doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n@@\n-old\n+new\n*** End Patch\n"
+}
+```
 
 ## 4. Usage Example
 

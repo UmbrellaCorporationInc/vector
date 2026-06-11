@@ -1047,6 +1047,50 @@ async fn patch_doc_tool_applies_valid_diff_and_returns_content() {
     );
 }
 
+/// Verifies that the `patch_doc` tool defaults omitted `format` payloads to `apply_patch`.
+#[tokio::test]
+async fn patch_doc_tool_applies_omitted_format_apply_patch_and_returns_content() {
+    let (dir, root) = create_patch_doc_test_project();
+    let rfc_path = dir.path().join("doc").join("rfc").join("draft").join("rfc-00042-my-rfc.md");
+    let patch = "\
+*** Begin Patch
+*** Update File: doc/rfc/draft/rfc-00042-my-rfc.md
+@@
+-Original line.
++Updated through apply_patch.
+*** End Patch
+"
+    .to_string();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
+            root_dir: root.display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            format: None,
+            patch: Some(patch),
+            git_diff: None,
+        }))
+        .await
+        .expect("patch_doc must succeed for an omitted-format apply_patch payload");
+
+    let expected_path =
+        dunce::canonicalize(&rfc_path).expect("canonicalize").to_string_lossy().to_string();
+    assert!(
+        result.contains(&format!("path: {expected_path}")),
+        "result must contain the canonicalized path; got: {result}"
+    );
+    assert!(
+        result.contains("Updated through apply_patch."),
+        "result must contain the patched content; got: {result}"
+    );
+
+    let on_disk = std::fs::read_to_string(&rfc_path).expect("read patched doc");
+    assert_eq!(on_disk, "Updated through apply_patch.\n");
+}
+
 /// Verifies that the `patch_doc` tool returns an error when the document does not exist.
 #[tokio::test]
 async fn patch_doc_tool_returns_error_for_missing_document() {

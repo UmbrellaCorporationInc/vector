@@ -143,10 +143,14 @@ pub struct PatchDocParams {
     /// The numeric code of the document to patch.
     pub code: u32,
     /// Patch format. Supported values are `unified` and `apply_patch`.
-    /// When omitted, the format defaults to `apply_patch`.
+    ///
+    /// When omitted, `patch` is parsed as `apply_patch`.
     #[serde(default)]
     pub format: Option<String>,
     /// The patch payload to apply to the document.
+    ///
+    /// Use a unified diff when `format` is `unified`; use an `apply_patch` payload when
+    /// `format` is omitted or set to `apply_patch`.
     #[serde(default)]
     pub patch: Option<String>,
     /// Deprecated alias for a unified-diff patch payload.
@@ -413,7 +417,7 @@ impl DocumentTools {
     /// All patching logic, path authorization, and encoding enforcement live in `runtime-doc`;
     /// this method only maps MCP params to the runtime input and returns the patched content.
     #[tool(
-        description = "Apply a patch to a governed document and return the final patched content or a structured validation error. Supported formats are `unified` and `apply_patch`; omitted format defaults to `apply_patch`. `git_diff` is a deprecated alias for `format: \"unified\"`."
+        description = "Apply a patch to a governed document and return the final patched content or a structured validation error. Send `format` and `patch`; supported format values are `unified` and `apply_patch`. Omit `format` to parse `patch` as `apply_patch`. `git_diff` is a deprecated alias for `format: \"unified\"`."
     )]
     async fn patch_doc(
         &self,

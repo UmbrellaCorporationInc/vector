@@ -99,10 +99,10 @@ input:
   language: rust
 ```
 
-- [ ] Update `PatchDocParams` so MCP callers can send `format` and `patch`.
-- [ ] Keep the MCP adapter thin; parsing, validation, and patch application must stay in `runtime-doc`.
-- [ ] Update runtime and MCP README documentation with one valid `format: "unified"` example and one valid omitted-format `apply_patch` example.
-- [ ] Ensure generated tool documentation reflects the default format and supported values.
+- [x] Update `PatchDocParams` so MCP callers can send `format` and `patch`.
+- [x] Keep the MCP adapter thin; parsing, validation, and patch application must stay in `runtime-doc`.
+- [x] Update runtime and MCP README documentation with one valid `format: "unified"` example and one valid omitted-format `apply_patch` example.
+- [x] Ensure generated tool documentation reflects the default format and supported values.
 
 ### 3.5. Phase E - Add replace_doc Runtime Operation
 
