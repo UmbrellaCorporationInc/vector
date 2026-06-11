@@ -116,13 +116,13 @@ input:
   language: rust
 ```
 
-- [ ] Add a `replace_doc` operation in `runtime-doc`.
-- [ ] Accept the same authoritative targeting fields as `patch_doc`: `root_dir`, `doc_type`, `code`, and optional `package`.
-- [ ] Accept `content` as the complete replacement Markdown/plain-text document, not a patch format.
-- [ ] Resolve the writable path from governed document metadata rather than accepting a caller-provided path.
-- [ ] Reject replacement content with a UTF-8 BOM.
-- [ ] Reject replacement content whose governed front matter identity does not match the resolved document, including `id`, `type`, `code`, and `slug`.
-- [ ] Return the resolved path and final content after a successful write.
+- [x] Add a `replace_doc` operation in `runtime-doc`.
+- [x] Accept the same authoritative targeting fields as `patch_doc`: `root_dir`, `doc_type`, `code`, and optional `package`.
+- [x] Accept `content` as the complete replacement Markdown/plain-text document, not a patch format.
+- [x] Resolve the writable path from governed document metadata rather than accepting a caller-provided path.
+- [x] Reject replacement content with a UTF-8 BOM.
+- [x] Reject replacement content whose governed front matter identity does not match the resolved document, including `id`, `type`, `code`, and `slug`.
+- [x] Return the resolved path and final content after a successful write.
 
 ### 3.6. Phase F - Expose replace_doc MCP Tool and Documentation
 

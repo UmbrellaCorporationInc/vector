@@ -217,7 +217,8 @@ async fn test_patch_doc_uses_package_document_root_when_package_is_provided() {
 
     assert_eq!(sender.outputs.len(), 1);
     assert_eq!(sender.outputs[0].content, "new content\n");
-    assert!(sender.outputs[0].path.contains(".vector-database/packages/my-package/doc"));
+    let normalized_path = sender.outputs[0].path.replace('\\', "/");
+    assert!(normalized_path.contains(".vector-database/packages/my-package/doc"));
 
     let doc_path = temp
         .path()
