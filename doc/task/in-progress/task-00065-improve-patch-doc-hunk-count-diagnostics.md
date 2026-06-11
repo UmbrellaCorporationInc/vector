@@ -126,8 +126,8 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Run `cargo test -p runtime-doc patch_doc`.
-- [ ] Run MCP document tool tests that cover `patch_doc`.
-- [ ] Run the Rust quality gate.
-- [ ] Run governed document validation.
-- [ ] Update `runtime/doc/README.md` or `mcp/vector/README.md` only if the user-facing `patch_doc` behavior changes.
+- [x] Run `cargo test -p runtime-doc patch_doc`.
+- [x] Run MCP document tool tests that cover `patch_doc`.
+- [x] Run the Rust quality gate.
+- [x] Run governed document validation.
+- [x] Update `runtime/doc/README.md` or `mcp/vector/README.md` only if the user-facing `patch_doc` behavior changes.
