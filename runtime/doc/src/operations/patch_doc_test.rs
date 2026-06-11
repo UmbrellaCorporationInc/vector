@@ -331,6 +331,124 @@ async fn test_patch_doc_valid_multi_hunk_diff_survives_hunk_count_preflight() {
     );
 }
 
+#[tokio::test]
+async fn test_patch_doc_applies_lf_diff_to_crlf_document_and_preserves_crlf() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(&temp, "task", filename, "old content\r\nsecond line\r\n");
+
+    let diff = "\
+--- a/task-00001-foo.md
++++ b/task-00001-foo.md
+@@ -1,2 +1,2 @@
+-old content
++new content
+ second line
+";
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff.to_string());
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs.len(), 1);
+    assert_eq!(sender.outputs[0].content, "new content\r\nsecond line\r\n");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let written = fs::read(&doc_path).unwrap();
+    assert_eq!(written, b"new content\r\nsecond line\r\n");
+}
+
+#[tokio::test]
+async fn test_patch_doc_applies_crlf_formatted_diff_to_lf_document() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(&temp, "task", filename, "old content\nsecond line\n");
+
+    let diff = format!(
+        "--- a/{filename}\r\n+++ b/{filename}\r\n@@ -1,2 +1,2 @@\r\n-old content\r\n+new content\r\n second line\r\n"
+    );
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff);
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs[0].content, "new content\nsecond line\n");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let written = fs::read(&doc_path).unwrap();
+    assert_eq!(written, b"new content\nsecond line\n");
+}
+
+#[tokio::test]
+async fn test_patch_doc_preserves_absent_final_newline_when_patch_marks_no_newline() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    create_doc_file(&temp, "task", filename, "old content");
+
+    let diff = format!(
+        "--- a/{filename}\n+++ b/{filename}\n@@ -1,1 +1,1 @@\n-old content\n\\ No newline at end of file\n+new content\n\\ No newline at end of file\n"
+    );
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff);
+    let mut sender = MockSender::new();
+    patch_doc(input, &mut sender).await.unwrap();
+
+    assert_eq!(sender.outputs[0].content, "new content");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let written = fs::read(&doc_path).unwrap();
+    assert_eq!(written, b"new content");
+}
+
+#[tokio::test]
+async fn test_patch_doc_context_mismatch_error_includes_hunk_context_and_newline_mode() {
+    let temp = TempDir::new().unwrap();
+    let root = IoPath::new(temp.path());
+
+    write_doc_config(&temp, "task");
+    let filename = "task-00001-foo.md";
+    let original = "actual one\r\nactual two\r\n";
+    create_doc_file(&temp, "task", filename, original);
+
+    let diff = "\
+--- a/task-00001-foo.md
++++ b/task-00001-foo.md
+@@ -1,2 +1,2 @@
+-expected one
+-expected two
++new one
++new two
+";
+
+    let input = PatchDocInput::new(root, "task".to_string(), 1, diff.to_string());
+    let mut sender = MockSender::new();
+    let result = patch_doc(input, &mut sender).await;
+
+    assert!(result.is_err(), "expected context mismatch rejection");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("hunk 1 context mismatch"), "{err}");
+    assert!(err.contains("@@ -1,2 +1,2 @@"), "{err}");
+    assert!(err.contains("Expected context: [\"expected one\", \"expected two\"]"), "{err}");
+    assert!(
+        err.contains("Observed context at document line 1: [\"actual one\", \"actual two\"]"),
+        "{err}"
+    );
+    assert!(err.contains("Newline mode: CRLF normalized to LF"), "{err}");
+
+    let doc_path = temp.path().join("doc").join("task").join("draft").join(filename);
+    let on_disk = fs::read_to_string(&doc_path).unwrap();
+    assert_eq!(on_disk, original, "file must not be modified when hunk context fails");
+}
+
 // ── BOM rejection ─────────────────────────────────────────────────────────────
 
 #[tokio::test]

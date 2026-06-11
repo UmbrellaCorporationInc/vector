@@ -89,11 +89,11 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Make `patch_doc` patch against a canonical representation that preserves enough information to write the final file correctly.
-- [ ] Normalize only newline differences that are safe and reversible for governed Markdown documents.
-- [ ] Preserve existing frontmatter and validation semantics.
-- [ ] Improve rejection diagnostics for failed hunks.
-- [ ] Keep `find_doc` backward-compatible unless implementation evidence proves the contract itself is the root cause.
+- [x] Make `patch_doc` patch against a canonical representation that preserves enough information to write the final file correctly.
+- [x] Normalize only newline differences that are safe and reversible for governed Markdown documents.
+- [x] Preserve existing frontmatter and validation semantics.
+- [x] Improve rejection diagnostics for failed hunks.
+- [x] Keep `find_doc` backward-compatible unless implementation evidence proves the contract itself is the root cause.
 
 ### 3.3. Phase C - Enforce Markdown Encoding and Line Endings
 

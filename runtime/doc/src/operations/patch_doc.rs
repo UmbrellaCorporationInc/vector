@@ -18,6 +18,46 @@ struct HunkLineCounts {
     new: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NewlineMode {
+    Lf,
+    Crlf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CanonicalDocument {
+    content: String,
+    newline_mode: NewlineMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HunkHeader {
+    old_start: usize,
+    old_count: usize,
+    new_count: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HunkRange {
+    start: usize,
+    count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HunkContext {
+    index: usize,
+    header: String,
+    old_start: usize,
+    expected: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InProgressHunkContext {
+    header_line: String,
+    header: HunkHeader,
+    expected: Vec<String>,
+}
+
 /// Input for the `patch_doc` operation.
 ///
 /// # DTO(Plugin operation input contracts use public fields for ergonomic data transfer)
@@ -97,26 +137,35 @@ fn patch_parse_error_message(error: impl Display) -> String {
     format!("patch is not a valid unified diff: {parser_error}")
 }
 
-fn parse_hunk_range_count(range: &str, prefix: char) -> Option<usize> {
+fn parse_hunk_range(range: &str, prefix: char) -> Option<HunkRange> {
     let raw_range = range.strip_prefix(prefix)?;
-    let (_start, count) = raw_range.split_once(',').unwrap_or((raw_range, "1"));
-    count.parse().ok()
+    let (start, count) = raw_range.split_once(',').unwrap_or((raw_range, "1"));
+    Some(HunkRange { start: start.parse().ok()?, count: count.parse().ok()? })
 }
 
-fn parse_hunk_header_counts(line: &str) -> Option<HunkLineCounts> {
+fn parse_hunk_header(line: &str) -> Option<HunkHeader> {
     if !line.starts_with("@@ ") {
         return None;
     }
 
     let mut parts = line.strip_prefix("@@ ")?.split_whitespace();
-    let old = parse_hunk_range_count(parts.next()?, '-')?;
-    let new = parse_hunk_range_count(parts.next()?, '+')?;
+    let old_range = parse_hunk_range(parts.next()?, '-')?;
+    let new_range = parse_hunk_range(parts.next()?, '+')?;
     let closing_marker = parts.next()?;
     if closing_marker != "@@" {
         return None;
     }
 
-    Some(HunkLineCounts { old, new })
+    Some(HunkHeader {
+        old_start: old_range.start,
+        old_count: old_range.count,
+        new_count: new_range.count,
+    })
+}
+
+fn parse_hunk_header_counts(line: &str) -> Option<HunkLineCounts> {
+    let header = parse_hunk_header(line)?;
+    Some(HunkLineCounts { old: header.old_count, new: header.new_count })
 }
 
 fn hunk_count_mismatch_message(
@@ -186,6 +235,174 @@ fn preflight_hunk_line_counts(diff: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn detect_newline_mode(content: &str) -> Result<NewlineMode, String> {
+    let mut crlf = 0usize;
+    let mut bare_lf = 0usize;
+    let mut bare_cr = 0usize;
+    let bytes = content.as_bytes();
+    let mut index = 0usize;
+
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\r' if bytes.get(index + 1) == Some(&b'\n') => {
+                crlf += 1;
+                index += 2;
+            }
+            b'\r' => {
+                bare_cr += 1;
+                index += 1;
+            }
+            b'\n' => {
+                bare_lf += 1;
+                index += 1;
+            }
+            _ => index += 1,
+        }
+    }
+
+    if bare_cr > 0 {
+        return Err(
+            "document uses unsupported bare carriage-return line endings; patch_doc can only normalize LF or CRLF safely"
+                .to_string(),
+        );
+    }
+
+    if crlf > 0 && bare_lf > 0 {
+        return Err(
+            "document uses mixed LF and CRLF line endings; patch_doc can only normalize a homogeneous newline mode safely"
+                .to_string(),
+        );
+    }
+
+    if crlf > 0 { Ok(NewlineMode::Crlf) } else { Ok(NewlineMode::Lf) }
+}
+
+const fn newline_mode_description(mode: NewlineMode) -> &'static str {
+    match mode {
+        NewlineMode::Lf => "LF",
+        NewlineMode::Crlf => "CRLF normalized to LF for patch matching and restored on write",
+    }
+}
+
+fn canonicalize_document_content(content: &str) -> Result<CanonicalDocument, String> {
+    let newline_mode = detect_newline_mode(content)?;
+    let canonical = match newline_mode {
+        NewlineMode::Lf => content.to_string(),
+        NewlineMode::Crlf => content.replace("\r\n", "\n"),
+    };
+
+    Ok(CanonicalDocument { content: canonical, newline_mode })
+}
+
+fn restore_newline_mode(content: &str, mode: NewlineMode) -> String {
+    match mode {
+        NewlineMode::Lf => content.to_string(),
+        NewlineMode::Crlf => content.replace('\n', "\r\n"),
+    }
+}
+
+fn logical_lines(content: &str) -> Vec<&str> {
+    if content.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lines: Vec<&str> = content.split('\n').collect();
+    if content.ends_with('\n') {
+        lines.pop();
+    }
+    lines
+}
+
+fn finish_hunk_context(contexts: &mut Vec<HunkContext>, current: Option<InProgressHunkContext>) {
+    if let Some(current) = current {
+        contexts.push(HunkContext {
+            index: contexts.len() + 1,
+            header: current.header_line,
+            old_start: current.header.old_start,
+            expected: current.expected,
+        });
+    }
+}
+
+fn collect_hunk_contexts(diff: &str) -> Vec<HunkContext> {
+    let mut contexts = Vec::new();
+    let mut current: Option<InProgressHunkContext> = None;
+
+    for line in diff.lines() {
+        if let Some(header) = parse_hunk_header(line) {
+            finish_hunk_context(&mut contexts, current.take());
+            current = Some(InProgressHunkContext {
+                header_line: line.to_string(),
+                header,
+                expected: Vec::new(),
+            });
+            continue;
+        }
+
+        if let Some(current) = current.as_mut()
+            && let Some(b' ' | b'-') = line.as_bytes().first().copied()
+        {
+            current.expected.push(line[1..].to_string());
+        }
+    }
+
+    finish_hunk_context(&mut contexts, current);
+    contexts
+}
+
+fn format_lines_for_diagnostic(lines: &[String]) -> String {
+    if lines.is_empty() {
+        return "<none>".to_string();
+    }
+
+    lines.iter().map(|line| format!("\"{}\"", line.escape_default())).collect::<Vec<_>>().join(", ")
+}
+
+fn hunk_context_mismatch_message(
+    hunk: &HunkContext,
+    observed: &[String],
+    newline_mode: NewlineMode,
+) -> String {
+    format!(
+        "failed to apply patch: hunk {} context mismatch. Hunk header: {}. \
+         Newline mode: {}. Expected context: [{}]. Observed context at document line {}: [{}].",
+        hunk.index,
+        hunk.header,
+        newline_mode_description(newline_mode),
+        format_lines_for_diagnostic(&hunk.expected),
+        hunk.old_start,
+        format_lines_for_diagnostic(observed)
+    )
+}
+
+fn validate_hunk_contexts(
+    diff: &str,
+    canonical_content: &str,
+    newline_mode: NewlineMode,
+) -> Result<(), String> {
+    let document_lines = logical_lines(canonical_content);
+
+    for hunk in collect_hunk_contexts(diff) {
+        if hunk.expected.is_empty() {
+            continue;
+        }
+
+        let start_index = hunk.old_start.saturating_sub(1);
+        let observed: Vec<String> = document_lines
+            .iter()
+            .skip(start_index)
+            .take(hunk.expected.len())
+            .map(|line| (*line).to_string())
+            .collect();
+
+        if observed != hunk.expected {
+            return Err(hunk_context_mismatch_message(&hunk, &observed, newline_mode));
+        }
+    }
+
+    Ok(())
+}
+
 async fn patch_doc(
     input: PatchDocInput,
     output: &mut impl PluginSender<PatchDocOutput>,
@@ -209,6 +426,8 @@ async fn patch_doc(
 
     let abs_path = found.path;
     let existing_content = found.content;
+    let canonical_document = canonicalize_document_content(&existing_content)
+        .map_err(runtime_core::RuntimeError::operation)?;
 
     // Scope check: the resolved path must be inside doc/
     let doc_dir = dunce::canonicalize(input.root_dir.as_path().join("doc")).map_err(|e| {
@@ -268,11 +487,22 @@ async fn patch_doc(
         )));
     }
 
-    // Apply the patch
+    validate_hunk_contexts(
+        &normalized,
+        &canonical_document.content,
+        canonical_document.newline_mode,
+    )
+    .map_err(runtime_core::RuntimeError::operation)?;
+
+    // Apply the patch against the canonical LF representation, then restore the file's newline mode.
     let patcher = Patcher::new(patch);
-    let new_content = patcher.apply(&existing_content, false).map_err(|e| {
-        runtime_core::RuntimeError::operation(format!("failed to apply patch: {e}"))
+    let patched_canonical = patcher.apply(&canonical_document.content, false).map_err(|e| {
+        runtime_core::RuntimeError::operation(format!(
+            "failed to apply patch after newline normalization; newline mode: {}; {e}",
+            newline_mode_description(canonical_document.newline_mode)
+        ))
     })?;
+    let new_content = restore_newline_mode(&patched_canonical, canonical_document.newline_mode);
 
     // BOM check: resulting content must not contain a UTF-8 BOM
     if new_content.as_bytes().starts_with(UTF8_BOM) {
