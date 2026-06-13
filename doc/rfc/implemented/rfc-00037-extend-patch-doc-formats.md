@@ -16,6 +16,7 @@ tags:
 related:
   - spec-00001-repository-directory-structure
   - task-00066-implement-rfc-00037-extend-patch-doc-formats
+  - task-00067-update-mcp-tool-patch-doc
 supersedes: []
 superseded_by: null
 aliases:

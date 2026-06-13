@@ -1,8 +1,23 @@
 {
   "permissions": {
-    "allow": ["mcp__vector", "Bash"]
+    "allow": [
+      "mcp__vector",
+      "Bash",
+      "PowerShell",
+      "Edit",
+      "Write",
+      "Read",
+      "Bash(xtask:*)"
+    ],
+    "deny": ["Bash(cargo xtask:*)", "PowerShell"]
   },
   "model": "claude-sonnet-4-6",
   "enabledMcpjsonServers": ["vector"],
-  "effortLevel": "medium"
+  "effortLevel": "medium",
+  "enableAllProjectMcpServers": true,
+  "disableNonEssentialTraffic": true,
+  "cleanupPeriodDays": 5,
+  "verbose": true,
+  "preferredNotifChannel": "terminal_bell",
+  "defaultShell": "bash"
 }

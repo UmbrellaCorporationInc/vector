@@ -25,6 +25,15 @@ aliases:
 
 # RFC 00035: Incremental Validation Index Phase 2
 
+```vector-agent-inline-action
+label: Start a discussion about this document
+prompt-field: prompt-message
+profile: code
+prompt: prompts-00010-start-discussion-action
+input:
+  document: rfc-00035-incremental-validation-index-phase-2
+```
+
 ```vector-agent-action
 label: Create a task
 profile: create-doc
@@ -139,12 +148,12 @@ This keeps validation approximately linear in changed file content rather than m
 
 ## 4. Tradeoffs
 
-| Pro | Con |
-|-----|-----|
-| Repeated `validate_fix` runs become proportional to changed files instead of all files. | Adds cache invalidation logic and schema versioning. |
+| Pro                                                                                                     | Con                                                                                                  |
+|---------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| Repeated `validate_fix` runs become proportional to changed files instead of all files.                 | Adds cache invalidation logic and schema versioning.                                                 |
 | Bare document stem validation can use a direct `HashSet` lookup instead of expensive repeated searches. | The implementation must keep the global stem set consistent after moves, deletes, and package syncs. |
-| The cache improves editor workflows where validation runs after each save. | Atomic writes and corruption recovery need explicit tests. |
-| Keeping the index discardable preserves correctness. | Rebuilds still pay the full scan cost when the cache is missing or invalidated. |
+| The cache improves editor workflows where validation runs after each save.                              | Atomic writes and corruption recovery need explicit tests.                                           |
+| Keeping the index discardable preserves correctness.                                                    | Rebuilds still pay the full scan cost when the cache is missing or invalidated.                      |
 
 ## 5. Acceptance Criteria
 

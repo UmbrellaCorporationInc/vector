@@ -957,6 +957,25 @@ fn patch_doc_params_deserializes_deprecated_git_diff_alias() {
     assert!(params.git_diff.as_ref().is_some_and(|git_diff| !git_diff.is_empty()));
 }
 
+/// Verifies that explicitly passing `format: "apply_patch"` is accepted and maps to the same
+/// format as the omitted-format default. Agents may name the format explicitly or omit it;
+/// both paths must reach `ApplyPatch` — the recommended format for agent-authored edits.
+#[test]
+fn patch_doc_input_from_params_explicit_apply_patch_format_accepted() {
+    let input = super::patch_doc_input_from_params(super::PatchDocParams {
+        package: String::new(),
+        root_dir: "/tmp/p".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 42,
+        format: Some("apply_patch".to_string()),
+        patch: Some("*** Begin Patch\n*** End Patch\n".to_string()),
+        git_diff: None,
+    })
+    .expect("explicit apply_patch format must be accepted");
+
+    assert_eq!(input.format, runtime_doc::operations::PatchDocFormat::ApplyPatch);
+}
+
 #[test]
 fn patch_doc_input_from_params_defaults_omitted_format_to_apply_patch() {
     let input = super::patch_doc_input_from_params(super::PatchDocParams {
@@ -1106,7 +1125,8 @@ async fn patch_doc_tool_returns_error_for_missing_document() {
             format: None,
             patch: None,
             git_diff: Some(
-                "--- a/rfc-00999-x.md\n+++ b/rfc-00999-x.md\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
+                "--- a/rfc-00999-x.md\n+++ b/rfc-00999-x.md\n@@ -1,1 +1,1 @@\n-old\n+new\n"
+                    .to_string(),
             ),
         }))
         .await;
@@ -1249,7 +1269,7 @@ async fn patch_doc_tool_returns_error_for_target_mismatch() {
             format: None,
             patch: None,
             git_diff: Some(
-                "--- a/rfc-00001-other.md\n+++ b/rfc-00001-other.md\n@@ -1 +1 @@\n-old\n+new\n"
+                "--- a/rfc-00001-other.md\n+++ b/rfc-00001-other.md\n@@ -1,1 +1,1 @@\n-old\n+new\n"
                     .to_string(),
             ),
         }))
@@ -1440,6 +1460,96 @@ async fn replace_doc_tool_returns_error_for_bom_content() {
         "error must carry the operation prefix; got: {err:?}"
     );
     assert!(err.contains("BOM"), "error must mention BOM for remediation guidance; got: {err:?}");
+}
+
+/// Verifies that a unified diff targeting a non-first line succeeds when the hunk header uses
+/// the correct 1-based line index. The first document line is 1, so targeting the second line
+/// of a two-line document requires `@@ -2,1 +2,1 @@`, not `@@ -1,1 +1,1 @@`.
+#[tokio::test]
+async fn patch_doc_tool_applies_unified_diff_with_correct_1based_line_index_on_non_first_line() {
+    use std::fs;
+    let dir = tempfile::tempdir().expect("temp dir");
+    let vector_dir = dir.path().join(".vector");
+    fs::create_dir_all(&vector_dir).expect("create .vector dir");
+    fs::write(
+        vector_dir.join("document-types.yaml"),
+        "doc-type: {template: t, prompt-template: pt, prompt: p, create-document-type-form: f}\ndocument-types:\n  rfc:\n    layout: status\n    code-width: 5\n    prompt: p\n    create-document-form: f\n    statuses: [draft]",
+    )
+    .expect("write config");
+    let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&rfc_dir).expect("create rfc dir");
+    fs::write(rfc_dir.join("rfc-00042-my-rfc.md"), "Line one.\nLine two.\n").expect("write doc");
+
+    let patch = "--- a/rfc-00042-my-rfc.md\n+++ b/rfc-00042-my-rfc.md\n@@ -2,1 +2,1 @@\n-Line two.\n+Line TWO.\n".to_string();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
+            root_dir: dir.path().display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            format: Some("unified".to_string()),
+            patch: Some(patch),
+            git_diff: None,
+        }))
+        .await
+        .expect("patch_doc must succeed when hunk header uses the correct 1-based line index for line 2");
+
+    assert!(
+        result.contains("Line TWO."),
+        "patched content must contain the replacement; got: {result}"
+    );
+    assert!(!result.contains("Line two."), "original second line must be replaced; got: {result}");
+    assert!(result.contains("Line one."), "first line must be unchanged; got: {result}");
+}
+
+/// Verifies that a unified diff whose hunk header targets the wrong 1-based line is rejected.
+/// If the target content is on document line 2 but the hunk header says line 1, the removed
+/// line does not match the actual document content at that position and the patch must fail.
+#[tokio::test]
+async fn patch_doc_tool_rejects_unified_diff_with_wrong_line_index() {
+    use std::fs;
+    let dir = tempfile::tempdir().expect("temp dir");
+    let vector_dir = dir.path().join(".vector");
+    fs::create_dir_all(&vector_dir).expect("create .vector dir");
+    fs::write(
+        vector_dir.join("document-types.yaml"),
+        "doc-type: {template: t, prompt-template: pt, prompt: p, create-document-type-form: f}\ndocument-types:\n  rfc:\n    layout: status\n    code-width: 5\n    prompt: p\n    create-document-form: f\n    statuses: [draft]",
+    )
+    .expect("write config");
+    let rfc_dir = dir.path().join("doc").join("rfc").join("draft");
+    fs::create_dir_all(&rfc_dir).expect("create rfc dir");
+    let doc_path = rfc_dir.join("rfc-00042-my-rfc.md");
+    fs::write(&doc_path, "Line one.\nLine two.\n").expect("write doc");
+    let original = fs::read_to_string(&doc_path).expect("read original");
+
+    // The target text "Line two." is on line 2, but the hunk header claims line 1.
+    // Line 1 is "Line one.", so the removed line does not match and the patch must be rejected.
+    let patch = "--- a/rfc-00042-my-rfc.md\n+++ b/rfc-00042-my-rfc.md\n@@ -1,1 +1,1 @@\n-Line two.\n+Line TWO.\n".to_string();
+
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .patch_doc(Parameters(super::PatchDocParams {
+            package: String::new(),
+            root_dir: dir.path().display().to_string(),
+            doc_type: "rfc".to_string(),
+            code: 42,
+            format: Some("unified".to_string()),
+            patch: Some(patch),
+            git_diff: None,
+        }))
+        .await;
+
+    assert!(
+        result.is_err(),
+        "patch_doc must reject a unified diff whose hunk header targets the wrong line"
+    );
+    assert_eq!(
+        fs::read_to_string(&doc_path).expect("read after rejection"),
+        original,
+        "rejected patch must not modify the document"
+    );
 }
 
 /// Verifies that the `patch_doc` tool returns an error when the diff would produce BOM content.

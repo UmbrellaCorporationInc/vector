@@ -131,6 +131,8 @@ Acceptance criteria:
 
 Create the primary retrieval table in LanceDB. The persisted document identity must be package-aware and stem-based because Vector can resolve governed documents without storing source paths.
 
+This phase defines the persisted data model that later retrieval phases depend on, but it does not define the retrieval algorithm itself. Hybrid retrieval is made explicit in `Phase 8`, where semantic vector search and lexical search are executed together. Phase 6 must therefore preserve the fields and indexable text required for both embedding-based similarity and lexical matching.
+
 Required fields:
 
 - `chunk_id`
