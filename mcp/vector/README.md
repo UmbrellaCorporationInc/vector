@@ -93,13 +93,15 @@ The `package` input parameter is used for package-qualified document lookup. Whe
 
 Explicit unified diff example:
 
+Unified diff hunk headers use 1-based line indices — the first document line is line 1, not line 0. Always use the full `@@ -start,count +start,count @@` form. The path in `---` and `+++` lines must be the document path resolved from `doc_type`, `code`, and optional `package`; call `find_doc` to obtain it.
+
 ```json
 {
   "root_dir": "/path/to/project",
   "doc_type": "rfc",
   "code": 37,
   "format": "unified",
-  "patch": "--- a/doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n+++ b/doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n@@ -1 +1 @@\n-old\n+new\n"
+  "patch": "--- a/doc/rfc/implemented/rfc-00037-extend-patch-doc-formats.md\n+++ b/doc/rfc/implemented/rfc-00037-extend-patch-doc-formats.md\n@@ -1,1 +1,1 @@\n-old\n+new\n"
 }
 ```
 

@@ -146,12 +146,17 @@ pub struct PatchDocParams {
     /// Patch format. Supported values are `unified` and `apply_patch`.
     ///
     /// When omitted, `patch` is parsed as `apply_patch`.
+    /// When `format` is `unified`, hunk headers must use 1-based line indices —
+    /// the first document line is line 1, not line 0.
     #[serde(default)]
     pub format: Option<String>,
     /// The patch payload to apply to the document.
     ///
-    /// Use a unified diff when `format` is `unified`; use an `apply_patch` payload when
-    /// `format` is omitted or set to `apply_patch`.
+    /// When `format` is `unified`, the payload must be a standard unified diff. Use the full
+    /// `@@ -start,count +start,count @@` hunk header form with 1-based line indices. The path
+    /// in `---` and `+++` lines must match the document path resolved from `doc_type`, `code`,
+    /// and optional `package`; call `find_doc` to obtain that path before constructing the diff.
+    /// When `format` is omitted or `apply_patch`, provide an `apply_patch`-style payload.
     #[serde(default)]
     pub patch: Option<String>,
     /// Deprecated alias for a unified-diff patch payload.
@@ -443,7 +448,7 @@ impl DocumentTools {
     /// All patching logic, path authorization, and encoding enforcement live in `runtime-doc`;
     /// this method only maps MCP params to the runtime input and returns the patched content.
     #[tool(
-        description = "Apply a patch to a governed document and return the final patched content or a structured validation error. Send `format` and `patch`; supported format values are `unified` and `apply_patch`. Omit `format` to parse `patch` as `apply_patch`. `git_diff` is a deprecated alias for `format: \"unified\"`."
+        description = "Apply a patch to a governed document and return the final patched content or a structured validation error. Send `format` and `patch`; supported format values are `unified` and `apply_patch`. Omit `format` to parse `patch` as `apply_patch`. When `format` is `unified`, hunk headers must use 1-based line indices (the first document line is line 1) and the full `@@ -start,count +start,count @@` form; the path in `---` and `+++` lines must be the path resolved by `doc_type`, `code`, and optional `package`. `git_diff` is a deprecated alias for `format: \"unified\"`."
     )]
     async fn patch_doc(
         &self,

@@ -56,9 +56,9 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Identify every MCP-facing `patch_doc` description or example that implies zero-based unified-diff hunk numbering or fails to state the preferred authoring format.
-- [ ] Confirm whether the incorrect guidance lives only in static documentation, generated tool metadata, or both.
-- [ ] Record the minimum file set needed to correct the guidance without widening the scope into runtime behavior changes.
+- [x] Identify every MCP-facing `patch_doc` description or example that implies zero-based unified-diff hunk numbering or fails to state the preferred authoring format.
+- [x] Confirm whether the incorrect guidance lives only in static documentation, generated tool metadata, or both.
+- [x] Record the minimum file set needed to correct the guidance without widening the scope into runtime behavior changes.
 
 ### 3.2. Phase B - Correct Unified Diff Documentation
 
@@ -72,9 +72,9 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Update all MCP-facing unified diff examples so hunk headers use the real unified-diff convention with 1-based line indices.
-- [ ] Remove any wording that can train callers to synthesize malformed hunk headers.
-- [ ] Keep the examples minimal and valid for the governed-document path resolved by `doc_type`, `code`, and optional `package`.
+- [x] Update all MCP-facing unified diff examples so hunk headers use the real unified-diff convention with 1-based line indices.
+- [x] Remove any wording that can train callers to synthesize malformed hunk headers.
+- [x] Keep the examples minimal and valid for the governed-document path resolved by `doc_type`, `code`, and optional `package`.
 
 ### 3.3. Phase C - Make apply_patch the Recommended Path
 

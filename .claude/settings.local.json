@@ -1,6 +1,6 @@
 {
   "permissions": {
-    "allow": ["mcp__vector", "Bash"]
+    "allow": ["mcp__vector", "Bash", "Edit", "Write", "Read"]
   },
   "model": "claude-sonnet-4-6",
   "enabledMcpjsonServers": ["vector"],
