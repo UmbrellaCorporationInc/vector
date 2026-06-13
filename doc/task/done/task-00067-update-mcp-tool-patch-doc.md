@@ -5,7 +5,7 @@ code: "00067"
 slug: update-mcp-tool-patch-doc
 title: Update MCP patch_doc Documentation Guidance
 description: Clarify MCP patch_doc documentation so unified diff examples use 1-based hunk indices and apply_patch is presented as the recommended agent-facing format.
-status: todo
+status: done
 created: 2026-06-13
 updated: 2026-06-13
 tags:
