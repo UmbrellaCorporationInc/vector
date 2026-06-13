@@ -957,6 +957,25 @@ fn patch_doc_params_deserializes_deprecated_git_diff_alias() {
     assert!(params.git_diff.as_ref().is_some_and(|git_diff| !git_diff.is_empty()));
 }
 
+/// Verifies that explicitly passing `format: "apply_patch"` is accepted and maps to the same
+/// format as the omitted-format default. Agents may name the format explicitly or omit it;
+/// both paths must reach `ApplyPatch` — the recommended format for agent-authored edits.
+#[test]
+fn patch_doc_input_from_params_explicit_apply_patch_format_accepted() {
+    let input = super::patch_doc_input_from_params(super::PatchDocParams {
+        package: String::new(),
+        root_dir: "/tmp/p".to_string(),
+        doc_type: "rfc".to_string(),
+        code: 42,
+        format: Some("apply_patch".to_string()),
+        patch: Some("*** Begin Patch\n*** End Patch\n".to_string()),
+        git_diff: None,
+    })
+    .expect("explicit apply_patch format must be accepted");
+
+    assert_eq!(input.format, runtime_doc::operations::PatchDocFormat::ApplyPatch);
+}
+
 #[test]
 fn patch_doc_input_from_params_defaults_omitted_format_to_apply_patch() {
     let input = super::patch_doc_input_from_params(super::PatchDocParams {

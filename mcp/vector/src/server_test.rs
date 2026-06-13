@@ -321,8 +321,12 @@ fn vector_server_patch_doc_tool_schema_documents_patch_formats() {
         "patch_doc description must list supported patch formats; got: {description}"
     );
     assert!(
-        description.contains("Omit `format`") && description.contains("apply_patch"),
+        description.to_lowercase().contains("omit `format`") && description.contains("apply_patch"),
         "patch_doc description must explain the default format; got: {description}"
+    );
+    assert!(
+        description.contains("Recommended") && description.contains("apply_patch"),
+        "patch_doc description must recommend apply_patch as the agent-authored edit path; got: {description}"
     );
 
     let required =

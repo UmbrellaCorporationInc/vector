@@ -63,7 +63,7 @@
 | `find_doc`              | Document          | Locate a governed document by type and numeric code; returns `path`, `package` (if resolved from a package), and `content` |
 | `create_doc_prompt`     | Document          | Create a governed document and return the resolved authoring prompt |
 | `create_doc_type_prompt`| Document          | Create a governed document type and return the resolved authoring prompt |
-| `patch_doc`             | Document          | Apply a patch to a governed document; supports `format: "unified"` and omitted-format `apply_patch`, enforces target matching, returns format-specific diagnostics, rejects BOM-encoded output, and returns the final patched content |
+| `patch_doc`             | Document          | Apply a patch to a governed document; recommended agent path is omitted-format `apply_patch` (no numeric hunk headers required); `format: "unified"` is still supported for source-control-native diffs; enforces target matching, returns format-specific diagnostics, rejects BOM-encoded output, and returns the final patched content |
 | `replace_doc`           | Document          | Replace a governed document with complete content; resolves the target from `doc_type`, `code`, and optional `package`, validates governed front matter identity, rejects BOM content, and returns the resolved path and final content. Bootstrap companion to `create_doc_prompt`. |
 | `language_quality_gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
 | `language_best_practices` | Language        | Resolve and concatenate governed best-practices prompt bodies for a language list |
@@ -91,7 +91,20 @@ The `package` input parameter is used for package-qualified document lookup. Whe
 
 `patch_doc` resolves the writable document from `root_dir`, `doc_type`, `code`, and optional `package`; callers do not provide a write path. Send patch content in `patch` and select the syntax with `format`. Supported format values are `unified` and `apply_patch`. When `format` is omitted, `patch` is parsed as `apply_patch`. The deprecated `git_diff` field remains a transition alias for `format: "unified"`.
 
-Explicit unified diff example:
+**Recommended for agent-authored edits:** omit `format` and send an `apply_patch`-style payload. This is the safer default because it does not require numeric hunk headers or line-count arithmetic. Use `format: "unified"` only when you already have a source-control-native diff.
+
+Recommended agent path — omitted-format `apply_patch` example:
+
+```json
+{
+  "root_dir": "/path/to/project",
+  "doc_type": "rfc",
+  "code": 37,
+  "patch": "*** Begin Patch\n*** Update File: doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n@@\n-old\n+new\n*** End Patch\n"
+}
+```
+
+Explicit unified diff example (for source-control-native callers):
 
 Unified diff hunk headers use 1-based line indices — the first document line is line 1, not line 0. Always use the full `@@ -start,count +start,count @@` form. The path in `---` and `+++` lines must be the document path resolved from `doc_type`, `code`, and optional `package`; call `find_doc` to obtain it.
 
@@ -102,17 +115,6 @@ Unified diff hunk headers use 1-based line indices — the first document line i
   "code": 37,
   "format": "unified",
   "patch": "--- a/doc/rfc/implemented/rfc-00037-extend-patch-doc-formats.md\n+++ b/doc/rfc/implemented/rfc-00037-extend-patch-doc-formats.md\n@@ -1,1 +1,1 @@\n-old\n+new\n"
-}
-```
-
-Omitted-format `apply_patch` example:
-
-```json
-{
-  "root_dir": "/path/to/project",
-  "doc_type": "rfc",
-  "code": 37,
-  "patch": "*** Begin Patch\n*** Update File: doc/rfc/draft/rfc-00037-extend-patch-doc-formats.md\n@@\n-old\n+new\n*** End Patch\n"
 }
 ```
 

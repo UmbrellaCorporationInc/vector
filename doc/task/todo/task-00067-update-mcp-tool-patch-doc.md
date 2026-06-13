@@ -88,9 +88,9 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Update MCP tool descriptions and README guidance to explicitly recommend omitted-format `apply_patch` for agent-authored edits.
-- [ ] Preserve `format: "unified"` as a supported option for callers that already have source-control-native diffs.
-- [ ] Ensure the wording distinguishes between the recommended default for agents and the still-supported explicit unified path.
+- [x] Update MCP tool descriptions and README guidance to explicitly recommend omitted-format `apply_patch` for agent-authored edits.
+- [x] Preserve `format: "unified"` as a supported option for callers that already have source-control-native diffs.
+- [x] Ensure the wording distinguishes between the recommended default for agents and the still-supported explicit unified path.
 
 ### 3.4. Phase D - Validate the Published Contract
 

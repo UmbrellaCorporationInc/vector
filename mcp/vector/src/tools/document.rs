@@ -145,17 +145,25 @@ pub struct PatchDocParams {
     pub code: u32,
     /// Patch format. Supported values are `unified` and `apply_patch`.
     ///
-    /// When omitted, `patch` is parsed as `apply_patch`.
+    /// **Recommended for agent-authored edits:** omit this field and send an `apply_patch`-style
+    /// payload in `patch`. When omitted, `format` defaults to `apply_patch`, which is the safer
+    /// choice because it does not require numeric hunk headers or line-count arithmetic.
+    ///
+    /// Use `format: "unified"` only when you already have a source-control-native diff.
     /// When `format` is `unified`, hunk headers must use 1-based line indices —
     /// the first document line is line 1, not line 0.
     #[serde(default)]
     pub format: Option<String>,
     /// The patch payload to apply to the document.
     ///
+    /// **Recommended for agent-authored edits:** omit `format` and use an `apply_patch`-style
+    /// payload here. This is the safer default because it does not require numeric hunk headers.
+    ///
     /// When `format` is `unified`, the payload must be a standard unified diff. Use the full
     /// `@@ -start,count +start,count @@` hunk header form with 1-based line indices. The path
     /// in `---` and `+++` lines must match the document path resolved from `doc_type`, `code`,
     /// and optional `package`; call `find_doc` to obtain that path before constructing the diff.
+    /// Use `format: "unified"` only when you already have a source-control-native diff.
     /// When `format` is omitted or `apply_patch`, provide an `apply_patch`-style payload.
     #[serde(default)]
     pub patch: Option<String>,
@@ -448,7 +456,7 @@ impl DocumentTools {
     /// All patching logic, path authorization, and encoding enforcement live in `runtime-doc`;
     /// this method only maps MCP params to the runtime input and returns the patched content.
     #[tool(
-        description = "Apply a patch to a governed document and return the final patched content or a structured validation error. Send `format` and `patch`; supported format values are `unified` and `apply_patch`. Omit `format` to parse `patch` as `apply_patch`. When `format` is `unified`, hunk headers must use 1-based line indices (the first document line is line 1) and the full `@@ -start,count +start,count @@` form; the path in `---` and `+++` lines must be the path resolved by `doc_type`, `code`, and optional `package`. `git_diff` is a deprecated alias for `format: \"unified\"`."
+        description = "Apply a patch to a governed document and return the final patched content or a structured validation error. Recommended for agent-authored edits: omit `format` and send an `apply_patch`-style payload in `patch` — this is the safer default because it does not require numeric hunk headers or line-count arithmetic. Use `format: \"unified\"` only when you already have a source-control-native diff; when doing so, hunk headers must use 1-based line indices (the first document line is line 1) and the full `@@ -start,count +start,count @@` form, and the path in `---` and `+++` lines must be the path resolved by `doc_type`, `code`, and optional `package`. `git_diff` is a deprecated alias for `format: \"unified\"`."
     )]
     async fn patch_doc(
         &self,
