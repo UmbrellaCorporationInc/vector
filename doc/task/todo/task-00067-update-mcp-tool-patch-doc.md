@@ -104,9 +104,9 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Regenerate or refresh any MCP-facing derived documentation if the repository flow requires it.
-- [ ] Run the relevant documentation or crate quality gate needed to verify the updated MCP text.
-- [ ] Confirm the final guidance is internally consistent across README text, tool metadata, and examples.
+- [x] Regenerate or refresh any MCP-facing derived documentation if the repository flow requires it.
+- [x] Run the relevant documentation or crate quality gate needed to verify the updated MCP text.
+- [x] Confirm the final guidance is internally consistent across README text, tool metadata, and examples.
 
 ### 3.5. Phase Z - Wrap-up
 
