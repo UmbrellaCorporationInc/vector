@@ -120,8 +120,8 @@ input:
   language: rust, markdown
 ```
 
-- [ ] Update README files on packages modified.
-- [ ] Keep the task in `todo` until the MCP-facing documentation and any derived outputs agree on both the 1-based unified-diff rule and the `apply_patch` recommendation.
+- [x] Update README files on packages modified.
+- [x] Keep the task in `todo` until the MCP-facing documentation and any derived outputs agree on both the 1-based unified-diff rule and the `apply_patch` recommendation.
 
 ## 4. Gaps, Flaws, and Tradeoffs
 
