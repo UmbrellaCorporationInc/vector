@@ -134,7 +134,7 @@ input:
   language: Rust, YAML, Markdown
 ```
 
-- [ ] Update the GitHub Actions Rust workflow to provide `protoc` before building crates that compile the LanceDB dependency graph.
+- [x] Update the GitHub Actions Rust workflow to provide `protoc` before building crates that compile the LanceDB dependency graph.
 - [x] Document the `protoc` build dependency for local development and CI in the affected README files.
 
 ### 3.7. Phase Z - Wrap-up
