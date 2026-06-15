@@ -117,10 +117,10 @@ input:
   language: Rust
 ```
 
-- [ ] Update `vector-database` to invoke the RAG-owned database lifecycle operation.
-- [ ] Ensure the CLI does not implement separate schema-creation or index-creation logic.
-- [ ] Return actionable errors when store initialization or compatibility validation fails.
-- [ ] Document the command behavior for creating or updating the local RAG store.
+- [x] Update `vector-database` to invoke the RAG-owned database lifecycle operation.
+- [x] Ensure the CLI does not implement separate schema-creation or index-creation logic.
+- [x] Return actionable errors when store initialization or compatibility validation fails.
+- [x] Document the command behavior for creating or updating the local RAG store.
 
 ### 3.6. Phase Y - Tooling And CI
 
