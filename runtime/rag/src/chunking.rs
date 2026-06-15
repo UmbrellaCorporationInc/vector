@@ -239,10 +239,9 @@ pub fn chunk_markdown_document(
                 &chunk.heading_path,
                 &chunk.text,
             );
-            let chunk_id = chunk_id(
+            let chunk_id = crate::stable_chunk_id(
                 document.package.as_deref(),
                 &document.document_stem,
-                &chunk.heading_path,
                 chunk_ordinal,
                 &chunk_hash,
             );
@@ -778,21 +777,6 @@ fn parse_atx_heading(line: &str) -> Option<ParsedAtxHeading<'_>> {
     Some((u8::try_from(level).ok()?, text))
 }
 
-fn chunk_id(
-    package: Option<&str>,
-    document_stem: &str,
-    heading_path: &[String],
-    chunk_ordinal: usize,
-    chunk_hash: &str,
-) -> String {
-    let package_namespace = package.unwrap_or(WORKSPACE_CHUNK_NAMESPACE);
-    let heading_slug = heading_path
-        .last()
-        .map_or_else(|| ROOT_CHUNK_HEADING_SLUG.to_owned(), |heading| slug_component(heading));
-
-    format!("{package_namespace}/{document_stem}/{heading_slug}/{chunk_ordinal:04}/{chunk_hash}")
-}
-
 fn populate_neighbor_chunk_ids(chunks: &mut [MarkdownChunkRecord]) {
     let chunk_ids = chunks.iter().map(|chunk| chunk.chunk_id.clone()).collect::<Vec<_>>();
 
@@ -836,26 +820,6 @@ fn stable_chunk_hash(
 
 fn normalized_chunk_text(text: &str) -> String {
     text.replace("\r\n", "\n").replace('\r', "\n")
-}
-
-fn slug_component(value: &str) -> String {
-    let mut slug = String::new();
-    let mut previous_separator = false;
-
-    for character in value.chars().flat_map(char::to_lowercase) {
-        if character.is_ascii_alphanumeric() {
-            slug.push(character);
-            previous_separator = false;
-        } else if !previous_separator && !slug.is_empty() {
-            slug.push('-');
-            previous_separator = true;
-        }
-    }
-
-    if previous_separator {
-        slug.pop();
-    }
-    if slug.is_empty() { ROOT_CHUNK_HEADING_SLUG.to_owned() } else { slug }
 }
 
 #[cfg(test)]
