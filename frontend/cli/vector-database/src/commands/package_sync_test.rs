@@ -202,11 +202,26 @@ async fn test_package_sync_cli_integration_with_pre_messages() {
     );
     std::fs::write(root.join(".vector/packages.yaml"), manifest_yaml).unwrap();
 
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+        .map_or_else(|_| std::env::current_dir().unwrap(), std::path::PathBuf::from);
+    let manifest_path_str = manifest_dir.join("Cargo.toml").to_string_lossy().into_owned();
+
     // 5. Run vector-database package sync CLI as a real subprocess
-    // Locate the binary relative to the test executable to avoid spawning `cargo run`
-    // inside `cargo test`, which deadlocks on Cargo's build lock.
-    let bin_path = find_bin("vector-database");
-    let (stdout_str, stderr_str) = run_cmd(&bin_path, &["package", "sync"], root).await;
+    let (stdout_str, stderr_str) = run_cmd(
+        "cargo",
+        &[
+            "run",
+            "--manifest-path",
+            &manifest_path_str,
+            "--bin",
+            "vector-database",
+            "--",
+            "package",
+            "sync",
+        ],
+        root,
+    )
+    .await;
 
     println!("--- CLI stdout ---");
     println!("{stdout_str}");
@@ -236,7 +251,21 @@ async fn test_package_sync_cli_integration_with_pre_messages() {
     run_cmd("git", &["commit", "-m", "update doc"], &git_source_dir).await;
 
     // Run sync again
-    let (stdout_ref_str, stderr_ref_str) = run_cmd(&bin_path, &["package", "sync"], root).await;
+    let (stdout_ref_str, stderr_ref_str) = run_cmd(
+        "cargo",
+        &[
+            "run",
+            "--manifest-path",
+            &manifest_path_str,
+            "--bin",
+            "vector-database",
+            "--",
+            "package",
+            "sync",
+        ],
+        root,
+    )
+    .await;
 
     println!("--- CLI second run stdout ---");
     println!("{stdout_ref_str}");
@@ -256,20 +285,6 @@ async fn test_package_sync_cli_integration_with_pre_messages() {
     // Verify git package was updated successfully
     let git_doc_content = std::fs::read_to_string(synced_git_doc).unwrap();
     assert_eq!(git_doc_content, "Hello Git package updated");
-}
-
-fn find_bin(name: &str) -> String {
-    let mut dir = std::env::current_exe().expect("cannot locate test executable");
-    dir.pop();
-    if dir.file_name().map(|n| n == "deps").unwrap_or(false) {
-        dir.pop();
-    }
-    let bin = dir.join(if cfg!(windows) {
-        format!("{name}.exe")
-    } else {
-        name.to_string()
-    });
-    bin.to_string_lossy().into_owned()
 }
 
 async fn run_cmd(cmd: &str, args: &[&str], dir: &std::path::Path) -> (String, String) {
