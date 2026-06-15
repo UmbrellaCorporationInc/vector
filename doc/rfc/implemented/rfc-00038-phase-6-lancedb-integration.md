@@ -5,7 +5,7 @@ code: "00038"
 slug: phase-6-lancedb-integration
 title: Phase 6 LanceDB Integration
 description: Proposes the LanceDB storage schema and indexing contract for RAG chunks with vector and full-text retrieval support.
-status: accepted
+status: implemented
 created: 2026-06-15
 updated: 2026-06-15
 authors: []

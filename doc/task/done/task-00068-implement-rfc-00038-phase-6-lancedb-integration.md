@@ -5,7 +5,7 @@ code: "00068"
 slug: implement-rfc-00038-phase-6-lancedb-integration
 title: Implement RFC 00038 Phase 6 LanceDB Integration
 description: Implement the LanceDB retrieval store, the RAG-owned database lifecycle operation, and CLI integration for Phase 6.
-status: in-progress
+status: done
 created: 2026-06-15
 updated: 2026-06-15
 tags:
