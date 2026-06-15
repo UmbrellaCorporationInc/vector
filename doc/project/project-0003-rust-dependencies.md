@@ -111,6 +111,12 @@ Tags: #rust #hashing #filesystem
 Scope: `runtime-io`
 Description: BLAKE3 content hashing crate approved for `runtime-io` file-byte hashing primitives. The approved use is limited to hashing file bytes through the generic IO boundary; callers must not include paths, modified times, package identity, Markdown metadata, or other domain data in the hash input.
 
+## 16. lancedb
+
+Tags: #rust #vector-database #storage
+Scope: `runtime-rag`
+Description: Embedded vector database approved for the `runtime-rag` Phase 6 persistence boundary. The approved use is limited to owning the local RAG retrieval store lifecycle, schema creation, index creation, and later retrieval-store writes under `.vector-database/rag/lancedb/`. LanceDB-specific behavior must remain behind `runtime-rag` and must not leak into CLI-only code.
+
 ## Workspace-local dependencies
 
 These workspace crates are used as internal dependencies and are governed by the workspace architecture rather than third-party dependency approval:

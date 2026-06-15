@@ -7,6 +7,8 @@ thiserror = "2.0.17"
 tokio = { version = "1", features = ["sync", "rt", "fs", "io-util", "rt-multi-thread", "process", "macros"] }
 paste = "1.0"
 rmcp = { version = "1.6.0", features = ["server", "transport-io"] }
+arrow-array = "58.3.0"
+arrow-schema = "58.3.0"
 runtime-channel = { path = "runtime/channel" }
 runtime-core = { path = "runtime/core" }
 runtime-doc = { path = "runtime/doc" }
@@ -29,6 +31,7 @@ patcher = "0.2"
 mcp-vector = { path = "mcp/vector" }
 terminal_size = "0.4"
 blake3 = "1"
+lancedb = "0.30.0"
 
 [workspace.package]
 edition = "2024"

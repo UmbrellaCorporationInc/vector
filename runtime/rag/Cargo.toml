@@ -6,10 +6,16 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+arrow-array = { workspace = true }
+arrow-schema = { workspace = true }
 fastembed = { workspace = true }
+lancedb = { workspace = true }
+runtime-core = { workspace = true }
 runtime-markdown = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
+runtime-channel = { workspace = true }
 runtime-io = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "rt"] }
 

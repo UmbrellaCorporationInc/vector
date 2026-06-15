@@ -45,6 +45,30 @@ vector/
 
 ## Installation
 
+### Protocol Buffers compiler (`protoc`)
+
+Some workspace builds now require the Protocol Buffers compiler `protoc`
+through the LanceDB dependency graph.
+
+Install `protoc` with the package manager for your platform:
+
+```sh
+# Linux
+apt install -y protobuf-compiler
+protoc --version
+
+# macOS
+brew install protobuf
+protoc --version
+
+# Windows
+winget install protobuf
+protoc --version
+```
+
+Ensure `protoc --version` reports a sufficiently recent compiler after
+installation.
+
 ### MCP server (`mcp-vector`)
 
 Install the latest release directly from the repository:

@@ -97,9 +97,11 @@ async fn test_embed_markdown_extraction_embeds_generated_chunks_as_one_text_batc
     let MarkdownEmbeddingPipelineOutcome::Embedded(batch) = outcome else {
         unreachable!("expected extracted workspace document to chunk and embed");
     };
+    let batch = *batch;
     assert_eq!(batch.package, None);
     assert_eq!(batch.document_stem, "rfc-00036-phase-5-embedder");
     assert_eq!(batch.document_hash, fixture.document_hash);
+    assert_eq!(batch.extraction.document_stem, "rfc-00036-phase-5-embedder");
     assert_eq!(batch.chunks.len(), 2);
     assert_eq!(batch.chunks[0].chunk.text, "## First\n\nAlpha body for embedding.");
     assert_eq!(batch.chunks[0].embedding_model, "test-model");

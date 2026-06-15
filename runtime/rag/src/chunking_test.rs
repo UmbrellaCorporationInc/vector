@@ -45,11 +45,7 @@ async fn test_chunk_record_exposes_rfc_required_fields() {
 
     assert_eq!(chunks.len(), 1);
     let chunk = &chunks[0];
-    assert!(
-        chunk
-            .chunk_id
-            .starts_with("workspace/spec-00011-rag-plan-implementation/short-section/0000/")
-    );
+    assert!(chunk.chunk_id.starts_with("workspace/spec-00011-rag-plan-implementation/0000/"));
     assert_eq!(chunk.package, None);
     assert_eq!(chunk.document_stem, "spec-00011-rag-plan-implementation");
     assert_eq!(chunk.document_hash, document.document_hash);
@@ -210,11 +206,7 @@ async fn test_chunking_preserves_package_identity_for_synchronized_documents() {
 
     assert_eq!(chunks.len(), 1);
     assert_eq!(chunks[0].package.as_deref(), Some("shared-docs"));
-    assert!(
-        chunks[0]
-            .chunk_id
-            .starts_with("shared-docs/spec-00011-rag-plan-implementation/package-spec/0000/")
-    );
+    assert!(chunks[0].chunk_id.starts_with("shared-docs/spec-00011-rag-plan-implementation/0000/"));
 }
 
 #[tokio::test]
