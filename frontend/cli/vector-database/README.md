@@ -83,6 +83,18 @@ Creates or validates the local Phase 6 LanceDB store under
 - Does not implement separate table, schema, or index creation logic in the CLI.
 - Prints the resolved store path and primary table name after the operation completes.
 
+**Phase 6 Store Contract:**
+- The local retrieval store lives only under `.vector-database/rag/lancedb/`.
+- The primary table persists one retrieval-oriented chunk row per embedded Markdown chunk.
+- Persisted rows include `chunk_id`, governed package and document identity, document and chunk hashes, heading path, frontmatter, raw text, token count, embedding metadata, and the vector payload.
+- `chunk_id` remains the deterministic upsert identity for replacing unchanged or updated chunks.
+- Full-text indexing over `text` and vector indexing over `vector` are owned by `runtime-rag`, not by the CLI layer.
+
+**Ownership Boundary:**
+- `vector-database` is only the execution surface for the RAG store lifecycle command.
+- `runtime-rag` owns LanceDB compatibility validation, schema rules, index creation, and actionable persistence errors.
+- Any future store contract changes must be implemented in `runtime-rag` first and then consumed by this CLI boundary.
+
 **Exit behavior:**
 
 | Condition | Exit code |

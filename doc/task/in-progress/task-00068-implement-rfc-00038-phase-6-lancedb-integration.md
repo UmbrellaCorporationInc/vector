@@ -149,6 +149,6 @@ input:
   language: Markdown, Rust
 ```
 
-- [ ] Update the affected README files with the Phase 6 LanceDB store contract and CLI ownership boundary.
-- [ ] Run the relevant Rust quality gates for `runtime-rag` and `vector-database`.
-- [ ] Confirm every acceptance criterion in [[rfc-00038-phase-6-lancedb-integration]] has implementation or test coverage.
+- [x] Update the affected README files with the Phase 6 LanceDB store contract and CLI ownership boundary.
+- [x] Run the relevant Rust quality gates for `runtime-rag` and `vector-database`.
+- [x] Confirm every acceptance criterion in [[rfc-00038-phase-6-lancedb-integration]] has implementation or test coverage.

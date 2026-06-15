@@ -32,6 +32,37 @@ orchestration boundaries for Vector.
   `.vector-database/rag/lancedb/`, including the primary table contract and the
   full-text index on persisted chunk text.
 
+## Phase 6 LanceDB Store Contract
+
+Phase 6 persists one primary LanceDB table for retrieval chunks under
+`.vector-database/rag/lancedb/`. The storage contract is denormalized around a
+single chunk row so semantic, lexical, and metadata-driven retrieval can
+operate on the same persisted unit.
+
+The primary row contract stores these fields:
+
+- `chunk_id`
+- `package`
+- `document_stem`
+- `document_hash`
+- `chunk_hash`
+- `chunk_ordinal`
+- `heading_path`
+- `frontmatter`
+- `text`
+- `token_count`
+- `embedding_model`
+- `embedding_dimension`
+- `vector`
+
+`chunk_id` is the stable upsert key. It is derived from package identity,
+governed document stem, chunk ordinal, and chunk hash so unchanged chunks keep
+their persisted identity across repeated indexing runs.
+
+The Phase 6 store keeps raw chunk text in `text` for inspection and full-text
+retrieval, and it keeps package, document stem, heading path, tags, and
+selected frontmatter data filterable through persisted metadata columns.
+
 ## Phase 1 Defaults
 
 The first local RAG implementation uses:
@@ -124,6 +155,24 @@ preserves the original `MarkdownChunkRecord` and adds:
 The embedded batch types are intentionally storage-ready but storage-agnostic.
 Later LanceDB phases can persist the model metadata and vector without calling a
 concrete embedding backend directly.
+
+## LanceDB Ownership Boundary
+
+`runtime-rag` owns the Phase 6 LanceDB lifecycle and persistence rules. That
+includes:
+
+- resolving `.vector-database/rag/lancedb/` from the workspace root;
+- creating or opening the primary chunk table;
+- validating the active embedding model and dimension against store metadata;
+- creating the full-text index on `text`;
+- creating the vector index on `vector` after persisted rows exist;
+- replacing stale document rows deterministically by package and
+  `document_stem`.
+
+Adapters such as `vector-database` must call the high-level `InitRagStoreOp`
+operation instead of implementing table, schema, or index creation logic
+directly. This keeps LanceDB-specific behavior inside the RAG domain boundary
+and prevents CLI code from becoming a second owner of persistence invariants.
 
 ## Fastembed Model Metadata
 
