@@ -1,10 +1,5 @@
 //! Integration tests for the `package sync` CLI command.
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::print_stdout,
-    clippy::panic
-)]
+#![allow(clippy::expect_used, clippy::unwrap_used, clippy::print_stdout, clippy::panic)]
 
 use runtime_io::{CommandBuilder, CommandExecutor, ProcessCommandExecutor};
 
@@ -31,10 +26,9 @@ async fn run_cmd(cmd: &str, args: &[&str], dir: &std::path::Path) -> CmdOutput {
     let mut stdout_bytes = Vec::new();
     let mut stderr_bytes = Vec::new();
     handle
-        .stream_output(
-            &mut |b| stdout_bytes.extend_from_slice(b),
-            &mut |b| stderr_bytes.extend_from_slice(b),
-        )
+        .stream_output(&mut |b| stdout_bytes.extend_from_slice(b), &mut |b| {
+            stderr_bytes.extend_from_slice(b)
+        })
         .await;
     let exit = handle.wait().await.expect("failed to wait for command");
     let stderr = String::from_utf8_lossy(&stderr_bytes).into_owned();
