@@ -64,11 +64,10 @@ input:
   language: Rust
 ```
 
-- [ ] Add a high-level operation in `runtime-rag` that creates or updates the LanceDB store under `.vector-database/rag/lancedb/`.
-- [ ] Keep LanceDB-specific schema and index creation behind the RAG persistence boundary instead of exposing it through CLI code.
-- [ ] Make table creation idempotent across repeated runs.
-- [ ] Create the vector index on `vector` and the full-text inverted index on `text`.
-- [ ] Fail writes before commit when `embedding_model` or `embedding_dimension` are incompatible with the active store contract.
+- [x] Add a high-level operation in `runtime-rag` that creates or updates the LanceDB store under `.vector-database/rag/lancedb/`.
+- [x] Keep LanceDB-specific schema and index creation behind the RAG persistence boundary instead of exposing it through CLI code.
+- [x] Make table creation idempotent across repeated runs.
+- [x] Create the full-text inverted index on `text` during lifecycle initialization.
 
 ### 3.3. Phase C - Indexing Integration
 
@@ -86,6 +85,8 @@ input:
 - [ ] Implement deterministic upserts keyed by `chunk_id`.
 - [ ] Replace stale document rows deterministically by package and document stem when a document changes or is deleted.
 - [ ] Keep raw text and metadata inspectable without reopening source files.
+- [ ] Create the vector index on `vector` once persisted rows exist so index creation does not depend on unsupported empty-table behavior.
+- [ ] Fail writes before commit when `embedding_model` or `embedding_dimension` are incompatible with the active store contract.
 
 ### 3.4. Phase D - CLI Integration
 
@@ -104,7 +105,22 @@ input:
 - [ ] Return actionable errors when store initialization or compatibility validation fails.
 - [ ] Document the command behavior for creating or updating the local RAG store.
 
-### 3.5. Phase Z - Wrap-up
+### 3.5. Phase Y - Tooling And CI
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00068
+  phase: Phase Y
+  language: Rust, YAML, Markdown
+```
+
+- [ ] Update the GitHub Actions Rust workflow to provide `protoc` before building crates that compile the LanceDB dependency graph.
+- [x] Document the `protoc` build dependency for local development and CI in the affected README files.
+
+### 3.6. Phase Z - Wrap-up
 
 ```vector-agent-action
 label: Execute Phase in Agent

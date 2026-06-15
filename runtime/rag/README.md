@@ -27,6 +27,10 @@ orchestration boundaries for Vector.
 - **Fastembed Baseline**: `FastembedBgeSmallEnV15Embedder` isolates fastembed
   initialization and model execution behind the `Embedder` boundary for the
   `BGESmallENV15` model.
+- **LanceDB Store Lifecycle**: `ensure_lancedb_store(...)` owns creation and
+  validation of the local Phase 6 LanceDB store under
+  `.vector-database/rag/lancedb/`, including the primary table contract and the
+  full-text index on persisted chunk text.
 
 ## Phase 1 Defaults
 
@@ -135,6 +139,25 @@ Vector's RAG defaults before runtime use. `try_new()` performs fastembed model
 initialization and keeps model download, cache setup, and ONNX runtime behavior
 isolated from indexing callers. Unit and pipeline tests use deterministic fake
 embedders instead of downloading or executing the real model.
+
+## Build Dependencies
+
+`runtime-rag` now depends on `lancedb` for the Phase 6 local retrieval store.
+The current LanceDB dependency graph requires the Protocol Buffers compiler
+`protoc` at build time through `lance-encoding`.
+
+Local development and CI must therefore provide `protoc` through one of these
+paths before running `cargo build` or `cargo test` for crates that compile the
+LanceDB dependency graph:
+
+- expose `protoc` on `PATH`;
+- or set the `PROTOC` environment variable to the `protoc` executable path.
+
+On Windows, install `protoc` with:
+
+```powershell
+winget install protobuf
+```
 
 ## Boundary Rules
 

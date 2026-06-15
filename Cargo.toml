@@ -29,6 +29,7 @@ patcher = "0.2"
 mcp-vector = { path = "mcp/vector" }
 terminal_size = "0.4"
 blake3 = "1"
+lancedb = "0.30.0"
 
 [workspace.package]
 edition = "2024"
