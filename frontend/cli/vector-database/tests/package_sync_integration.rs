@@ -27,7 +27,7 @@ async fn run_cmd(cmd: &str, args: &[&str], dir: &std::path::Path) -> CmdOutput {
     let mut stderr_bytes = Vec::new();
     handle
         .stream_output(&mut |b| stdout_bytes.extend_from_slice(b), &mut |b| {
-            stderr_bytes.extend_from_slice(b)
+            stderr_bytes.extend_from_slice(b);
         })
         .await;
     let exit = handle.wait().await.expect("failed to wait for command");
