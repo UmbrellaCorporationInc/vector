@@ -7,7 +7,7 @@ use crate::{
 };
 use runtime_markdown::{
     MarkdownExtractionError, MarkdownExtractionErrorRecord, MarkdownExtractionOutcome,
-    MarkdownSourceSpan,
+    MarkdownExtractionRecord, MarkdownSourceSpan,
 };
 use std::collections::BTreeMap;
 
@@ -65,6 +65,8 @@ pub struct EmbeddedMarkdownChunkBatch {
     pub document_stem: String,
     /// Source document content hash from discovery.
     pub document_hash: String,
+    /// Normalized extraction metadata required by later storage phases.
+    pub extraction: MarkdownExtractionRecord,
     /// Ordered chunks carrying embedding vectors and model metadata.
     pub chunks: Vec<EmbeddedMarkdownChunkRecord>,
 }
@@ -74,7 +76,7 @@ pub struct EmbeddedMarkdownChunkBatch {
 #[non_exhaustive]
 pub enum MarkdownEmbeddingPipelineOutcome {
     /// Extraction, chunking, and embedding succeeded.
-    Embedded(EmbeddedMarkdownChunkBatch),
+    Embedded(Box<EmbeddedMarkdownChunkBatch>),
     /// The document could not be embedded, but unrelated documents can continue.
     Failed(MarkdownEmbeddingFailureRecord),
 }
@@ -240,14 +242,34 @@ pub fn embed_markdown_extraction(
     match chunk_markdown_extraction(outcome, source, config, token_counter) {
         MarkdownChunkingPipelineOutcome::Chunked(batch) => {
             match embed_markdown_chunks(embedder, &batch.chunks) {
-                Ok(chunks) => {
-                    MarkdownEmbeddingPipelineOutcome::Embedded(EmbeddedMarkdownChunkBatch {
+                Ok(chunks) => match outcome {
+                    MarkdownExtractionOutcome::Extracted(extraction) => {
+                        MarkdownEmbeddingPipelineOutcome::Embedded(Box::new(
+                            EmbeddedMarkdownChunkBatch {
+                                package: extraction.package.clone(),
+                                document_stem: extraction.document_stem.clone(),
+                                document_hash: extraction.document_hash.clone(),
+                                extraction: extraction.clone(),
+                                chunks,
+                            },
+                        ))
+                    }
+                    _ => MarkdownEmbeddingPipelineOutcome::Failed(MarkdownEmbeddingFailureRecord {
                         package: batch.package,
                         document_stem: batch.document_stem,
                         document_hash: batch.document_hash,
-                        chunks,
-                    })
-                }
+                        error: MarkdownEmbeddingPipelineError::Chunking(
+                            MarkdownChunkingPipelineError::MalformedExtractionInput {
+                                kind: "unsupported_extraction_outcome".to_owned(),
+                                message:
+                                    "Markdown extraction returned an unsupported outcome variant."
+                                        .to_owned(),
+                                source_span: None,
+                                details: BTreeMap::new(),
+                            },
+                        ),
+                    }),
+                },
                 Err(error) => {
                     MarkdownEmbeddingPipelineOutcome::Failed(MarkdownEmbeddingFailureRecord {
                         package: batch.package,

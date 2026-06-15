@@ -81,12 +81,12 @@ input:
   language: Rust
 ```
 
-- [ ] Wire the Phase 6 store to accept chunking and embedding outputs from the RAG pipeline.
-- [ ] Implement deterministic upserts keyed by `chunk_id`.
-- [ ] Replace stale document rows deterministically by package and document stem when a document changes or is deleted.
-- [ ] Keep raw text and metadata inspectable without reopening source files.
-- [ ] Create the vector index on `vector` once persisted rows exist so index creation does not depend on unsupported empty-table behavior.
-- [ ] Fail writes before commit when `embedding_model` or `embedding_dimension` are incompatible with the active store contract.
+- [x] Wire the Phase 6 store to accept chunking and embedding outputs from the RAG pipeline.
+- [x] Implement deterministic upserts keyed by `chunk_id`.
+- [x] Replace stale document rows deterministically by package and document stem when a document changes or is deleted.
+- [x] Keep raw text and metadata inspectable without reopening source files.
+- [x] Create the vector index on `vector` once persisted rows exist so index creation does not depend on unsupported empty-table behavior.
+- [x] Fail writes before commit when `embedding_model` or `embedding_dimension` are incompatible with the active store contract.
 
 ### 3.4. Phase D - CLI Integration
 
