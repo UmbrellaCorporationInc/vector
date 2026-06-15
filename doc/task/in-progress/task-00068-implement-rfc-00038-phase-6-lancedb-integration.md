@@ -88,7 +88,7 @@ input:
 - [x] Create the vector index on `vector` once persisted rows exist so index creation does not depend on unsupported empty-table behavior.
 - [x] Fail writes before commit when `embedding_model` or `embedding_dimension` are incompatible with the active store contract.
 
-### 3.4. Phase D - CLI Integration
+### 3.4. Phase D - Runtime Operation Boundary
 
 ```vector-agent-action
 label: Execute Phase in Agent
@@ -100,12 +100,29 @@ input:
   language: Rust
 ```
 
+- [x] Add a `runtime-rag` operation boundary for LanceDB lifecycle work that matches the project runtime operation pattern used by `doc` and `project`.
+- [x] Route store initialization and compatibility validation through the standard dispatcher/channel execution path instead of calling lifecycle functions directly from adapters.
+- [x] Keep LanceDB-specific request and error mapping owned by `runtime-rag` so higher-level callers depend on operation contracts rather than raw persistence functions.
+- [x] Add or update tests that verify the new `runtime-rag` operation executes correctly through the standard dispatcher path.
+
+### 3.5. Phase E - CLI Integration
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00068
+  phase: Phase E
+  language: Rust
+```
+
 - [ ] Update `vector-database` to invoke the RAG-owned database lifecycle operation.
 - [ ] Ensure the CLI does not implement separate schema-creation or index-creation logic.
 - [ ] Return actionable errors when store initialization or compatibility validation fails.
 - [ ] Document the command behavior for creating or updating the local RAG store.
 
-### 3.5. Phase Y - Tooling And CI
+### 3.6. Phase Y - Tooling And CI
 
 ```vector-agent-action
 label: Execute Phase in Agent
@@ -120,7 +137,7 @@ input:
 - [ ] Update the GitHub Actions Rust workflow to provide `protoc` before building crates that compile the LanceDB dependency graph.
 - [x] Document the `protoc` build dependency for local development and CI in the affected README files.
 
-### 3.6. Phase Z - Wrap-up
+### 3.7. Phase Z - Wrap-up
 
 ```vector-agent-action
 label: Execute Phase in Agent

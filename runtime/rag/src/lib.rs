@@ -7,6 +7,7 @@ pub mod chunking;
 pub mod defaults;
 pub mod embedding;
 pub mod lifecycle;
+pub mod operations;
 pub mod pipeline;
 pub mod storage;
 
@@ -14,5 +15,6 @@ pub use chunking::*;
 pub use defaults::*;
 pub use embedding::*;
 pub use lifecycle::*;
+pub use operations::*;
 pub use pipeline::*;
 pub use storage::*;
