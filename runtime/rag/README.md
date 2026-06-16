@@ -37,6 +37,11 @@ orchestration boundaries for Vector.
   embedding reuse, stale row deletion, and per-document failure isolation.
   `IndexResult` summarizes skipped, re-indexed, deleted, and failed document
   counts so callers can render a run summary without inspecting internal storage.
+- **Phase 8 Hybrid Retrieval**: `HybridSearchOp` owns query normalization,
+  query embedding, semantic and lexical branch execution, deterministic
+  Reciprocal Rank Fusion (RRF), section-level deduplication, same-section
+  adjacent chunk expansion, and the machine-readable retrieval payload consumed
+  by CLI adapters and future MCP callers.
 
 ## Phase 7 Incremental Indexing
 
@@ -127,6 +132,44 @@ The LanceDB lexical branch remains a baseline, not a tuned search engine.
 LanceDB ranking quality is good enough for identifier-heavy corpora, long error
 messages, or code-shaped queries. Phase 8 intentionally keeps deterministic RRF
 fusion instead of adding score tuning that could hide those shortcomings.
+
+### Known Retrieval Correctness Risks
+
+Phase 8 closes the retrieval contract gap, but several risks remain explicit:
+
+- **Fusion determinism depends on branch ordering**: the fixed `k = 60` RRF
+  constant and stable tie-break ordering are covered by tests, but any future
+  LanceDB branch ordering drift could still change rankings if the underlying
+  candidate lists move.
+- **Section identity is intentionally coarse**: deduplication uses
+  `(package, document_stem, heading_path)`, which prevents one heading from
+  flooding results but can hide multiple useful chunk hits under a very broad
+  section.
+- **Expansion is intentionally narrow**: adjacent chunk expansion is restricted
+  to direct neighbors in the same section and stops at the final retrieval
+  limit. This preserves attribution boundaries, but it may still omit useful
+  farther context when a section is long.
+- **Lexical quality is still unproven**: exact `document_stem` and synthetic
+  filename retrieval are covered, but LanceDB full-text ranking quality for
+  realistic identifier-heavy corpora still needs Phase 11 benchmarking.
+
+## Phase 8 Hybrid Retrieval
+
+`HybridSearchOp` is the only supported Phase 8 retrieval boundary. It performs:
+
+1. Query normalization and governed retrieval default resolution.
+2. Query embedding through the active embedder contract.
+3. Semantic vector search against the LanceDB vector index.
+4. Lexical search against the `search_text` full-text surface.
+5. Package and document filtering before fusion on both branches.
+6. Reciprocal Rank Fusion with a fixed `k = 60` constant.
+7. Section-level deduplication using `(package, document_stem, heading_path)`.
+8. Same-section neighbor expansion within the final result limit.
+
+Each `HybridSearchResult` includes package identity, document stem, heading
+path, chunk identity, chunk ordinal, chunk text, token count, branch ranks,
+RRF score, neighbor chunk identifiers, and expansion provenance. Adapters must
+reuse this output instead of re-implementing ranking or result shaping.
 
 ## Phase 1 Defaults
 

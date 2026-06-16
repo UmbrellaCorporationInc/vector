@@ -5,7 +5,7 @@ code: "00070"
 slug: implement-rfc-00040-phase-8-hybrid-search
 title: Implement RFC 00040 Phase 8 Hybrid Search
 description: Implement the Phase 8 hybrid retrieval operation, fusion rules, deduplication policy, adjacent chunk expansion, and CLI search command defined by RFC 00040.
-status: in-progress
+status: done
 created: 2026-06-16
 updated: 2026-06-16
 tags:
@@ -129,7 +129,7 @@ input:
 ```
 
 - [x] Add tests for semantic-only hits, lexical-only hits, mixed hits fused by RRF, filter application, section-level deduplication, adjacent chunk expansion, and CLI output behavior.
-- [x] Cover exact identifier and document-stem retrieval through lexical matching. Filename hits remain out of scope for Phase E because governed document lookup already resolves them structurally through MCP.
+- [x] Cover exact identifier, document-stem, and synthetic filename retrieval through lexical matching.
 - [x] Cover conceptual query retrieval through semantic matching.
 - [x] Lock the chosen RRF constant behind deterministic tests so future tuning cannot silently change ranking behavior.
 - [x] Document any LanceDB lexical limitations discovered during implementation instead of hiding them behind score tuning.
@@ -146,9 +146,9 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Verify every acceptance criterion in [[rfc-00040-phase-8-hybrid-search]] has implementation or test coverage.
-- [ ] Record any unresolved correctness risk around fusion determinism, section identity, expansion limits, or LanceDB lexical quality.
-- [ ] Update README files for `runtime-rag` and `vector-database` if retrieval workflows or command behavior changed.
+- [x] Verify every acceptance criterion in [[rfc-00040-phase-8-hybrid-search]] has implementation or test coverage.
+- [x] Record any unresolved correctness risk around fusion determinism, section identity, expansion limits, or LanceDB lexical quality.
+- [x] Update README files for `runtime-rag` and `vector-database` if retrieval workflows or command behavior changed.
 
 ## 4. Staff Engineer Review
 

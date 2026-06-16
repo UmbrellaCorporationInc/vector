@@ -451,6 +451,61 @@ async fn run_hybrid_search_retrieves_exact_document_stem_through_lexical_search(
 }
 
 #[tokio::test]
+async fn run_hybrid_search_retrieves_filename_through_lexical_search() {
+    let root = unique_fixture_root("lexical-filename");
+    let mut embedder = MappingEmbedder::default()
+        .with_query_vector("spec-00011-rag-plan-implementation.md", padded_vector(0.0, 0.0, 0.0));
+
+    for index in 0..20 {
+        let stem = format!("task-{:05}-semantic-{index}", index + 1);
+        let marker = format!("SEM{index}");
+        let rank_distance = u16::try_from(index).unwrap();
+        embedder =
+            embedder.with_chunk_vector(&marker, padded_vector(f32::from(rank_distance), 0.0, 0.0));
+        insert_fixture_document(
+            &root,
+            None,
+            &stem,
+            &doc_source("Semantic", &format!("{marker} vector-only content.")),
+            &embedder,
+        )
+        .await;
+    }
+
+    insert_fixture_document(
+        &root,
+        None,
+        "spec-00011-rag-plan-implementation",
+        &doc_source("Target", "Chunk body omits the synthetic filename surface."),
+        &embedder,
+    )
+    .await;
+
+    let output = run_hybrid_search(
+        &HybridSearchInput::new(
+            root,
+            RagDefaults::phase_one(),
+            "spec-00011-rag-plan-implementation.md".to_owned(),
+            None,
+            None,
+            Some(24),
+        ),
+        &embedder,
+    )
+    .await
+    .unwrap();
+
+    let filename_match = output
+        .results
+        .iter()
+        .find(|result| result.document_stem == "spec-00011-rag-plan-implementation")
+        .expect("filename match must appear in fused results");
+    assert_eq!(filename_match.semantic_rank, None);
+    assert_eq!(filename_match.lexical_rank, Some(1));
+    assert_f32_eq(filename_match.rrf_score, 1.0 / 61.0);
+}
+
+#[tokio::test]
 async fn run_hybrid_search_fuses_semantic_and_lexical_ranks_with_fixed_rrf_constant() {
     let root = unique_fixture_root("rrf-fusion");
     let embedder = MappingEmbedder::default()

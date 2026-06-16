@@ -5,7 +5,7 @@ code: "00040"
 slug: phase-8-hybrid-search
 title: Phase 8 Hybrid Search
 description: Proposes the hybrid retrieval algorithm and CLI query command for Phase 8 of the local RAG plan.
-status: accepted
+status: implemented
 created: 2026-06-16
 updated: 2026-06-16
 authors: []

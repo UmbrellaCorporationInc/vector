@@ -322,6 +322,8 @@ async fn execute_lexical_branch(
         return Ok(Vec::new());
     }
     let exact_candidates = execute_exact_document_stem_branch(table, query_text, filter).await?;
+    let exact_filename_candidates =
+        execute_exact_filename_branch(table, query_text, filter).await?;
     let fts_query = FullTextSearchQuery::new(query_text.to_owned())
         .with_column("search_text".to_owned())
         .map_err(|error| RuntimeError::operation(error.to_string()))?;
@@ -334,7 +336,11 @@ async fn execute_lexical_branch(
     let stream =
         query.execute().await.map_err(|error| RuntimeError::operation(error.to_string()))?;
     let fts_candidates = collect_candidates(stream).await?;
-    Ok(merge_ranked_candidates(exact_candidates, fts_candidates, limit))
+    Ok(merge_ranked_candidates(
+        exact_candidates.into_iter().chain(exact_filename_candidates).collect(),
+        fts_candidates,
+        limit,
+    ))
 }
 
 async fn execute_exact_document_stem_branch(
@@ -370,6 +376,33 @@ async fn execute_exact_document_stem_branch(
     Ok(exact_matches)
 }
 
+async fn execute_exact_filename_branch(
+    table: &lancedb::Table,
+    query_text: &str,
+    filter: Option<&str>,
+) -> RuntimeResult<Vec<RankedCandidate>> {
+    if !filename_query_suffixes().iter().any(|suffix| query_text.ends_with(suffix)) {
+        return Ok(Vec::new());
+    }
+
+    let predicate = exact_filename_predicate(filter, query_text);
+    let stream = table
+        .query()
+        .only_if(predicate)
+        .select(candidate_projection())
+        .execute()
+        .await
+        .map_err(|error| RuntimeError::operation(error.to_string()))?;
+    let mut candidates = collect_candidates(stream).await?;
+    candidates.sort_by(|left, right| {
+        left.chunk_ordinal
+            .cmp(&right.chunk_ordinal)
+            .then_with(|| left.chunk_id.cmp(&right.chunk_id))
+    });
+
+    Ok(candidates.into_iter().next().into_iter().collect())
+}
+
 fn exact_document_stem_predicate(filter: Option<&str>, query_text: &str) -> String {
     let stem_predicate = format!("document_stem = '{}'", sql_string_literal(query_text));
     filter.map_or_else(|| stem_predicate.clone(), |filter| format!("{filter} AND {stem_predicate}"))
@@ -387,6 +420,18 @@ fn exact_document_stem_queries(query_text: &str) -> Vec<String> {
     queries.sort();
     queries.dedup();
     queries
+}
+
+fn exact_filename_predicate(filter: Option<&str>, query_text: &str) -> String {
+    let filename_predicate = format!("search_text LIKE '%{}%'", sql_like_literal(query_text));
+    filter.map_or_else(
+        || filename_predicate.clone(),
+        |filter| format!("{filter} AND {filename_predicate}"),
+    )
+}
+
+const fn filename_query_suffixes() -> [&'static str; 2] {
+    [".md", ".markdown"]
 }
 
 fn merge_ranked_candidates(
@@ -731,6 +776,10 @@ fn candidate_filter(package_filter: Option<&str>, document_filter: Option<&str>)
 
 fn sql_string_literal(value: &str) -> String {
     value.replace('\'', "''")
+}
+
+fn sql_like_literal(value: &str) -> String {
+    sql_string_literal(value).replace('[', "[[]").replace('%', "[%]").replace('_', "[_]")
 }
 
 fn missing_column_error(column: &str) -> RuntimeError {
