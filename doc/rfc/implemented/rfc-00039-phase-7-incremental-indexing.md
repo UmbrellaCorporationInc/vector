@@ -5,7 +5,7 @@ code: "00039"
 slug: phase-7-incremental-indexing
 title: Phase 7 Incremental Indexing
 description: Proposes the incremental indexing pipeline that wires together discovery, parsing, chunking, embedding, and LanceDB storage with hash-based change detection.
-status: accepted
+status: implemented
 created: 2026-06-15
 updated: 2026-06-15
 authors: []

@@ -5,7 +5,7 @@ code: "00069"
 slug: implement-rfc-00039-phase-7-incremental-indexing
 title: Implement RFC 00039 Phase 7 Incremental Indexing
 description: Implement the incremental indexing pipeline, orchestration boundary, change detection, stale row deletion, and failure reporting defined by RFC 00039.
-status: in-progress
+status: done
 created: 2026-06-15
 updated: 2026-06-15
 tags:
