@@ -75,11 +75,11 @@ input:
   language: Rust
 ```
 
-- [ ] Embed the query with the active embedding model and execute semantic search against the LanceDB vector index.
-- [ ] Execute lexical search against the LanceDB full-text index on chunk text.
-- [ ] Apply package and document filters before fusion on both candidate branches.
-- [ ] Merge ranked semantic and lexical candidates with a fixed Reciprocal Rank Fusion constant owned by `runtime-rag`.
-- [ ] Keep missing branch ranks contributing zero instead of inventing normalized cross-mode score comparisons.
+- [x] Embed the query with the active embedding model and execute semantic search against the LanceDB vector index.
+- [x] Execute lexical search against the LanceDB full-text index on chunk text.
+- [x] Apply package and document filters before fusion on both candidate branches.
+- [x] Merge ranked semantic and lexical candidates with a fixed Reciprocal Rank Fusion constant owned by `runtime-rag`.
+- [x] Keep missing branch ranks contributing zero instead of inventing normalized cross-mode score comparisons.
 
 ### 3.3. Phase C - Deduplication, Expansion, And Result Shape
 
