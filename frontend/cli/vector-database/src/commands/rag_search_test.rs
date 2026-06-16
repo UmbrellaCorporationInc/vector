@@ -64,6 +64,10 @@ fn sample_context() -> RetrievalContext {
     )
 }
 
+fn empty_context() -> RetrievalContext {
+    RetrievalContext::empty("no matches".to_owned(), 3)
+}
+
 fn unique_root(label: &str) -> std::path::PathBuf {
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().subsec_nanos();
     let root = std::env::temp_dir().join(format!("vector-cli-rag-search-{label}-{nanos}"));
@@ -111,12 +115,30 @@ fn parse_args_rejects_missing_query_and_zero_limit() {
 fn render_human_output_includes_context_identity_and_text() {
     let rendered = render_human_output(&sample_context());
 
-    assert!(rendered.contains("Retrieved 1 chunk(s) for 'hybrid retrieval'"));
+    assert!(rendered.contains("Retrieval Context"));
+    assert!(rendered.contains("status=has_results query='hybrid retrieval' limit=3 returned=1"));
+    assert!(rendered.contains("Sources:"));
+    assert!(rendered.contains("- src-1 [shared-docs]"));
     assert!(
         rendered.contains("[shared-docs] task-00070-implement-rfc-00040-phase-8-hybrid-search")
     );
+    assert!(rendered.contains("Chunks:"));
+    assert!(rendered.contains("- ctx-1 [shared-docs]"));
     assert!(rendered.contains("source=src-1 chunk=chunk-001 ordinal=1 tokens=42"));
+    assert!(rendered.contains("match_reason=primary"));
     assert!(rendered.contains("Hybrid retrieval result text."));
+    assert!(rendered.contains("Diagnostics:"));
+    assert!(rendered.contains("total_token_count=42 dropped_after_limit=0 retrieval_limit=3"));
+}
+
+#[test]
+fn render_human_output_preserves_empty_retrieval_as_successful_context() {
+    let rendered = render_human_output(&empty_context());
+
+    assert!(rendered.contains("status=empty query='no matches' limit=3 returned=0"));
+    assert!(rendered.contains("Sources:\n\n- none"));
+    assert!(rendered.contains("Chunks:\n\n- none"));
+    assert!(rendered.contains("total_token_count=0 dropped_after_limit=0 retrieval_limit=3"));
 }
 
 #[test]
@@ -126,9 +148,35 @@ fn render_json_output_serializes_retrieval_context_payload() {
 
     assert_eq!(payload["query"], "hybrid retrieval");
     assert_eq!(payload["status"], "has_results");
+    assert_eq!(payload["limit"], 3);
+    assert_eq!(payload["returned"], 1);
+    assert_eq!(payload["sources"][0]["package"], "shared-docs");
     assert_eq!(payload["sources"][0]["source_id"], "src-1");
+    assert_eq!(
+        payload["sources"][0]["citation_label"],
+        "shared-docs/task-00070-implement-rfc-00040-phase-8-hybrid-search > Phase D"
+    );
+    assert_eq!(payload["chunks"][0]["context_id"], "ctx-1");
+    assert_eq!(payload["chunks"][0]["source_id"], "src-1");
     assert_eq!(payload["chunks"][0]["chunk_id"], "chunk-001");
+    assert_eq!(payload["chunks"][0]["token_count"], 42);
     assert_eq!(payload["chunks"][0]["match_reason"], "primary");
+    assert_eq!(payload["diagnostics"]["total_token_count"], 42);
+    assert_eq!(payload["diagnostics"]["dropped_after_limit"], 0);
+    assert_eq!(payload["diagnostics"]["retrieval_limit"], 3);
+}
+
+#[test]
+fn render_json_output_preserves_empty_retrieval_context() {
+    let rendered = render_json_output(&empty_context()).expect("json rendering should succeed");
+    let payload: Value = serde_json::from_str(&rendered).expect("json payload should parse");
+
+    assert_eq!(payload["query"], "no matches");
+    assert_eq!(payload["status"], "empty");
+    assert_eq!(payload["limit"], 3);
+    assert_eq!(payload["returned"], 0);
+    assert_eq!(payload["sources"], serde_json::json!([]));
+    assert_eq!(payload["chunks"], serde_json::json!([]));
     assert_eq!(payload["diagnostics"]["retrieval_limit"], 3);
 }
 

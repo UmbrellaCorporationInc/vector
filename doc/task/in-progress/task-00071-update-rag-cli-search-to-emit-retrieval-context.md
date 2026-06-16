@@ -64,10 +64,10 @@ input:
   language: rust
 ```
 
-- [ ] Make `--json` serialize `RetrievalContext` directly or through a thin compatibility wrapper that preserves all canonical fields and semantics.
-- [ ] Update human-readable CLI output to render `RetrievalContext` sources, chunks, empty status, and diagnostics clearly.
-- [ ] Preserve structured empty retrieval responses as successful command output.
-- [ ] Preserve non-zero exit behavior for actionable failures such as missing indexes, incompatible embedding metadata, malformed filters, or query execution failures.
+- [x] Make `--json` serialize `RetrievalContext` directly or through a thin compatibility wrapper that preserves all canonical fields and semantics.
+- [x] Update human-readable CLI output to render `RetrievalContext` sources, chunks, empty status, and diagnostics clearly.
+- [x] Preserve structured empty retrieval responses as successful command output.
+- [x] Preserve non-zero exit behavior for actionable failures such as missing indexes, incompatible embedding metadata, malformed filters, or query execution failures.
 
 ### 3.3. Phase C — Tests And Validation
 

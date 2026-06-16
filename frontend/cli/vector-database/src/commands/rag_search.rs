@@ -6,7 +6,8 @@ use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_rag::{
     AssembleRetrievalContextOp, HybridSearchInput, HybridSearchOp, HybridSearchOutput, RagDefaults,
-    RetrievalContext, RetrievalContextChunk, RetrievalContextStatus, RetrievalMatchReason,
+    RetrievalContext, RetrievalContextChunk, RetrievalContextDiagnostics, RetrievalContextSource,
+    RetrievalContextStatus, RetrievalMatchReason,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,17 +132,29 @@ pub fn parse_args(args: &[String]) -> Result<RagSearchArgs, String> {
 /// Render the default human-readable search output.
 #[must_use]
 pub fn render_human_output(context: &RetrievalContext) -> String {
-    if context.status == RetrievalContextStatus::Empty {
-        return format!("No retrieval results for '{}' (limit {}).", context.query, context.limit);
+    let mut lines = vec![format!(
+        "Retrieval Context\nstatus={} query='{}' limit={} returned={}",
+        status_label(context.status),
+        context.query,
+        context.limit,
+        context.returned
+    )];
+
+    lines.push("Sources:".to_owned());
+    if context.sources.is_empty() {
+        lines.push("- none".to_owned());
+    } else {
+        lines.extend(context.sources.iter().map(format_human_source));
     }
 
-    let mut lines = vec![format!(
-        "Retrieved {} chunk(s) for '{}' (limit {}).",
-        context.returned, context.query, context.limit
-    )];
-    for chunk in &context.chunks {
-        lines.push(format_human_chunk(chunk));
+    lines.push("Chunks:".to_owned());
+    if context.chunks.is_empty() {
+        lines.push("- none".to_owned());
+    } else {
+        lines.extend(context.chunks.iter().map(format_human_chunk));
     }
+
+    lines.push(format_human_diagnostics(context.diagnostics));
     lines.join("\n\n")
 }
 
@@ -155,6 +168,19 @@ pub fn render_json_output(context: &RetrievalContext) -> Result<String, String> 
         .map_err(|error| format!("failed to serialize retrieval context: {error}"))
 }
 
+fn format_human_source(source: &RetrievalContextSource) -> String {
+    let package = source.package.as_deref().unwrap_or("<workspace>");
+    let heading_path = if source.heading_path.is_empty() {
+        "<root>".to_owned()
+    } else {
+        source.heading_path.join(" > ")
+    };
+    format!(
+        "- {} [{}] {} :: {} ({})",
+        source.source_id, package, source.document_stem, heading_path, source.citation_label
+    )
+}
+
 fn format_human_chunk(chunk: &RetrievalContextChunk) -> String {
     let package = chunk.package.as_deref().unwrap_or("<workspace>");
     let heading_path = if chunk.heading_path.is_empty() {
@@ -163,9 +189,9 @@ fn format_human_chunk(chunk: &RetrievalContextChunk) -> String {
         chunk.heading_path.join(" > ")
     };
     let mut lines = vec![
-        format!("{}. [{}] {} :: {}", chunk.context_id, package, chunk.document_stem, heading_path),
+        format!("- {} [{}] {} :: {}", chunk.context_id, package, chunk.document_stem, heading_path),
         format!(
-            "source={} chunk={} ordinal={} tokens={} match_reason={}",
+            "  source={} chunk={} ordinal={} tokens={} match_reason={}",
             chunk.source_id,
             chunk.chunk_id,
             chunk.chunk_ordinal,
@@ -173,8 +199,23 @@ fn format_human_chunk(chunk: &RetrievalContextChunk) -> String {
             match_reason_label(chunk.match_reason)
         ),
     ];
-    lines.push(chunk.text.clone());
+    lines.push(format!("  {}", chunk.text));
     lines.join("\n")
+}
+
+fn format_human_diagnostics(diagnostics: RetrievalContextDiagnostics) -> String {
+    format!(
+        "Diagnostics:\ntotal_token_count={} dropped_after_limit={} retrieval_limit={}",
+        diagnostics.total_token_count, diagnostics.dropped_after_limit, diagnostics.retrieval_limit
+    )
+}
+
+const fn status_label(status: RetrievalContextStatus) -> &'static str {
+    match status {
+        RetrievalContextStatus::HasResults => "has_results",
+        RetrievalContextStatus::Empty => "empty",
+        _ => "unknown",
+    }
 }
 
 const fn match_reason_label(match_reason: RetrievalMatchReason) -> &'static str {
