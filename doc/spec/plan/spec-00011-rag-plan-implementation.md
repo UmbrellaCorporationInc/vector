@@ -15,6 +15,7 @@ tags:
   - local
 related:
   - rfc-00038-phase-6-lancedb-integration
+  - rfc-00039-phase-7-incremental-indexing
 supersedes: []
 superseded_by: null
 aliases:
@@ -162,6 +163,7 @@ Acceptance criteria:
 ### Phase 7: Implement Incremental Indexing
 
 Build the indexing pipeline over discovery, parsing, chunking, embedding, and storage.
+See [[rfc-00039-phase-7-incremental-indexing]] for the proposed operation boundary, two-level hash-based change detection, stale chunk removal contract, and failure isolation model for this phase.
 
 - Skip unchanged documents by content hash.
 - Re-index changed documents.
