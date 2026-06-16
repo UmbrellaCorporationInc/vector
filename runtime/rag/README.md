@@ -42,6 +42,12 @@ orchestration boundaries for Vector.
   Reciprocal Rank Fusion (RRF), section-level deduplication, same-section
   adjacent chunk expansion, and the machine-readable retrieval payload consumed
   by CLI adapters and future MCP callers.
+- **Phase 9 Canonical Retrieval Context**: `AssembleRetrievalContextOp`
+  converts Phase 8 retrieval output into the canonical, model-agnostic
+  `RetrievalContext` contract consumed by CLI and MCP adapters. It normalizes
+  source attribution, assigns response-local context identifiers, preserves
+  package and chunk identity, enforces the final result limit, reports token
+  diagnostics, and represents successful empty retrieval as `status: empty`.
 
 ## Phase 7 Incremental Indexing
 
@@ -170,6 +176,34 @@ Each `HybridSearchResult` includes package identity, document stem, heading
 path, chunk identity, chunk ordinal, chunk text, token count, branch ranks,
 RRF score, neighbor chunk identifiers, and expansion provenance. Adapters must
 reuse this output instead of re-implementing ranking or result shaping.
+
+## Phase 9 Canonical Retrieval Context
+
+`AssembleRetrievalContextOp` is the runtime boundary that turns
+`HybridSearchOutput` into a canonical `RetrievalContext`. The operation does
+not invoke an LLM, summarize text, rewrite chunk text, or reopen source files.
+It only packages the evidence already returned by Phase 8.
+
+The canonical context separates normalized sources from evidence chunks:
+
+- `RetrievalContext` records the query, status, final limit, returned chunk
+  count, sources, chunks, and diagnostics.
+- `RetrievalContextSource` is keyed by package identity, governed document
+  stem, and heading path. Its deterministic `citation_label` includes the
+  package name for package-qualified documents.
+- `RetrievalContextChunk` preserves package identity, document stem, heading
+  path, chunk id, chunk ordinal, chunk text, token count, and whether the chunk
+  is `primary` or `expanded`.
+- `RetrievalContextDiagnostics` records total returned token count, the final
+  retrieval limit, and chunks dropped after limit enforcement.
+
+Successful empty retrieval returns `status: empty` with no sources and no
+chunks. This is distinct from operational failures such as missing stores,
+incompatible embedding metadata, malformed filters, or query execution errors.
+
+The runtime contract is ready for adapters. Updating
+`vector-database rag search <query>` and future MCP retrieval output to emit
+this shape is tracked separately by Task 00071.
 
 ## Phase 1 Defaults
 

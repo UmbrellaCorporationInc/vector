@@ -83,26 +83,7 @@ input:
 - [x] Report diagnostic totals for total token count, retrieval limit, and chunks dropped after limit enforcement.
 - [x] Add tests for primary chunks, expanded chunks, repeated sources, limit truncation, package-qualified sources, and diagnostic token totals.
 
-### 3.3. Phase C - CLI And MCP Integration
-
-```vector-agent-action
-label: Execute Phase in Agent
-profile: code
-prompt: prompts-00004-execute-task-phase
-input:
-  task: task 00072
-  phase: Phase C
-  language: rust
-```
-
-- [ ] Update `vector-database rag search <query>` to render and serialize Phase 9 `RetrievalContext` output instead of raw Phase 8 retrieval hits.
-- [ ] Keep existing query, limit, package, document, and JSON flags unless the implementation proves they conflict with the canonical contract.
-- [ ] Ensure CLI JSON output preserves the canonical fields and semantics, either directly or through a thin compatibility wrapper.
-- [ ] Ensure MCP retrieval output uses the same canonical context shape.
-- [ ] Prevent CLI and MCP adapters from reimplementing source attribution, limit enforcement, or empty-result semantics.
-- [ ] Add integration coverage for CLI JSON output and MCP structured output using the same assembled context.
-
-### 3.4. Phase Z - Wrap-up
+### 3.3. Phase Z - Wrap-up
 
 ```vector-agent-action
 label: Execute Phase in Agent
@@ -114,10 +95,15 @@ input:
   language: rust
 ```
 
-- [ ] Update README files for any modified package whose documented RAG behavior changes.
-- [ ] Run formatting, linting, and the relevant Rust test suite.
-- [ ] Verify `validate_fix` passes for governed documentation.
-- [ ] Confirm acceptance criteria from [[rfc-00041-phase-9-canonical-result-for-retrieval-operation]] are either implemented or explicitly deferred in a follow-up task.
+- [x] Update README files for any modified package whose documented RAG behavior changes.
+- [x] Run formatting, linting, and the relevant Rust test suite.
+- [x] Verify `validate_fix` passes for governed documentation.
+- [x] Confirm acceptance criteria from [[rfc-00041-phase-9-canonical-result-for-retrieval-operation]] are either implemented or explicitly deferred in a follow-up task.
+
+### 3.4. Phase Z Acceptance Review
+
+- Implemented in this task: runtime `RetrievalContext` contract, source attribution, selected chunk fields, final limit enforcement, empty-result semantics, no LLM or source-file reopening in context assembly, and tests for primary chunks, expanded chunks, repeated sources, final limit truncation, empty results, package-qualified sources, and diagnostic token totals.
+- Deferred to [[task-00071-update-rag-cli-search-to-emit-retrieval-context]]: CLI JSON output, `vector-database rag search <query>` human rendering, and MCP retrieval output adoption of the canonical context shape.
 
 ## 4. Staff Engineer Review
 
