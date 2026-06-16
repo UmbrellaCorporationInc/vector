@@ -5,8 +5,8 @@
 `vector-database` is the command-line interface (CLI) for executing package synchronization and managing repository package manifest mutations in the Vector workspace. It acts as the execution surface for the planning operations defined in `runtime-packages`.
 
 It also exposes the Phase 6 local RAG store initialization command and the Phase
-7 incremental indexing command by delegating store lifecycle and indexing
-ownership to `runtime-rag`.
+7 incremental indexing command and the Phase 8 hybrid retrieval command by
+delegating store lifecycle, indexing, and retrieval ownership to `runtime-rag`.
 
 ## 2. Boundaries
 
@@ -16,6 +16,7 @@ ownership to `runtime-rag`.
 - Interfacing with `runtime-packages` to add new dependencies into `.vector/packages.yaml` via CLI arguments.
 - Triggering the RAG-owned LanceDB lifecycle operation that creates or validates the local retrieval store.
 - Running the Phase 7 incremental indexing pipeline via `update-database`, which delegates all orchestration to `runtime-rag::IndexWorkspaceOp`.
+- Running the Phase 8 hybrid retrieval command via `rag search`, which delegates all ranking, filtering, deduplication, and expansion behavior to `runtime-rag::HybridSearchOp`.
 - Streaming subprocess execution logs and print messages before running actions.
 - Rejecting invalid package structures (i.e. making sure synchronized packages contain `doc/` and `.vector/`).
 
@@ -100,6 +101,38 @@ Markdown documents, skipping files whose content hash is unchanged.
 | One or more documents failed during indexing | `1` |
 | Dispatcher or operation error | `1` |
 
+### `rag search`
+
+Executes the Phase 8 hybrid retrieval workflow against the local RAG store.
+
+**Execution Details:**
+- Delegates to `runtime-rag::HybridSearchOp` through the standard
+  `PluginDispatcher`.
+- Reuses governed Phase 1 RAG defaults for semantic candidate limit, lexical
+  candidate limit, and final retrieval limit unless `--limit` overrides the
+  final result count.
+- Forwards `--package` and `--document` filters directly to the runtime
+  retrieval operation so the CLI does not fork filtering semantics.
+- Prints human-readable retrieval output by default and a stable JSON payload
+  when `--json` is set.
+- Does not implement ranking, score fusion, deduplication, or adjacent chunk
+  expansion logic in the CLI layer.
+
+**Arguments:**
+- `<query>`: Required free-text query string.
+- `--limit <n>`: Optional final result count override.
+- `--package <name>`: Optional package filter.
+- `--document <stem>`: Optional governed document stem filter.
+- `--json`: Emit machine-readable JSON output.
+
+**Exit behavior:**
+
+| Condition | Exit code |
+|---|---|
+| Retrieval succeeds, including empty result sets | `0` |
+| Store is missing, incompatible, or query execution fails | `1` |
+| Argument parsing fails | `1` |
+
 ### `rag init`
 
 Creates or validates the local Phase 6 LanceDB store under
@@ -147,6 +180,12 @@ vector-database package add my-local file /absolute/path/to/source
 
 # Create or validate the local RAG store
 vector-database rag init
+
+# Search the local RAG store with hybrid retrieval
+vector-database rag search "hybrid retrieval"
+
+# Filter hybrid retrieval to one package and emit JSON
+vector-database rag search "hybrid retrieval" --package shared-docs --limit 3 --json
 
 # Run the incremental indexing pipeline
 vector-database rag update-database

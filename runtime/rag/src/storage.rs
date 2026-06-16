@@ -79,6 +79,8 @@ pub struct LanceDbChunkRow {
     pub frontmatter: Option<MarkdownMetadataValue>,
     /// Raw chunk text preserved for inspection and full-text indexing.
     pub text: String,
+    /// Synthetic lexical surface used for exact identifier and filename matching.
+    pub search_text: String,
     /// Token count emitted by chunking.
     pub token_count: usize,
     /// Embedding model identifier stored with the vector payload.
@@ -133,6 +135,11 @@ pub fn lancedb_chunk_row(
             .as_ref()
             .map(|frontmatter| frontmatter.metadata.clone()),
         text: chunk.chunk.text.clone(),
+        search_text: lexical_search_text(
+            &chunk.chunk.document_stem,
+            &chunk.chunk.heading_path,
+            &chunk.chunk.text,
+        ),
         token_count: chunk.chunk.token_count,
         embedding_model: chunk.embedding_model.clone(),
         embedding_dimension: chunk.embedding_dimension,
@@ -154,6 +161,23 @@ fn lancedb_chunk_metadata(
         tags: frontmatter_tags(extraction),
         frontmatter_fields: selected_frontmatter_fields(extraction),
     }
+}
+
+fn lexical_search_text(document_stem: &str, heading_path: &[String], text: &str) -> String {
+    let heading_path_text = heading_path.join(" / ");
+    let filename = format!("{document_stem}.md");
+    let normalized_stem = lexical_normalized_identifier(document_stem);
+    let normalized_filename = lexical_normalized_identifier(&filename);
+    format!(
+        "{document_stem}\n{filename}\n{normalized_stem}\n{normalized_filename}\n{heading_path_text}\n{text}"
+    )
+}
+
+fn lexical_normalized_identifier(identifier: &str) -> String {
+    identifier
+        .chars()
+        .map(|character| if character.is_ascii_alphanumeric() { character } else { ' ' })
+        .collect()
 }
 
 fn frontmatter_tags(extraction: &MarkdownExtractionRecord) -> Vec<String> {

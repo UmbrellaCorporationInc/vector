@@ -211,6 +211,34 @@ async fn test_persist_embedded_markdown_chunks_keeps_raw_text_inspectable() {
     assert_eq!(persisted_rows, 1);
 }
 
+#[tokio::test]
+async fn test_persist_embedded_markdown_chunks_indexes_document_stem_and_filename_for_lexical_search()
+ {
+    let root_dir = unique_fixture_root("persist-search-text");
+    let batch = embedded_fixture(
+        "persist-search-text",
+        None,
+        "spec-00011-rag-plan-implementation",
+        "# Title\n\n## Retrieval\n\nChunk text does not repeat the governed stem.\n",
+        &DeterministicLifecycleEmbedder::new("BGESmallENV15", 3),
+    )
+    .await;
+    persist_embedded_markdown_chunks(&LanceDbChunkWriteRequest {
+        root_dir: root_dir.clone(),
+        batch,
+    })
+    .await
+    .unwrap();
+
+    let table = open_primary_table(&lancedb_store_dir(&root_dir)).await.unwrap();
+    let indexed_rows = table
+        .count_rows(Some("search_text LIKE '%spec-00011-rag-plan-implementation.md%'".to_owned()))
+        .await
+        .unwrap();
+
+    assert_eq!(indexed_rows, 1);
+}
+
 fn fixture_request(
     root_dir: PathBuf,
     embedding_model: &str,
