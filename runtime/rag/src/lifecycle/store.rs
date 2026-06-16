@@ -1,8 +1,8 @@
-//! `LanceDB` Phase 6 lifecycle boundary for the local RAG store.
+//! `LanceDB` Phase 6 store lifecycle: creation, persistence, and deletion boundaries.
 
 use crate::{
-    EmbeddedMarkdownChunkBatch, LANCEDB_PRIMARY_CHUNK_TABLE, LanceDbChunkRow, RagDefaults,
-    lancedb_chunk_row,
+    EmbeddedMarkdownChunkBatch, EmbeddingVector, LANCEDB_PRIMARY_CHUNK_TABLE, LanceDbChunkRow,
+    RagDefaults, lancedb_chunk_row,
 };
 use arrow_array::builder::StringBuilder;
 use arrow_array::types::Float32Type;
@@ -21,6 +21,9 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+/// Stored chunk embeddings indexed by `chunk_hash` for selective re-embedding.
+pub type StoredChunkEmbeddings = HashMap<String, EmbeddingVector>;
 
 const STORE_SCHEMA_VERSION: &str = "phase-6-v1";
 const STORE_METADATA_SCHEMA_VERSION_KEY: &str = "vector.rag.store_schema_version";
@@ -372,6 +375,12 @@ pub async fn delete_document_chunks(
     })
 }
 
+/// Resolve the governed `LanceDB` store directory for a workspace root.
+#[must_use]
+pub fn lancedb_store_dir(root_dir: &Path) -> PathBuf {
+    root_dir.join(RagDefaults::phase_one().lancedb_storage_path())
+}
+
 async fn ensure_primary_table(
     database: &Connection,
     request: &LanceDbStoreRequest,
@@ -542,7 +551,7 @@ async fn ensure_text_index(table: &lancedb::Table) -> Result<bool, LanceDbStoreE
     }
 }
 
-async fn open_primary_table(database_dir: &Path) -> Result<Table, LanceDbStoreError> {
+pub(crate) async fn open_primary_table(database_dir: &Path) -> Result<Table, LanceDbStoreError> {
     let database =
         connect(database_dir.to_string_lossy().as_ref()).execute().await.map_err(|error| {
             LanceDbStoreError::ConnectDatabase {
@@ -659,7 +668,7 @@ async fn ensure_vector_index_if_needed(table: &Table) -> Result<bool, LanceDbSto
     }
 }
 
-async fn delete_document_rows(
+pub(crate) async fn delete_document_rows(
     table: &Table,
     package: Option<&str>,
     document_stem: &str,
@@ -788,7 +797,11 @@ fn primary_row_batch_schema(rows: &[LanceDbChunkRow]) -> Result<SchemaRef, Lance
     ])))
 }
 
-fn document_predicate(package: Option<&str>, document_stem: &str, alias: Option<&str>) -> String {
+pub(crate) fn document_predicate(
+    package: Option<&str>,
+    document_stem: &str,
+    alias: Option<&str>,
+) -> String {
     let package_column = qualified_column("package", alias);
     let stem_column = qualified_column("document_stem", alias);
     let package_predicate = package.map_or_else(
@@ -802,7 +815,7 @@ fn qualified_column(column: &str, alias: Option<&str>) -> String {
     alias.map_or_else(|| column.to_owned(), |alias| format!("{alias}.{column}"))
 }
 
-fn sql_string_literal(value: &str) -> String {
+pub(crate) fn sql_string_literal(value: &str) -> String {
     value.replace('\'', "''")
 }
 
@@ -811,12 +824,6 @@ fn already_exists_error(message: &str) -> bool {
     normalized.contains("already exists") || normalized.contains("existing index")
 }
 
-/// Resolve the governed `LanceDB` store directory for a workspace root.
-#[must_use]
-pub fn lancedb_store_dir(root_dir: &Path) -> PathBuf {
-    root_dir.join(RagDefaults::phase_one().lancedb_storage_path())
-}
-
 #[cfg(test)]
-#[path = "lifecycle_test.rs"]
+#[path = "store_test.rs"]
 mod tests;

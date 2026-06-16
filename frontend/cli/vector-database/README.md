@@ -4,8 +4,9 @@
 
 `vector-database` is the command-line interface (CLI) for executing package synchronization and managing repository package manifest mutations in the Vector workspace. It acts as the execution surface for the planning operations defined in `runtime-packages`.
 
-It also exposes the Phase 6 local RAG store initialization command by delegating
-store lifecycle ownership to `runtime-rag`.
+It also exposes the Phase 6 local RAG store initialization command and the Phase
+7 incremental indexing command by delegating store lifecycle and indexing
+ownership to `runtime-rag`.
 
 ## 2. Boundaries
 
@@ -14,6 +15,7 @@ store lifecycle ownership to `runtime-rag`.
 - Running package synchronization (`sync` command) which executes `git clone`, `git fetch`, and file copy operations.
 - Interfacing with `runtime-packages` to add new dependencies into `.vector/packages.yaml` via CLI arguments.
 - Triggering the RAG-owned LanceDB lifecycle operation that creates or validates the local retrieval store.
+- Running the Phase 7 incremental indexing pipeline via `update-database`, which delegates all orchestration to `runtime-rag::IndexWorkspaceOp`.
 - Streaming subprocess execution logs and print messages before running actions.
 - Rejecting invalid package structures (i.e. making sure synchronized packages contain `doc/` and `.vector/`).
 
@@ -28,7 +30,7 @@ store lifecycle ownership to `runtime-rag`.
 | Dependency | Role |
 |---|---|
 | `runtime-packages` | Manifest contracts and `sync-packages` / `add-package` operations |
-| `runtime-rag` | Phase 6 RAG store lifecycle operation and defaults |
+| `runtime-rag` | Phase 6 RAG store lifecycle and Phase 7 incremental indexing operations |
 | `runtime-channel` | Standard dispatcher used to execute plugin operations |
 | `runtime-io` | Terminal commands execution, path helpers, and IO |
 | `runtime-core` | Core runtime types and traits |
@@ -71,6 +73,32 @@ Appends a new package dependency to `.vector/packages.yaml`.
 |---|---|
 | Package added and manifest saved successfully | `0` |
 | Duplicate package name or validation failure | `1` |
+
+### `rag update-database`
+
+Runs the Phase 7 incremental indexing pipeline against the local workspace.
+Initializes the LanceDB store if not already present, then indexes all governed
+Markdown documents, skipping files whose content hash is unchanged.
+
+**Execution Details:**
+- Delegates to `runtime-rag::IndexWorkspaceOp`, which composes `InitRagStoreOp`
+  (Phase 6 store initialization) and `RagIndexerOp` (Phase 7 incremental pass)
+  in sequence using a `CapturingSender`.
+- Skips documents whose persisted `document_hash` matches the current file hash;
+  re-embeds only chunks whose `chunk_hash` changed.
+- Deletes rows for source documents removed from the corpus during the run.
+- Isolates per-document failures so one malformed file does not abort the run.
+- Prints a summary line: `Indexed: N re-indexed, N skipped, N deleted.`
+- Prints per-document failure details to stderr if any failures were recorded.
+- No indexing or schema logic resides in the CLI adapter.
+
+**Exit behavior:**
+
+| Condition | Exit code |
+|---|---|
+| All documents indexed or skipped successfully | `0` |
+| One or more documents failed during indexing | `1` |
+| Dispatcher or operation error | `1` |
 
 ### `rag init`
 
@@ -119,4 +147,7 @@ vector-database package add my-local file /absolute/path/to/source
 
 # Create or validate the local RAG store
 vector-database rag init
+
+# Run the incremental indexing pipeline
+vector-database rag update-database
 ```

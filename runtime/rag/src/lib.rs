@@ -6,6 +6,7 @@
 pub mod chunking;
 pub mod defaults;
 pub mod embedding;
+/// `LanceDB` Phase 6 store lifecycle and Phase 7 reconciliation query boundaries.
 pub mod lifecycle;
 pub mod operations;
 pub mod pipeline;

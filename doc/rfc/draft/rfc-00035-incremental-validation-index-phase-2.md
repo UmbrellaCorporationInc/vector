@@ -17,6 +17,7 @@ tags:
   - markdown
 related:
   - task-00062-fix-patch-doc-or-find-doc
+  - rfc-00039-phase-7-incremental-indexing
 supersedes: []
 superseded_by: null
 aliases:
@@ -173,3 +174,4 @@ This keeps validation approximately linear in changed file content rather than m
 - Should synchronized package files be indexed during package sync, during validation, or both?
 - Should the index store backlink data now, or defer backlinks until a separate navigation or graph RFC?
 - Should `validate` default to indexed mode locally and full-rescan mode in CI?
+- [[rfc-00039-phase-7-incremental-indexing]] defers `IndexResult` persistence to this RFC. Should the validation index infrastructure under `.vector-database/validation/` also cover RAG indexing run results (counts of skipped, re-indexed, deleted, and failed documents), or should RAG run-result tracking use a separate store under `.vector-database/rag/`?
