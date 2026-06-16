@@ -5,7 +5,7 @@ code: "00072"
 slug: implement-rfc-00041-phase-9-canonical-result-for-retrieval-operation
 title: Implement RFC 00041 Phase 9 Canonical Result For Retrieval Operation
 description: Implement the canonical retrieval context result contract shared by the RAG runtime, CLI output, and MCP output.
-status: in-progress
+status: done
 created: 2026-06-16
 updated: 2026-06-16
 tags:

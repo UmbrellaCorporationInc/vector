@@ -1,7 +1,10 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use super::*;
-use runtime_rag::{HybridSearchOutput, HybridSearchResult};
+use runtime_rag::{
+    HybridSearchOutput, HybridSearchResult, RetrievalContext, RetrievalContextChunk,
+    RetrievalContextDiagnostics, RetrievalContextSource, RetrievalMatchReason,
+};
 use serde_json::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -31,6 +34,33 @@ fn sample_output() -> HybridSearchOutput {
         Some("task-00070-implement-rfc-00040-phase-8-hybrid-search".to_owned()),
         3,
         vec![sample_result()],
+    )
+}
+
+fn sample_context() -> RetrievalContext {
+    RetrievalContext::new(
+        "hybrid retrieval".to_owned(),
+        3,
+        vec![RetrievalContextSource::new(
+            "src-1".to_owned(),
+            Some("shared-docs".to_owned()),
+            "task-00070-implement-rfc-00040-phase-8-hybrid-search".to_owned(),
+            vec!["Phase D".to_owned()],
+            "shared-docs/task-00070-implement-rfc-00040-phase-8-hybrid-search > Phase D".to_owned(),
+        )],
+        vec![RetrievalContextChunk::new(
+            "ctx-1".to_owned(),
+            "src-1".to_owned(),
+            Some("shared-docs".to_owned()),
+            "task-00070-implement-rfc-00040-phase-8-hybrid-search".to_owned(),
+            vec!["Phase D".to_owned()],
+            "chunk-001".to_owned(),
+            1,
+            "Hybrid retrieval result text.".to_owned(),
+            42,
+            RetrievalMatchReason::Primary,
+        )],
+        RetrievalContextDiagnostics::new(42, 0, 3),
     )
 }
 
@@ -78,26 +108,42 @@ fn parse_args_rejects_missing_query_and_zero_limit() {
 }
 
 #[test]
-fn render_human_output_includes_identity_score_and_text() {
-    let rendered = render_human_output(&sample_output());
+fn render_human_output_includes_context_identity_and_text() {
+    let rendered = render_human_output(&sample_context());
 
-    assert!(rendered.contains("Retrieved 1 result(s) for 'hybrid retrieval'"));
+    assert!(rendered.contains("Retrieved 1 chunk(s) for 'hybrid retrieval'"));
     assert!(
         rendered.contains("[shared-docs] task-00070-implement-rfc-00040-phase-8-hybrid-search")
     );
-    assert!(rendered.contains("score=0.032500"));
+    assert!(rendered.contains("source=src-1 chunk=chunk-001 ordinal=1 tokens=42"));
     assert!(rendered.contains("Hybrid retrieval result text."));
 }
 
 #[test]
-fn render_json_output_preserves_machine_readable_payload() {
-    let rendered = render_json_output(&sample_output()).expect("json rendering should succeed");
+fn render_json_output_serializes_retrieval_context_payload() {
+    let rendered = render_json_output(&sample_context()).expect("json rendering should succeed");
     let payload: Value = serde_json::from_str(&rendered).expect("json payload should parse");
 
-    assert_eq!(payload["query_text"], "hybrid retrieval");
-    assert_eq!(payload["package_filter"], "shared-docs");
-    assert_eq!(payload["results"][0]["chunk_id"], "chunk-001");
-    assert_eq!(payload["results"][0]["lexical_rank"], 1);
+    assert_eq!(payload["query"], "hybrid retrieval");
+    assert_eq!(payload["status"], "has_results");
+    assert_eq!(payload["sources"][0]["source_id"], "src-1");
+    assert_eq!(payload["chunks"][0]["chunk_id"], "chunk-001");
+    assert_eq!(payload["chunks"][0]["match_reason"], "primary");
+    assert_eq!(payload["diagnostics"]["retrieval_limit"], 3);
+}
+
+#[tokio::test]
+async fn assemble_retrieval_context_converts_hybrid_search_output_before_rendering() {
+    let context =
+        assemble_retrieval_context(sample_output()).await.expect("context assembly should succeed");
+
+    assert_eq!(context.query, "hybrid retrieval");
+    assert_eq!(context.limit, 3);
+    assert_eq!(context.returned, 1);
+    assert_eq!(context.sources[0].source_id, "src-1");
+    assert_eq!(context.chunks[0].context_id, "ctx-1");
+    assert_eq!(context.chunks[0].chunk_id, "chunk-001");
+    assert_eq!(context.chunks[0].match_reason, RetrievalMatchReason::Primary);
 }
 
 #[tokio::test]

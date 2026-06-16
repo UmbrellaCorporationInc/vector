@@ -47,10 +47,10 @@ input:
   language: rust
 ```
 
-- [ ] Route the CLI search execution path through the Phase 9 context assembly operation after Phase 8 retrieval completes.
-- [ ] Preserve the existing query, limit, package, document, and JSON CLI inputs unless the RFC requires a contract-level change.
-- [ ] Ensure the command receives `RetrievalContext` before human rendering or JSON serialization.
-- [ ] Keep retrieval ranking, deduplication, limit enforcement, source attribution, and empty-result semantics out of the CLI adapter.
+- [x] Route the CLI search execution path through the Phase 9 context assembly operation after Phase 8 retrieval completes.
+- [x] Preserve the existing query, limit, package, document, and JSON CLI inputs unless the RFC requires a contract-level change.
+- [x] Ensure the command receives `RetrievalContext` before human rendering or JSON serialization.
+- [x] Keep retrieval ranking, deduplication, limit enforcement, source attribution, and empty-result semantics out of the CLI adapter.
 
 ### 3.2. Phase B — Output Contract
 

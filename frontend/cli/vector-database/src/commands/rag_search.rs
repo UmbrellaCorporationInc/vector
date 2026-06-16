@@ -1,13 +1,13 @@
-//! Command implementation for Phase 8 hybrid retrieval search.
+//! Command implementation for RAG retrieval search.
 
 #![allow(clippy::print_stdout)]
 
 use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_rag::{
-    HybridSearchInput, HybridSearchOp, HybridSearchOutput, HybridSearchResult, RagDefaults,
+    AssembleRetrievalContextOp, HybridSearchInput, HybridSearchOp, HybridSearchOutput, RagDefaults,
+    RetrievalContext, RetrievalContextChunk, RetrievalContextStatus, RetrievalMatchReason,
 };
-use serde_json::{Value, json};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Parsed arguments for `vector-database rag search`.
@@ -24,7 +24,7 @@ pub struct RagSearchArgs {
     json_output: bool,
 }
 
-/// Run the Phase 8 hybrid retrieval command through the runtime-rag operation.
+/// Run the retrieval command through the runtime-rag operations.
 ///
 /// # Errors
 ///
@@ -51,10 +51,29 @@ pub async fn run(root_dir: &std::path::Path, args: RagSearchArgs) -> Result<(), 
         .map_err(|error| format!("hybrid search failed: {error}"))?
         .ok_or_else(|| "hybrid search did not produce output".to_owned())?;
 
-    let rendered =
-        if args.json_output { render_json_output(&output)? } else { render_human_output(&output) };
+    let context = assemble_retrieval_context(output).await?;
+    let rendered = if args.json_output {
+        render_json_output(&context)?
+    } else {
+        render_human_output(&context)
+    };
     println!("{rendered}");
     Ok(())
+}
+
+async fn assemble_retrieval_context(
+    output: HybridSearchOutput,
+) -> Result<RetrievalContext, String> {
+    let (_cancel, mut receiver) = PluginDispatcher::new(AssembleRetrievalContextOp::new())
+        .input(output)
+        .build()
+        .map_err(|error| format!("failed to prepare retrieval context operation: {error}"))?;
+
+    receiver
+        .recv()
+        .await
+        .map_err(|error| format!("retrieval context assembly failed: {error}"))?
+        .ok_or_else(|| "retrieval context assembly did not produce output".to_owned())
 }
 
 /// Parse CLI arguments for `vector-database rag search`.
@@ -111,22 +130,17 @@ pub fn parse_args(args: &[String]) -> Result<RagSearchArgs, String> {
 
 /// Render the default human-readable search output.
 #[must_use]
-pub fn render_human_output(output: &HybridSearchOutput) -> String {
-    if output.results.is_empty() {
-        return format!(
-            "No retrieval results for '{}' (limit {}).",
-            output.query_text, output.result_limit
-        );
+pub fn render_human_output(context: &RetrievalContext) -> String {
+    if context.status == RetrievalContextStatus::Empty {
+        return format!("No retrieval results for '{}' (limit {}).", context.query, context.limit);
     }
 
     let mut lines = vec![format!(
-        "Retrieved {} result(s) for '{}' (limit {}).",
-        output.results.len(),
-        output.query_text,
-        output.result_limit
+        "Retrieved {} chunk(s) for '{}' (limit {}).",
+        context.returned, context.query, context.limit
     )];
-    for (index, result) in output.results.iter().enumerate() {
-        lines.push(format_human_result(index + 1, result));
+    for chunk in &context.chunks {
+        lines.push(format_human_chunk(chunk));
     }
     lines.join("\n\n")
 }
@@ -136,61 +150,39 @@ pub fn render_human_output(output: &HybridSearchOutput) -> String {
 /// # Errors
 ///
 /// Returns an error when the retrieval payload cannot be serialized to JSON.
-pub fn render_json_output(output: &HybridSearchOutput) -> Result<String, String> {
-    let payload = json!({
-        "query_text": output.query_text,
-        "package_filter": output.package_filter,
-        "document_filter": output.document_filter,
-        "result_limit": output.result_limit,
-        "results": output.results.iter().map(result_json).collect::<Vec<_>>(),
-    });
-    serde_json::to_string_pretty(&payload)
-        .map_err(|error| format!("failed to serialize hybrid search output: {error}"))
+pub fn render_json_output(context: &RetrievalContext) -> Result<String, String> {
+    serde_json::to_string_pretty(context)
+        .map_err(|error| format!("failed to serialize retrieval context: {error}"))
 }
 
-fn format_human_result(index: usize, result: &HybridSearchResult) -> String {
-    let package = result.package.as_deref().unwrap_or("<workspace>");
-    let heading_path = if result.heading_path.is_empty() {
+fn format_human_chunk(chunk: &RetrievalContextChunk) -> String {
+    let package = chunk.package.as_deref().unwrap_or("<workspace>");
+    let heading_path = if chunk.heading_path.is_empty() {
         "<root>".to_owned()
     } else {
-        result.heading_path.join(" > ")
+        chunk.heading_path.join(" > ")
     };
     let mut lines = vec![
-        format!("{index}. [{}] {} :: {}", package, result.document_stem, heading_path),
+        format!("{}. [{}] {} :: {}", chunk.context_id, package, chunk.document_stem, heading_path),
         format!(
-            "chunk={} ordinal={} score={:.6} semantic_rank={} lexical_rank={} expanded={}",
-            result.chunk_id,
-            result.chunk_ordinal,
-            result.rrf_score,
-            optional_rank(result.semantic_rank),
-            optional_rank(result.lexical_rank),
-            result.was_expanded
+            "source={} chunk={} ordinal={} tokens={} match_reason={}",
+            chunk.source_id,
+            chunk.chunk_id,
+            chunk.chunk_ordinal,
+            chunk.token_count,
+            match_reason_label(chunk.match_reason)
         ),
     ];
-    if let Some(expanded_from) = &result.expanded_from_chunk_id {
-        lines.push(format!("expanded_from={expanded_from}"));
-    }
-    lines.push(result.text.clone());
+    lines.push(chunk.text.clone());
     lines.join("\n")
 }
 
-fn result_json(result: &HybridSearchResult) -> Value {
-    json!({
-        "package": result.package,
-        "document_stem": result.document_stem,
-        "heading_path": result.heading_path,
-        "chunk_id": result.chunk_id,
-        "chunk_ordinal": result.chunk_ordinal,
-        "text": result.text,
-        "token_count": result.token_count,
-        "semantic_rank": result.semantic_rank,
-        "lexical_rank": result.lexical_rank,
-        "rrf_score": result.rrf_score,
-        "previous_chunk_id": result.previous_chunk_id,
-        "next_chunk_id": result.next_chunk_id,
-        "was_expanded": result.was_expanded,
-        "expanded_from_chunk_id": result.expanded_from_chunk_id,
-    })
+const fn match_reason_label(match_reason: RetrievalMatchReason) -> &'static str {
+    match match_reason {
+        RetrievalMatchReason::Primary => "primary",
+        RetrievalMatchReason::Expanded => "expanded",
+        _ => "unknown",
+    }
 }
 
 fn parse_limit(raw: &str) -> Result<usize, String> {
@@ -204,10 +196,6 @@ fn parse_limit(raw: &str) -> Result<usize, String> {
 
 fn missing_flag_value(flag: &str) -> String {
     format!("missing value for {flag}")
-}
-
-fn optional_rank(rank: Option<usize>) -> String {
-    rank.map_or_else(|| "-".to_owned(), |value| value.to_string())
 }
 
 #[cfg(test)]
