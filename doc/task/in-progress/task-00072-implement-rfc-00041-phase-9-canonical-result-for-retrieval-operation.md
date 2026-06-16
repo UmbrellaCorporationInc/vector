@@ -74,14 +74,14 @@ input:
   language: rust
 ```
 
-- [ ] Introduce the runtime operation that converts Phase 8 retrieval hits into `RetrievalContext`.
-- [ ] Ensure the operation does not invoke an LLM, summarize text, rewrite chunk text, or reopen source files.
-- [ ] Normalize repeated source attribution into shared `RetrievalContextSource` entries.
-- [ ] Assign response-local context ids such as `ctx-1`, `ctx-2`, and stable source ids.
-- [ ] Preserve whether each chunk is `primary` or `expanded`.
-- [ ] Enforce the configured final retrieval limit after deduplication and adjacent expansion.
-- [ ] Report diagnostic totals for total token count, retrieval limit, and chunks dropped after limit enforcement.
-- [ ] Add tests for primary chunks, expanded chunks, repeated sources, limit truncation, package-qualified sources, and diagnostic token totals.
+- [x] Introduce the runtime operation that converts Phase 8 retrieval hits into `RetrievalContext`.
+- [x] Ensure the operation does not invoke an LLM, summarize text, rewrite chunk text, or reopen source files.
+- [x] Normalize repeated source attribution into shared `RetrievalContextSource` entries.
+- [x] Assign response-local context ids such as `ctx-1`, `ctx-2`, and stable source ids.
+- [x] Preserve whether each chunk is `primary` or `expanded`.
+- [x] Enforce the configured final retrieval limit after deduplication and adjacent expansion.
+- [x] Report diagnostic totals for total token count, retrieval limit, and chunks dropped after limit enforcement.
+- [x] Add tests for primary chunks, expanded chunks, repeated sources, limit truncation, package-qualified sources, and diagnostic token totals.
 
 ### 3.3. Phase C - CLI And MCP Integration
 

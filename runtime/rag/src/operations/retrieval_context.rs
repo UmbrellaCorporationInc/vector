@@ -1,6 +1,11 @@
 //! Canonical Phase 9 retrieval context contract.
 
+use crate::{HybridSearchOutput, HybridSearchResult};
+use runtime_core::{RuntimeResult, declare_plugin_operations, plugin::PluginSender};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+type SourceKey = (Option<String>, String, Vec<String>);
 
 /// Canonical, model-agnostic retrieved evidence payload.
 ///
@@ -106,6 +111,102 @@ pub struct RetrievalContextDiagnostics {
     pub retrieval_limit: usize,
 }
 
+async fn assemble_retrieval_context(
+    input: HybridSearchOutput,
+    output: &mut impl PluginSender<RetrievalContext>,
+) -> RuntimeResult<()> {
+    output.send(assemble_retrieval_context_output(input)).await
+}
+
+fn assemble_retrieval_context_output(input: HybridSearchOutput) -> RetrievalContext {
+    let original_result_count = input.results.len();
+    let returned_results = input.results.into_iter().take(input.result_limit).collect::<Vec<_>>();
+    let dropped_after_limit = original_result_count.saturating_sub(returned_results.len());
+
+    let mut source_ids_by_key = HashMap::<SourceKey, String>::new();
+    let mut sources = Vec::new();
+    let mut chunks = Vec::with_capacity(returned_results.len());
+    let mut total_token_count = 0_usize;
+
+    for (index, result) in returned_results.into_iter().enumerate() {
+        let source_key =
+            (result.package.clone(), result.document_stem.clone(), result.heading_path.clone());
+        let source_id = source_ids_by_key
+            .entry(source_key)
+            .or_insert_with(|| {
+                let source_id = format!("src-{}", sources.len() + 1);
+                sources.push(RetrievalContextSource::new(
+                    source_id.clone(),
+                    result.package.clone(),
+                    result.document_stem.clone(),
+                    result.heading_path.clone(),
+                    citation_label(
+                        result.package.as_deref(),
+                        &result.document_stem,
+                        &result.heading_path,
+                    ),
+                ));
+                source_id
+            })
+            .clone();
+
+        total_token_count += result.token_count;
+        chunks.push(retrieval_context_chunk(index + 1, source_id, result));
+    }
+
+    RetrievalContext::new(
+        input.query_text,
+        input.result_limit,
+        sources,
+        chunks,
+        RetrievalContextDiagnostics::new(
+            total_token_count,
+            dropped_after_limit,
+            input.result_limit,
+        ),
+    )
+}
+
+fn retrieval_context_chunk(
+    response_index: usize,
+    source_id: String,
+    result: HybridSearchResult,
+) -> RetrievalContextChunk {
+    let match_reason = if result.was_expanded {
+        RetrievalMatchReason::Expanded
+    } else {
+        RetrievalMatchReason::Primary
+    };
+
+    RetrievalContextChunk::new(
+        format!("ctx-{response_index}"),
+        source_id,
+        result.package,
+        result.document_stem,
+        result.heading_path,
+        result.chunk_id,
+        result.chunk_ordinal,
+        result.text,
+        result.token_count,
+        match_reason,
+    )
+}
+
+fn citation_label(package: Option<&str>, document_stem: &str, heading_path: &[String]) -> String {
+    let mut label =
+        package.map_or_else(|| document_stem.to_owned(), |name| format!("{name}/{document_stem}"));
+    for heading in heading_path {
+        label.push_str(" > ");
+        label.push_str(heading);
+    }
+    label
+}
+
+declare_plugin_operations! {
+    /// Operation boundary for Phase 9 canonical retrieval context assembly.
+    AssembleRetrievalContextOp => assemble_retrieval_context(HybridSearchOutput, RetrievalContext)
+}
+
 impl RetrievalContext {
     /// Construct a canonical retrieval context.
     #[must_use]
@@ -192,6 +293,20 @@ impl RetrievalContextDiagnostics {
         retrieval_limit: usize,
     ) -> Self {
         Self { total_token_count, dropped_after_limit, retrieval_limit }
+    }
+}
+
+impl AssembleRetrievalContextOp {
+    /// Construct a new `AssembleRetrievalContextOp`.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for AssembleRetrievalContextOp {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
