@@ -6,7 +6,8 @@ use crate::{
     lancedb_store_dir,
     lifecycle::{
         LanceDbChunkWriteRequest, LanceDbStoreError, StoredChunkEmbeddings,
-        query_document_chunk_embeddings, query_document_hash_indexed,
+        delete_indexed_document, query_all_indexed_document_stems, query_document_chunk_embeddings,
+        query_document_hash_indexed,
     },
     persist_embedded_markdown_chunks,
     pipeline::{MarkdownChunkingPipelineOutcome, chunk_markdown_extraction},
@@ -104,6 +105,23 @@ pub(crate) async fn run_incremental_indexing_pass(
     let store_dir = lancedb_store_dir(&input.root_dir);
     let mut result = IndexResult::default();
 
+    // Phase C: delete rows for source documents removed from the corpus.
+    let discovered: std::collections::HashSet<(Option<String>, String)> = report
+        .records()
+        .iter()
+        .map(|r| {
+            (r.package().map(std::borrow::ToOwned::to_owned), r.governed_document_stem().to_owned())
+        })
+        .collect();
+
+    for stem in query_all_indexed_document_stems(&store_dir).await? {
+        if !discovered.contains(&(stem.package.clone(), stem.document_stem.clone())) {
+            delete_indexed_document(&store_dir, stem.package.as_deref(), &stem.document_stem)
+                .await?;
+            result.deleted_count += 1;
+        }
+    }
+
     for record in report.records() {
         index_document(record, &store_dir, embedder, &mut result).await?;
     }
@@ -146,6 +164,11 @@ async fn index_document(
     )?;
 
     let root_dir = root_dir_from_store_dir(store_dir);
+
+    // Phase C: explicit delete-before-write so a crash between delete and write
+    // leaves the store in an empty state for this document, not a mixed state.
+    delete_indexed_document(store_dir, package, document_stem).await?;
+
     persist_embedded_markdown_chunks(&LanceDbChunkWriteRequest { root_dir, batch }).await?;
 
     result.reindexed_count += 1;

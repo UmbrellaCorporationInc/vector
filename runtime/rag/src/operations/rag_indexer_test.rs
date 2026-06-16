@@ -251,6 +251,144 @@ async fn run_pass_reuses_stored_embeddings_for_unchanged_chunks_on_document_chan
     );
 }
 
+// ── Phase C: store reconciliation and deletion ────────────────────────────
+
+#[tokio::test]
+async fn run_pass_deletes_rows_for_removed_source_document() {
+    let root_dir = unique_fixture_root("removed-doc");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-to-remove",
+        "---\ntitle: Will be removed\n---\n\n## Section\n\nRemovable content.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir.clone(), RagDefaults::phase_one());
+
+    let first = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(first.reindexed_count, 1, "document should be indexed on first run");
+    assert_eq!(first.deleted_count, 0);
+
+    let doc_path = root_dir.join("doc").join("task-00001-to-remove.md");
+    tokio::fs::remove_file(&doc_path).await.unwrap();
+
+    let second = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(second.deleted_count, 1, "removed document should be deleted from store");
+    assert_eq!(second.reindexed_count, 0);
+    assert_eq!(second.skipped_count, 0);
+
+    let third = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(third.deleted_count, 0, "no deletions when store already reflects empty corpus");
+    assert_eq!(third.reindexed_count, 0);
+    assert_eq!(third.skipped_count, 0);
+}
+
+#[tokio::test]
+async fn run_pass_deletion_is_scoped_to_removed_document_only() {
+    let root_dir = unique_fixture_root("scoped-deletion");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-remove-me",
+        "---\ntitle: Remove me\n---\n\n## Section\n\nRemovable.\n",
+    )
+    .await;
+    create_corpus_file(
+        &root_dir,
+        "task-00002-keep-me",
+        "---\ntitle: Keep me\n---\n\n## Section\n\nStable content.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir.clone(), RagDefaults::phase_one());
+
+    let first = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(first.reindexed_count, 2, "both documents should be indexed");
+
+    let doc_path = root_dir.join("doc").join("task-00001-remove-me.md");
+    tokio::fs::remove_file(&doc_path).await.unwrap();
+
+    let second = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(second.deleted_count, 1, "only the removed document should be deleted");
+    assert_eq!(second.skipped_count, 1, "the retained document should be skipped as unchanged");
+    assert_eq!(second.reindexed_count, 0);
+}
+
+#[tokio::test]
+async fn run_pass_no_indexed_stems_remain_after_document_removal() {
+    use crate::lifecycle::{lancedb_store_dir, query_all_indexed_document_stems};
+
+    let root_dir = unique_fixture_root("no-stems-after-removal");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-verify-removal",
+        "---\ntitle: Verify removal\n---\n\n## Section\n\nContent.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir.clone(), RagDefaults::phase_one());
+    run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    let store_dir = lancedb_store_dir(&root_dir);
+    let stems_before = query_all_indexed_document_stems(&store_dir).await.unwrap();
+    assert_eq!(stems_before.len(), 1, "one document stem should be indexed before removal");
+
+    let doc_path = root_dir.join("doc").join("task-00001-verify-removal.md");
+    tokio::fs::remove_file(&doc_path).await.unwrap();
+
+    run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    let stems_after = query_all_indexed_document_stems(&store_dir).await.unwrap();
+    assert!(stems_after.is_empty(), "no indexed stems should remain after removal");
+}
+
+#[tokio::test]
+async fn run_pass_changed_document_rows_are_replaced_and_subsequent_run_skips() {
+    use crate::lifecycle::{lancedb_store_dir, query_all_indexed_document_stems};
+
+    let root_dir = unique_fixture_root("rows-replaced");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-change-test",
+        "---\ntitle: Change test\n---\n\n## Section A\n\nOriginal content.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir.clone(), RagDefaults::phase_one());
+    run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-change-test",
+        "---\ntitle: Change test\n---\n\n## Section A\n\nUpdated content A.\n\n## Section B\n\nNew section B.\n",
+    )
+    .await;
+
+    let second = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(second.reindexed_count, 1, "changed document should be re-indexed");
+    assert_eq!(second.deleted_count, 0, "re-index must not be counted as a deletion");
+
+    let store_dir = lancedb_store_dir(&root_dir);
+    let stems = query_all_indexed_document_stems(&store_dir).await.unwrap();
+    assert_eq!(stems.len(), 1, "only one document stem should exist after re-index");
+    assert_eq!(stems[0].document_stem, "task-00001-change-test");
+
+    let third = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(third.skipped_count, 1, "re-indexed document must be skipped on subsequent run");
+    assert_eq!(third.reindexed_count, 0);
+}
+
 // ── Phase B: deterministic row identity ───────────────────────────────────
 
 #[tokio::test]

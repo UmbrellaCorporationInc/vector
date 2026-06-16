@@ -90,10 +90,10 @@ input:
   language: Rust
 ```
 
-- [ ] Delete stale rows for a changed document, scoped strictly to `(package, document_stem)`, before inserting replacement rows.
-- [ ] Delete all rows for source documents removed from the corpus during the next indexing run.
-- [ ] Prevent cross-document deletion by keeping reconciliation keyed to package and governed document identity.
-- [ ] Keep deletion and rewrite behavior deterministic so a follow-up run can recover cleanly after an interrupted write.
+- [x] Delete stale rows for a changed document, scoped strictly to `(package, document_stem)`, before inserting replacement rows.
+- [x] Delete all rows for source documents removed from the corpus during the next indexing run.
+- [x] Prevent cross-document deletion by keeping reconciliation keyed to package and governed document identity.
+- [x] Keep deletion and rewrite behavior deterministic so a follow-up run can recover cleanly after an interrupted write.
 
 ### 3.4. Phase D - Failure Isolation And Reporting
 

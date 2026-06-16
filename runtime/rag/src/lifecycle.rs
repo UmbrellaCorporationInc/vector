@@ -932,6 +932,110 @@ pub async fn query_document_chunk_embeddings(
     Ok(result)
 }
 
+/// Resolved `(package, document_stem)` identity for one governed document in the `LanceDB` store.
+///
+/// # DTO(store reconciliation identity consumed by Phase 7 stale-row detection)
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct IndexedDocumentStem {
+    /// Package identity, or `None` for workspace-local documents.
+    pub package: Option<String>,
+    /// Governed document stem in `<doc-type>-<code>-<slug>` form.
+    pub document_stem: String,
+}
+
+/// Query all distinct `(package, document_stem)` pairs currently stored in the `LanceDB` table.
+///
+/// Returns an empty list when the store directory has not been created yet.
+///
+/// # Errors
+/// Returns [`LanceDbStoreError`] when the table cannot be queried.
+pub async fn query_all_indexed_document_stems(
+    store_dir: &Path,
+) -> Result<Vec<IndexedDocumentStem>, LanceDbStoreError> {
+    use arrow_array::{Array, cast::AsArray};
+    use futures::TryStreamExt;
+
+    if !store_dir.exists() {
+        return Ok(Vec::new());
+    }
+    let table = match open_primary_table(store_dir).await {
+        Ok(table) => table,
+        Err(LanceDbStoreError::OpenPrimaryTable { .. }) => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    let stream = table
+        .query()
+        .select(lancedb::query::Select::columns(&["package", "document_stem"]))
+        .execute()
+        .await
+        .map_err(|error| LanceDbStoreError::OpenPrimaryTable {
+            table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+            message: error.to_string(),
+        })?;
+
+    let batches: Vec<arrow_array::RecordBatch> =
+        stream.try_collect().await.map_err(|error| LanceDbStoreError::OpenPrimaryTable {
+            table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+            message: error.to_string(),
+        })?;
+
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+
+    for batch in &batches {
+        let package_col =
+            batch.column_by_name("package").ok_or_else(|| LanceDbStoreError::OpenPrimaryTable {
+                table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+                message: "package column missing in query result".to_owned(),
+            })?;
+        let stem_col = batch.column_by_name("document_stem").ok_or_else(|| {
+            LanceDbStoreError::OpenPrimaryTable {
+                table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+                message: "document_stem column missing in query result".to_owned(),
+            }
+        })?;
+
+        let packages = package_col.as_string::<i32>();
+        let stems = stem_col.as_string::<i32>();
+
+        for row in 0..batch.num_rows() {
+            let package =
+                if packages.is_null(row) { None } else { Some(packages.value(row).to_owned()) };
+            let stem = stems.value(row).to_owned();
+            let key = (package.clone(), stem.clone());
+            if seen.insert(key) {
+                result.push(IndexedDocumentStem { package, document_stem: stem });
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+/// Delete all rows for one governed document directly from the store, scoped to
+/// `(package, document_stem)`.
+///
+/// Returns 0 when the store directory has not been created yet.
+///
+/// # Errors
+/// Returns [`LanceDbStoreError`] when the delete operation fails.
+pub async fn delete_indexed_document(
+    store_dir: &Path,
+    package: Option<&str>,
+    document_stem: &str,
+) -> Result<u64, LanceDbStoreError> {
+    if !store_dir.exists() {
+        return Ok(0);
+    }
+    let table = match open_primary_table(store_dir).await {
+        Ok(table) => table,
+        Err(LanceDbStoreError::OpenPrimaryTable { .. }) => return Ok(0),
+        Err(error) => return Err(error),
+    };
+    delete_document_rows(&table, package, document_stem).await
+}
+
 /// Resolve the governed `LanceDB` store directory for a workspace root.
 #[must_use]
 pub fn lancedb_store_dir(root_dir: &Path) -> PathBuf {
