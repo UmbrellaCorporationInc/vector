@@ -66,18 +66,62 @@ async fn rag_indexer(
     input: RagIndexerInput,
     output: &mut impl PluginSender<IndexResult>,
 ) -> RuntimeResult<()> {
-    use crate::embedding::FastembedBgeSmallEnV15Embedder;
     use runtime_core::RuntimeError;
 
-    let embedder = FastembedBgeSmallEnV15Embedder::try_new().map_err(|error| {
-        RuntimeError::operation(format!("Embedder initialization failed: {error}"))
-    })?;
-
+    let embedder = LazyFastembedEmbedder::new();
     let result = run_incremental_indexing_pass(&input, &embedder)
         .await
         .map_err(|error| RuntimeError::operation(error.to_string()))?;
 
     output.send(result).await
+}
+
+/// Embedder that defers model initialization until `embed_batch` is first called.
+///
+/// Skipping initialization on runs with no documents to embed avoids a model
+/// download when the corpus is empty or all documents are unchanged.
+struct LazyFastembedEmbedder {
+    inner:
+        std::sync::Mutex<Option<std::sync::Arc<crate::embedding::FastembedBgeSmallEnV15Embedder>>>,
+}
+
+impl LazyFastembedEmbedder {
+    const fn new() -> Self {
+        Self { inner: std::sync::Mutex::new(None) }
+    }
+}
+
+impl crate::Embedder for LazyFastembedEmbedder {
+    fn model_id(&self) -> &str {
+        crate::defaults::EMBEDDING_MODEL_IDENTIFIER
+    }
+
+    fn dimension(&self) -> usize {
+        crate::defaults::EMBEDDING_DIMENSION
+    }
+
+    fn embed_batch(
+        &self,
+        inputs: &[&str],
+    ) -> Result<Vec<crate::EmbeddingVector>, crate::EmbeddingError> {
+        let embedder = {
+            let mut guard = self.inner.lock().map_err(|_| crate::EmbeddingError::Backend {
+                message: "lazy embedder lock was poisoned".to_owned(),
+            })?;
+            if guard.is_none() {
+                *guard = Some(std::sync::Arc::new(
+                    crate::embedding::FastembedBgeSmallEnV15Embedder::try_new()?,
+                ));
+            }
+            guard
+                .as_ref()
+                .ok_or_else(|| crate::EmbeddingError::Backend {
+                    message: "lazy embedder did not initialize".to_owned(),
+                })?
+                .clone()
+        }; // mutex is released before calling embed_batch
+        embedder.embed_batch(inputs)
+    }
 }
 
 /// Run the incremental indexing pass with an injectable embedder.

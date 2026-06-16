@@ -124,10 +124,10 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Update `vector-database update-database` to call `IndexWorkspaceOp` as its single RAG entry point.
-- [ ] Exit with a non-zero code when `IndexResult` reports any document failures.
-- [ ] Add or update tests for unchanged-document skips, changed-chunk re-embedding, stale-row deletion on file change, stale-row deletion on file removal, and per-document failure isolation.
-- [ ] Use deterministic fake embedders in tests and avoid network-backed model downloads.
+- [x] Update `vector-database update-database` to call `IndexWorkspaceOp` as its single RAG entry point.
+- [x] Exit with a non-zero code when `IndexResult` reports any document failures.
+- [x] Add or update tests for unchanged-document skips, changed-chunk re-embedding, stale-row deletion on file change, stale-row deletion on file removal, and per-document failure isolation.
+- [x] Use deterministic fake embedders in tests and avoid network-backed model downloads.
 
 ### 3.6. Phase Z - Wrap-up
 
