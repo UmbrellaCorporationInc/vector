@@ -158,8 +158,16 @@ fn long_paragraph(marker: &str, token_count: usize, needle: Option<&str>) -> Str
 
 #[tokio::test]
 async fn hybrid_search_op_resolves_governed_default_limit_through_dispatcher() {
+    let root = unique_fixture_root("default-limit");
+    ensure_lancedb_store(&LanceDbStoreRequest {
+        root_dir: root.clone(),
+        embedding_model: RagDefaults::phase_one().embedding_model_identifier().to_owned(),
+        embedding_dimension: RagDefaults::phase_one().embedding_dimension(),
+    })
+    .await
+    .unwrap();
     let input = HybridSearchInput::new(
-        unique_fixture_root("default-limit"),
+        root,
         RagDefaults::phase_one(),
         "  hybrid retrieval  ".to_owned(),
         None,
@@ -181,8 +189,16 @@ async fn hybrid_search_op_resolves_governed_default_limit_through_dispatcher() {
 
 #[tokio::test]
 async fn hybrid_search_op_preserves_explicit_filters_and_limit() {
+    let root = unique_fixture_root("explicit-filters");
+    ensure_lancedb_store(&LanceDbStoreRequest {
+        root_dir: root.clone(),
+        embedding_model: RagDefaults::phase_one().embedding_model_identifier().to_owned(),
+        embedding_dimension: RagDefaults::phase_one().embedding_dimension(),
+    })
+    .await
+    .unwrap();
     let input = HybridSearchInput::new(
-        unique_fixture_root("explicit-filters"),
+        root,
         RagDefaults::phase_one(),
         "query".to_owned(),
         Some("shared-docs".to_owned()),
@@ -240,8 +256,16 @@ async fn hybrid_search_op_rejects_blank_filters_and_zero_limit() {
 
 #[tokio::test]
 async fn hybrid_search_op_receiver_is_none_after_single_output() {
+    let root = unique_fixture_root("single-output");
+    ensure_lancedb_store(&LanceDbStoreRequest {
+        root_dir: root.clone(),
+        embedding_model: RagDefaults::phase_one().embedding_model_identifier().to_owned(),
+        embedding_dimension: RagDefaults::phase_one().embedding_dimension(),
+    })
+    .await
+    .unwrap();
     let input = HybridSearchInput::new(
-        unique_fixture_root("single-output"),
+        root,
         RagDefaults::phase_one(),
         "query".to_owned(),
         None,

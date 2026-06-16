@@ -2,7 +2,7 @@
 
 use crate::{
     Embedder, EmbeddingError, EmbeddingVector, FastembedBgeSmallEnV15Embedder, RagDefaults,
-    lifecycle::{LanceDbStoreRequest, document_predicate, open_primary_table},
+    lifecycle::{LanceDbStoreRequest, document_predicate, lancedb_store_dir, open_primary_table},
 };
 use arrow_array::{Array, ListArray, RecordBatch, StringArray, UInt32Array, cast::AsArray};
 use futures::TryStreamExt;
@@ -183,6 +183,13 @@ async fn run_hybrid_search(
         embedding_model: input.config.embedding_model_identifier().to_owned(),
         embedding_dimension: input.config.embedding_dimension(),
     };
+    let database_dir = lancedb_store_dir(&input.root_dir);
+    if !database_dir.exists() {
+        return Err(RuntimeError::operation(format!(
+            "RAG store is missing at '{}'; run 'vector-database rag init' or 'vector-database rag update-database' first",
+            database_dir.display()
+        )));
+    }
     let store = crate::ensure_lancedb_store(&store_request)
         .await
         .map_err(|error| RuntimeError::operation(error.to_string()))?;
@@ -685,6 +692,59 @@ impl HybridSearchInput {
         result_limit: Option<usize>,
     ) -> Self {
         Self { root_dir, config, query_text, package_filter, document_filter, result_limit }
+    }
+}
+
+impl HybridSearchResult {
+    /// Construct one machine-readable hybrid retrieval result.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub const fn new(
+        package: Option<String>,
+        document_stem: String,
+        heading_path: Vec<String>,
+        chunk_id: String,
+        chunk_ordinal: usize,
+        text: String,
+        token_count: usize,
+        semantic_rank: Option<usize>,
+        lexical_rank: Option<usize>,
+        rrf_score: f32,
+        previous_chunk_id: Option<String>,
+        next_chunk_id: Option<String>,
+        was_expanded: bool,
+        expanded_from_chunk_id: Option<String>,
+    ) -> Self {
+        Self {
+            package,
+            document_stem,
+            heading_path,
+            chunk_id,
+            chunk_ordinal,
+            text,
+            token_count,
+            semantic_rank,
+            lexical_rank,
+            rrf_score,
+            previous_chunk_id,
+            next_chunk_id,
+            was_expanded,
+            expanded_from_chunk_id,
+        }
+    }
+}
+
+impl HybridSearchOutput {
+    /// Construct the machine-readable hybrid retrieval response payload.
+    #[must_use]
+    pub const fn new(
+        query_text: String,
+        package_filter: Option<String>,
+        document_filter: Option<String>,
+        result_limit: usize,
+        results: Vec<HybridSearchResult>,
+    ) -> Self {
+        Self { query_text, package_filter, document_filter, result_limit, results }
     }
 }
 

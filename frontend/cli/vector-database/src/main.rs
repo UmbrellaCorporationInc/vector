@@ -4,7 +4,9 @@
 
 use runtime_io::ProcessCommandExecutor;
 use std::path::PathBuf;
-use vector_database::commands::{package_add, package_sync, rag_init, rag_update_database};
+use vector_database::commands::{
+    package_add, package_sync, rag_init, rag_search, rag_update_database,
+};
 
 #[derive(Debug, Default)]
 struct PackageAddArgs {
@@ -51,6 +53,7 @@ fn print_usage() {
     println!("  package sync                    Synchronize packages defined in the manifest");
     println!("  package add <name> <type> <url> [tag]  Add a new package to the manifest");
     println!("  rag init                        Create or validate the local RAG LanceDB store");
+    println!("  rag search <query>              Search the local RAG store with hybrid retrieval");
     println!("  rag update-database             Index workspace documents into the RAG store");
 }
 
@@ -79,6 +82,10 @@ async fn handle_package_command(root_dir: &std::path::Path, args: &[String]) -> 
 async fn handle_rag_command(root_dir: &std::path::Path, args: &[String]) -> Result<(), String> {
     match args[2].as_str() {
         "init" => rag_init::run(root_dir).await,
+        "search" => {
+            let parsed = rag_search::parse_args(&args[3..])?;
+            rag_search::run(root_dir, parsed).await
+        }
         "update-database" => rag_update_database::run(root_dir).await,
         cmd => Err(format!("unknown rag subcommand '{cmd}'")),
     }

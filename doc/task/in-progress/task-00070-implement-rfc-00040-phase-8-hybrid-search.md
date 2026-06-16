@@ -111,10 +111,10 @@ input:
   language: Rust
 ```
 
-- [ ] Add `vector-database rag search <query>` as a thin adapter over the `runtime-rag` retrieval operation.
-- [ ] Support `--limit`, `--package`, `--document`, and `--json` without duplicating ranking or filtering logic in the CLI layer.
-- [ ] Print readable default output for live validation and a stable machine-readable payload for automation.
-- [ ] Exit with a non-zero code on actionable failures such as a missing store, incompatible embedding contract, or query embedding failure.
+- [x] Add `vector-database rag search <query>` as a thin adapter over the `runtime-rag` retrieval operation.
+- [x] Support `--limit`, `--package`, `--document`, and `--json` without duplicating ranking or filtering logic in the CLI layer.
+- [x] Print readable default output for live validation and a stable machine-readable payload for automation.
+- [x] Exit with a non-zero code on actionable failures such as a missing store, incompatible embedding contract, or query embedding failure.
 
 ### 3.5. Phase E - Quality Gates And Retrieval Coverage
 
