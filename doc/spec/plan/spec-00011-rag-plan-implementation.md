@@ -17,6 +17,7 @@ related:
   - rfc-00038-phase-6-lancedb-integration
   - rfc-00039-phase-7-incremental-indexing
   - rfc-00040-phase-8-hybrid-search
+  - rfc-00041-phase-9-canonical-result-for-retrieval-operation
 supersedes: []
 superseded_by: null
 aliases:
@@ -200,6 +201,7 @@ Acceptance criteria:
 ### Phase 9: Assemble MCP Context Results
 
 Create model-agnostic context results that MCP clients and agents can use as retrieved evidence.
+See [[rfc-00041-phase-9-canonical-result-for-retrieval-operation]] for the canonical retrieval context result contract, CLI adapter expectations, MCP output shape, and empty-result semantics for this phase.
 
 - Include selected chunks.
 - Include packages, document stems, and heading paths.
