@@ -181,6 +181,7 @@ Acceptance criteria:
 ### Phase 8: Implement Hybrid Retrieval
 
 Implement retrieval that combines semantic and lexical signals.
+See [[rfc-00040-phase-8-hybrid-search]] for the approved hybrid retrieval baseline, fusion strategy, deduplication identity, adjacent chunk expansion rules, and CLI query contract for this phase.
 
 - Run semantic vector search over embeddings.
 - Run lexical search through LanceDB hybrid search first.

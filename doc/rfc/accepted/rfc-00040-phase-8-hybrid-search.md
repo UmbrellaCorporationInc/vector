@@ -18,6 +18,7 @@ related:
   - spec-00011-rag-plan-implementation
   - rfc-00038-phase-6-lancedb-integration
   - rfc-00039-phase-7-incremental-indexing
+  - task-00070-implement-rfc-00040-phase-8-hybrid-search
 supersedes: []
 superseded_by: null
 aliases:
@@ -44,6 +45,8 @@ prompt: prompts-00010-start-discussion-action
 input:
   document: rfc-00040-phase-8-hybrid-search
 ```
+
+Implementation task: [[task-00070-implement-rfc-00040-phase-8-hybrid-search]]
 
 ## 1. Problem
 
