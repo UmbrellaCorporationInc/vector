@@ -2,18 +2,23 @@
 
 use crate::{
     Embedder, EmbeddingError, EmbeddingVector, FastembedBgeSmallEnV15Embedder, RagDefaults,
-    lifecycle::{LanceDbStoreRequest, open_primary_table},
+    lifecycle::{LanceDbStoreRequest, document_predicate, open_primary_table},
 };
-use arrow_array::{Array, ListArray, RecordBatch, StringArray, cast::AsArray};
+use arrow_array::{Array, ListArray, RecordBatch, StringArray, UInt32Array, cast::AsArray};
 use futures::TryStreamExt;
 use lancedb::{
     index::scalar::FullTextSearchQuery,
     query::{ExecutableQuery, QueryBase, Select},
 };
 use runtime_core::{RuntimeError, RuntimeResult, declare_plugin_operations, plugin::PluginSender};
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::Arc,
+};
 
 const HYBRID_SEARCH_RRF_K: usize = 60;
+type SectionNeighbors = (Option<String>, Option<String>);
 
 /// Input for the `hybrid_search` operation.
 ///
@@ -49,16 +54,26 @@ pub struct HybridSearchResult {
     pub heading_path: Vec<String>,
     /// Stable chunk identifier for debugging and traceability.
     pub chunk_id: String,
+    /// Zero-based chunk ordinal within the governed document.
+    pub chunk_ordinal: usize,
     /// Retrieved chunk text.
     pub text: String,
+    /// Token count emitted by chunking for this stored row.
+    pub token_count: usize,
     /// Semantic rank position when the chunk appears in the vector branch.
     pub semantic_rank: Option<usize>,
     /// Lexical rank position when the chunk appears in the full-text branch.
     pub lexical_rank: Option<usize>,
     /// Reciprocal Rank Fusion score after branch merging.
     pub rrf_score: f32,
+    /// Previous adjacent chunk identifier in the same section, when it exists.
+    pub previous_chunk_id: Option<String>,
+    /// Next adjacent chunk identifier in the same section, when it exists.
+    pub next_chunk_id: Option<String>,
     /// Whether the row was added by adjacent chunk expansion.
     pub was_expanded: bool,
+    /// Primary hit that introduced this row through adjacent chunk expansion.
+    pub expanded_from_chunk_id: Option<String>,
 }
 
 /// Output for the `hybrid_search` operation.
@@ -85,7 +100,9 @@ struct RankedCandidate {
     document_stem: String,
     heading_path: Vec<String>,
     chunk_id: String,
+    chunk_ordinal: usize,
     text: String,
+    token_count: usize,
     semantic_rank: Option<usize>,
     lexical_rank: Option<usize>,
 }
@@ -239,32 +256,22 @@ async fn execute_fusion<E: Embedder + Sync>(
             document_stem: candidate.document_stem,
             heading_path: candidate.heading_path,
             chunk_id: candidate.chunk_id,
+            chunk_ordinal: candidate.chunk_ordinal,
             text: candidate.text,
+            token_count: candidate.token_count,
             semantic_rank: candidate.semantic_rank,
             lexical_rank: candidate.lexical_rank,
             rrf_score: reciprocal_rank_fusion(candidate.semantic_rank, candidate.lexical_rank),
+            previous_chunk_id: None,
+            next_chunk_id: None,
             was_expanded: false,
+            expanded_from_chunk_id: None,
         })
         .collect::<Vec<_>>();
 
-    results.sort_by(|left, right| {
-        right
-            .rrf_score
-            .total_cmp(&left.rrf_score)
-            .then_with(|| {
-                left.semantic_rank
-                    .unwrap_or(usize::MAX)
-                    .cmp(&right.semantic_rank.unwrap_or(usize::MAX))
-            })
-            .then_with(|| {
-                left.lexical_rank
-                    .unwrap_or(usize::MAX)
-                    .cmp(&right.lexical_rank.unwrap_or(usize::MAX))
-            })
-            .then_with(|| left.chunk_id.cmp(&right.chunk_id))
-    });
-    results.truncate(request.result_limit);
-    Ok(results)
+    sort_search_results(&mut results);
+    let results = deduplicate_sections(results);
+    expand_adjacent_chunks(request.table, results, request.result_limit).await
 }
 
 async fn execute_semantic_branch(
@@ -343,12 +350,24 @@ fn parse_candidate_batch(batch: &RecordBatch) -> RuntimeResult<Vec<RankedCandida
         batch.column_by_name("heading_path").ok_or_else(|| missing_column_error("heading_path"))?;
     let chunk_id_col =
         batch.column_by_name("chunk_id").ok_or_else(|| missing_column_error("chunk_id"))?;
+    let chunk_ordinal_col = batch
+        .column_by_name("chunk_ordinal")
+        .ok_or_else(|| missing_column_error("chunk_ordinal"))?;
     let text_col = batch.column_by_name("text").ok_or_else(|| missing_column_error("text"))?;
+    let token_count_col =
+        batch.column_by_name("token_count").ok_or_else(|| missing_column_error("token_count"))?;
 
     let packages = package_col.as_string::<i32>();
     let stems = document_stem_col.as_string::<i32>();
     let chunk_ids = chunk_id_col.as_string::<i32>();
+    let chunk_ordinals =
+        chunk_ordinal_col.as_any().downcast_ref::<UInt32Array>().ok_or_else(|| {
+            RuntimeError::operation("chunk_ordinal column is not a UInt32Array".to_owned())
+        })?;
     let texts = text_col.as_string::<i32>();
+    let token_counts = token_count_col.as_any().downcast_ref::<UInt32Array>().ok_or_else(|| {
+        RuntimeError::operation("token_count column is not a UInt32Array".to_owned())
+    })?;
     let heading_paths = heading_path_col.as_any().downcast_ref::<ListArray>().ok_or_else(|| {
         RuntimeError::operation("heading_path column is not a ListArray".to_owned())
     })?;
@@ -362,7 +381,9 @@ fn parse_candidate_batch(batch: &RecordBatch) -> RuntimeResult<Vec<RankedCandida
             document_stem: stems.value(row).to_owned(),
             heading_path: heading_segments(heading_paths, row)?,
             chunk_id: chunk_ids.value(row).to_owned(),
+            chunk_ordinal: usize::try_from(chunk_ordinals.value(row)).unwrap_or(usize::MAX),
             text: texts.value(row).to_owned(),
+            token_count: usize::try_from(token_counts.value(row)).unwrap_or(usize::MAX),
             semantic_rank: None,
             lexical_rank: None,
         });
@@ -388,7 +409,221 @@ fn heading_segments(heading_paths: &ListArray, row: usize) -> RuntimeResult<Vec<
 }
 
 fn candidate_projection() -> Select {
-    Select::columns(&["package", "document_stem", "heading_path", "chunk_id", "text"])
+    Select::columns(&[
+        "package",
+        "document_stem",
+        "heading_path",
+        "chunk_id",
+        "chunk_ordinal",
+        "text",
+        "token_count",
+    ])
+}
+
+fn sort_search_results(results: &mut [HybridSearchResult]) {
+    results.sort_by(|left, right| {
+        right
+            .rrf_score
+            .total_cmp(&left.rrf_score)
+            .then_with(|| {
+                left.semantic_rank
+                    .unwrap_or(usize::MAX)
+                    .cmp(&right.semantic_rank.unwrap_or(usize::MAX))
+            })
+            .then_with(|| {
+                left.lexical_rank
+                    .unwrap_or(usize::MAX)
+                    .cmp(&right.lexical_rank.unwrap_or(usize::MAX))
+            })
+            .then_with(|| left.chunk_id.cmp(&right.chunk_id))
+    });
+}
+
+fn deduplicate_sections(results: Vec<HybridSearchResult>) -> Vec<HybridSearchResult> {
+    let mut seen_sections = HashSet::new();
+    let mut deduplicated = Vec::new();
+    for result in results {
+        let section_key = section_identity_key(
+            result.package.as_deref(),
+            &result.document_stem,
+            &result.heading_path,
+        );
+        if seen_sections.insert(section_key) {
+            deduplicated.push(result);
+        }
+    }
+    deduplicated
+}
+
+async fn expand_adjacent_chunks(
+    table: &lancedb::Table,
+    deduplicated_results: Vec<HybridSearchResult>,
+    result_limit: usize,
+) -> RuntimeResult<Vec<HybridSearchResult>> {
+    let mut document_cache = HashMap::<String, Vec<RankedCandidate>>::new();
+    let mut primaries = deduplicated_results.into_iter().take(result_limit).collect::<Vec<_>>();
+
+    for primary in &mut primaries {
+        let document_chunks = load_document_chunks(table, primary, &mut document_cache).await?;
+        apply_neighbor_metadata(primary, &document_chunks);
+    }
+
+    if primaries.len() >= result_limit {
+        return Ok(primaries);
+    }
+
+    let mut results = primaries.clone();
+    let mut seen_chunk_ids =
+        results.iter().map(|result| result.chunk_id.clone()).collect::<HashSet<_>>();
+
+    for primary in &primaries {
+        let document_chunks = load_document_chunks(table, primary, &mut document_cache).await?;
+        for expanded in expand_section_neighbors(primary, &document_chunks) {
+            if results.len() >= result_limit {
+                return Ok(results);
+            }
+            if seen_chunk_ids.insert(expanded.chunk_id.clone()) {
+                results.push(expanded);
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+async fn load_document_chunks(
+    table: &lancedb::Table,
+    result: &HybridSearchResult,
+    cache: &mut HashMap<String, Vec<RankedCandidate>>,
+) -> RuntimeResult<Vec<RankedCandidate>> {
+    let cache_key = document_identity_key(result.package.as_deref(), &result.document_stem);
+    if let Some(cached) = cache.get(&cache_key) {
+        return Ok(cached.clone());
+    }
+
+    let predicate = document_predicate(result.package.as_deref(), &result.document_stem, None);
+    let stream = table
+        .query()
+        .only_if(predicate)
+        .select(candidate_projection())
+        .execute()
+        .await
+        .map_err(|error| RuntimeError::operation(error.to_string()))?;
+    let mut rows = collect_candidates(stream).await?;
+    rows.sort_by(|left, right| {
+        left.chunk_ordinal
+            .cmp(&right.chunk_ordinal)
+            .then_with(|| left.chunk_id.cmp(&right.chunk_id))
+    });
+    cache.insert(cache_key, rows.clone());
+    Ok(rows)
+}
+
+fn apply_neighbor_metadata(result: &mut HybridSearchResult, document_chunks: &[RankedCandidate]) {
+    let neighbors = section_neighbors(document_chunks, result);
+    result.previous_chunk_id = neighbors.0;
+    result.next_chunk_id = neighbors.1;
+}
+
+fn expand_section_neighbors(
+    primary: &HybridSearchResult,
+    document_chunks: &[RankedCandidate],
+) -> Vec<HybridSearchResult> {
+    let Some(primary_index) =
+        document_chunks.iter().position(|chunk| chunk.chunk_id == primary.chunk_id)
+    else {
+        return Vec::new();
+    };
+
+    let same_section = document_chunks
+        .iter()
+        .enumerate()
+        .filter(|(_, chunk)| {
+            chunk.package == primary.package
+                && chunk.document_stem == primary.document_stem
+                && chunk.heading_path == primary.heading_path
+        })
+        .collect::<Vec<_>>();
+
+    let mut expanded = Vec::new();
+    for offset in [-1_isize, 1_isize] {
+        let Some(candidate_index) = primary_index.checked_add_signed(offset) else {
+            continue;
+        };
+        let Some(candidate) = document_chunks.get(candidate_index) else {
+            continue;
+        };
+        if candidate.package != primary.package
+            || candidate.document_stem != primary.document_stem
+            || candidate.heading_path != primary.heading_path
+        {
+            continue;
+        }
+
+        let previous_chunk_id = same_section
+            .iter()
+            .position(|(_, chunk)| chunk.chunk_id == candidate.chunk_id)
+            .and_then(|index| index.checked_sub(1))
+            .and_then(|index| same_section.get(index))
+            .map(|(_, chunk)| chunk.chunk_id.clone());
+        let next_chunk_id = same_section
+            .iter()
+            .position(|(_, chunk)| chunk.chunk_id == candidate.chunk_id)
+            .and_then(|index| same_section.get(index + 1))
+            .map(|(_, chunk)| chunk.chunk_id.clone());
+
+        expanded.push(HybridSearchResult {
+            package: candidate.package.clone(),
+            document_stem: candidate.document_stem.clone(),
+            heading_path: candidate.heading_path.clone(),
+            chunk_id: candidate.chunk_id.clone(),
+            chunk_ordinal: candidate.chunk_ordinal,
+            text: candidate.text.clone(),
+            token_count: candidate.token_count,
+            semantic_rank: None,
+            lexical_rank: None,
+            rrf_score: primary.rrf_score,
+            previous_chunk_id,
+            next_chunk_id,
+            was_expanded: true,
+            expanded_from_chunk_id: Some(primary.chunk_id.clone()),
+        });
+    }
+
+    expanded
+}
+
+fn section_neighbors(
+    document_chunks: &[RankedCandidate],
+    result: &HybridSearchResult,
+) -> SectionNeighbors {
+    let section_chunks = document_chunks
+        .iter()
+        .filter(|chunk| {
+            chunk.package == result.package
+                && chunk.document_stem == result.document_stem
+                && chunk.heading_path == result.heading_path
+        })
+        .collect::<Vec<_>>();
+    let Some(index) = section_chunks.iter().position(|chunk| chunk.chunk_id == result.chunk_id)
+    else {
+        return (None, None);
+    };
+    let previous = index.checked_sub(1).and_then(|previous| section_chunks.get(previous));
+    let next = section_chunks.get(index + 1);
+    (previous.map(|chunk| chunk.chunk_id.clone()), next.map(|chunk| chunk.chunk_id.clone()))
+}
+
+fn document_identity_key(package: Option<&str>, document_stem: &str) -> String {
+    format!("{}::{document_stem}", package.unwrap_or(""))
+}
+
+fn section_identity_key(
+    package: Option<&str>,
+    document_stem: &str,
+    heading_path: &[String],
+) -> String {
+    format!("{}::{document_stem}::{}", package.unwrap_or(""), heading_path.join("\u{1f}"))
 }
 
 fn reciprocal_rank_fusion(semantic_rank: Option<usize>, lexical_rank: Option<usize>) -> f32 {

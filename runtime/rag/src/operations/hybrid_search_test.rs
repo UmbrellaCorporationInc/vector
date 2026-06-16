@@ -144,6 +144,18 @@ fn doc_source(title: &str, body: &str) -> String {
     format!("---\ntitle: {title}\n---\n\n# Title\n\n{body}\n")
 }
 
+fn long_paragraph(marker: &str, token_count: usize, needle: Option<&str>) -> String {
+    let mut tokens = Vec::with_capacity(token_count.max(2));
+    tokens.push(marker.to_owned());
+    if let Some(needle) = needle {
+        tokens.push(needle.to_owned());
+    }
+    while tokens.len() < token_count {
+        tokens.push(format!("{marker}-{}", tokens.len()));
+    }
+    tokens.join(" ")
+}
+
 #[tokio::test]
 async fn hybrid_search_op_resolves_governed_default_limit_through_dispatcher() {
     let input = HybridSearchInput::new(
@@ -461,4 +473,131 @@ async fn run_hybrid_search_applies_package_and_document_filters_before_fusion() 
     assert_eq!(output.results.len(), 1);
     assert_eq!(output.results[0].package.as_deref(), Some("shared-docs"));
     assert_eq!(output.results[0].document_stem, "task-00020-filter-match");
+}
+
+#[tokio::test]
+async fn run_hybrid_search_deduplicates_multiple_chunks_from_one_section_before_limit() {
+    let root = unique_fixture_root("section-dedup");
+    let embedder = MappingEmbedder::default()
+        .with_query_vector("needle", padded_vector(0.0, 0.0, 0.0))
+        .with_chunk_vector("ALPHA", padded_vector(0.0, 0.0, 0.0))
+        .with_chunk_vector("BETA", padded_vector(0.1, 0.0, 0.0))
+        .with_chunk_vector("GAMMA", padded_vector(0.2, 0.0, 0.0))
+        .with_chunk_vector("DELTA", padded_vector(0.3, 0.0, 0.0));
+
+    let dominant_section = [
+        long_paragraph("ALPHA", 300, Some("needle")),
+        long_paragraph("BETA", 300, Some("needle")),
+        long_paragraph("GAMMA", 300, Some("needle")),
+    ]
+    .join("\n\n");
+    insert_fixture_document(
+        &root,
+        None,
+        "task-00030-dominant-section",
+        &doc_source("Dominant", &dominant_section),
+        &embedder,
+    )
+    .await;
+    insert_fixture_document(
+        &root,
+        None,
+        "task-00031-secondary-section",
+        &doc_source("Secondary", &long_paragraph("DELTA", 300, Some("needle"))),
+        &embedder,
+    )
+    .await;
+
+    let output = run_hybrid_search(
+        &HybridSearchInput::new(
+            root,
+            RagDefaults::phase_one(),
+            "needle".to_owned(),
+            None,
+            None,
+            Some(2),
+        ),
+        &embedder,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(output.results.len(), 2);
+    assert_eq!(
+        output
+            .results
+            .iter()
+            .filter(|result| result.document_stem == "task-00030-dominant-section")
+            .count(),
+        1
+    );
+    assert!(
+        output.results.iter().any(|result| result.document_stem == "task-00031-secondary-section"),
+        "a second section should survive after section-level deduplication"
+    );
+    assert!(output.results.iter().all(|result| !result.was_expanded));
+}
+
+#[tokio::test]
+async fn run_hybrid_search_expands_adjacent_chunks_only_within_same_section() {
+    let root = unique_fixture_root("section-expansion");
+    let embedder = MappingEmbedder::default()
+        .with_query_vector("needle", padded_vector(0.0, 0.0, 0.0))
+        .with_chunk_vector("ALPHA", padded_vector(0.2, 0.0, 0.0))
+        .with_chunk_vector("TARGET", padded_vector(0.0, 0.0, 0.0))
+        .with_chunk_vector("OMEGA", padded_vector(0.3, 0.0, 0.0))
+        .with_chunk_vector("OUTSIDE", padded_vector(0.4, 0.0, 0.0));
+
+    let expanded_doc = format!(
+        "# Title\n\n## Expanded Section\n\n{}\n\n{}\n\n{}\n\n## Other Section\n\n{}",
+        long_paragraph("ALPHA", 300, None),
+        long_paragraph("TARGET", 300, Some("needle")),
+        long_paragraph("OMEGA", 300, None),
+        long_paragraph("OUTSIDE", 300, Some("outside"))
+    );
+    insert_fixture_document(
+        &root,
+        None,
+        "task-00032-expanded-section",
+        &format!("---\ntitle: Expanded\n---\n\n{expanded_doc}\n"),
+        &embedder,
+    )
+    .await;
+
+    let output = run_hybrid_search(
+        &HybridSearchInput::new(
+            root,
+            RagDefaults::phase_one(),
+            "needle".to_owned(),
+            None,
+            None,
+            Some(4),
+        ),
+        &embedder,
+    )
+    .await
+    .unwrap();
+
+    let primary = output
+        .results
+        .iter()
+        .find(|result| !result.was_expanded && result.text.contains("TARGET"))
+        .expect("primary hit must exist");
+    assert!(primary.text.contains("TARGET"));
+    assert!(primary.previous_chunk_id.is_some());
+    assert!(primary.next_chunk_id.is_some());
+
+    let expanded = output
+        .results
+        .iter()
+        .filter(|result| {
+            result.was_expanded
+                && result.expanded_from_chunk_id.as_deref() == Some(primary.chunk_id.as_str())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(expanded.len(), 2);
+    assert!(expanded.iter().all(|result| result.heading_path == primary.heading_path));
+    assert!(expanded.iter().all(|result| !result.text.contains("OUTSIDE")));
+    assert!(expanded.iter().all(|result| result.semantic_rank.is_none()));
+    assert!(expanded.iter().all(|result| result.lexical_rank.is_none()));
 }

@@ -93,11 +93,11 @@ input:
   language: Rust
 ```
 
-- [ ] Deduplicate fused hits by `package`, `document_stem`, and `heading_path` so repeated chunks from one section do not dominate the final ranking.
-- [ ] Keep the highest-ranked chunk as the primary section hit and preserve chunk-level identifiers for debugging and traceability.
-- [ ] Implement adjacent chunk expansion only within the same section and only when neighbor chunks exist.
-- [ ] Mark expanded chunks as contextual additions rather than independent winners.
-- [ ] Return structured results that include package, document stem, heading path, chunk identifier, text, semantic rank, lexical rank, RRF score, and expansion metadata.
+- [x] Deduplicate fused hits by `package`, `document_stem`, and `heading_path` so repeated chunks from one section do not dominate the final ranking.
+- [x] Keep the highest-ranked chunk as the primary section hit and preserve chunk-level identifiers for debugging and traceability.
+- [x] Implement adjacent chunk expansion only within the same section and only when neighbor chunks exist.
+- [x] Mark expanded chunks as contextual additions rather than independent winners.
+- [x] Return structured results that include package, document stem, heading path, chunk identifier, text, semantic rank, lexical rank, RRF score, and expansion metadata.
 
 ### 3.4. Phase D - CLI Integration And Failure Semantics
 
