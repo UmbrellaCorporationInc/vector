@@ -57,11 +57,11 @@ input:
   language: Rust
 ```
 
-- [ ] Add a `runtime-rag` retrieval operation that owns Phase 8 query execution instead of placing retrieval logic in `vector-database`.
-- [ ] Follow the existing runtime operation pattern already used by `doc`, `project`, and earlier `rag` phases: own retrieval in `runtime-rag`, execute it through the standard dispatcher path, and keep `vector-database` as a thin adapter only.
-- [ ] Define explicit input and output contracts for query text, optional package and document filters, result limit, and machine-readable retrieval results.
-- [ ] Reuse governed RAG configuration defaults for retrieval settings instead of creating CLI-only defaults.
-- [ ] Keep retrieval contracts deterministic and adapter-safe so later MCP consumers can call the same operation without behavioral drift.
+- [x] Add a `runtime-rag` retrieval operation that owns Phase 8 query execution instead of placing retrieval logic in `vector-database`.
+- [x] Follow the existing runtime operation pattern already used by `doc`, `project`, and earlier `rag` phases: own retrieval in `runtime-rag`, execute it through the standard dispatcher path, and keep `vector-database` as a thin adapter only.
+- [x] Define explicit input and output contracts for query text, optional package and document filters, result limit, and machine-readable retrieval results.
+- [x] Reuse governed RAG configuration defaults for retrieval settings instead of creating CLI-only defaults.
+- [x] Keep retrieval contracts deterministic and adapter-safe so later MCP consumers can call the same operation without behavioral drift.
 
 ### 3.2. Phase B - Hybrid Search And Fusion
 
