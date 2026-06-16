@@ -19,6 +19,7 @@ related:
   - spec-00011-rag-plan-implementation
   - rfc-00040-phase-8-hybrid-search
   - task-00071-update-rag-cli-search-to-emit-retrieval-context
+  - task-00072-implement-rfc-00041-phase-9-canonical-result-for-retrieval-operation
 supersedes: []
 superseded_by: null
 aliases:

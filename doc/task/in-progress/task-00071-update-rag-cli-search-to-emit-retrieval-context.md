@@ -5,7 +5,7 @@ code: "00071"
 slug: update-rag-cli-search-to-emit-retrieval-context
 title: Update RAG CLI Search To Emit RetrievalContext
 description: Update the existing RAG search CLI command to render and serialize the Phase 9 canonical RetrievalContext contract.
-status: todo
+status: in-progress
 created: 2026-06-16
 updated: 2026-06-16
 tags:
