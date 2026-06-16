@@ -201,9 +201,9 @@ Successful empty retrieval returns `status: empty` with no sources and no
 chunks. This is distinct from operational failures such as missing stores,
 incompatible embedding metadata, malformed filters, or query execution errors.
 
-The runtime contract is ready for adapters. Updating
-`vector-database rag search <query>` and future MCP retrieval output to emit
-this shape is tracked separately by Task 00071.
+The `vector-database rag search <query>` adapter consumes this contract for both
+human-readable output and `--json` serialization. Future MCP retrieval output
+should consume the same shape instead of formatting Phase 8 hits independently.
 
 ## Phase 1 Defaults
 

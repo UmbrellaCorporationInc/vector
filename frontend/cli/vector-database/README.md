@@ -4,9 +4,10 @@
 
 `vector-database` is the command-line interface (CLI) for executing package synchronization and managing repository package manifest mutations in the Vector workspace. It acts as the execution surface for the planning operations defined in `runtime-packages`.
 
-It also exposes the Phase 6 local RAG store initialization command and the Phase
-7 incremental indexing command and the Phase 8 hybrid retrieval command by
-delegating store lifecycle, indexing, and retrieval ownership to `runtime-rag`.
+It also exposes the Phase 6 local RAG store initialization command, the Phase 7
+incremental indexing command, and the Phase 9 canonical retrieval context search
+command by delegating store lifecycle, indexing, retrieval, and context assembly
+ownership to `runtime-rag`.
 
 ## 2. Boundaries
 
@@ -16,7 +17,7 @@ delegating store lifecycle, indexing, and retrieval ownership to `runtime-rag`.
 - Interfacing with `runtime-packages` to add new dependencies into `.vector/packages.yaml` via CLI arguments.
 - Triggering the RAG-owned LanceDB lifecycle operation that creates or validates the local retrieval store.
 - Running the Phase 7 incremental indexing pipeline via `update-database`, which delegates all orchestration to `runtime-rag::IndexWorkspaceOp`.
-- Running the Phase 8 hybrid retrieval command via `rag search`, which delegates all ranking, filtering, deduplication, and expansion behavior to `runtime-rag::HybridSearchOp`.
+- Running the RAG search command via `rag search`, which delegates ranking, filtering, deduplication, expansion, and canonical context assembly to `runtime-rag`.
 - Streaming subprocess execution logs and print messages before running actions.
 - Rejecting invalid package structures (i.e. making sure synchronized packages contain `doc/` and `.vector/`).
 
@@ -103,20 +104,40 @@ Markdown documents, skipping files whose content hash is unchanged.
 
 ### `rag search`
 
-Executes the Phase 8 hybrid retrieval workflow against the local RAG store.
+Executes hybrid retrieval against the local RAG store and renders the Phase 9
+canonical `RetrievalContext` produced by `runtime-rag`.
 
 **Execution Details:**
 - Delegates to `runtime-rag::HybridSearchOp` through the standard
   `PluginDispatcher`.
+- Passes hybrid retrieval output through `runtime-rag::AssembleRetrievalContextOp`
+  before rendering human output or serializing JSON.
 - Reuses governed Phase 1 RAG defaults for semantic candidate limit, lexical
   candidate limit, and final retrieval limit unless `--limit` overrides the
   final result count.
 - Forwards `--package` and `--document` filters directly to the runtime
   retrieval operation so the CLI does not fork filtering semantics.
-- Prints human-readable retrieval output by default and a stable JSON payload
-  when `--json` is set.
-- Does not implement ranking, score fusion, deduplication, or adjacent chunk
-  expansion logic in the CLI layer.
+- Prints human-readable retrieval context by default and serializes the canonical
+  `RetrievalContext` JSON payload when `--json` is set.
+- Does not implement ranking, score fusion, deduplication, adjacent chunk
+  expansion, source attribution, empty-result semantics, or final limit
+  enforcement in the CLI layer.
+
+**Output contract:**
+- Human-readable output starts with `Retrieval Context`, then prints status,
+  query, final limit, returned chunk count, normalized sources, evidence chunks,
+  and diagnostics.
+- `--json` emits the canonical `RetrievalContext` fields: `query`, `status`,
+  `limit`, `returned`, `sources`, `chunks`, and `diagnostics`.
+- `status` is `has_results` when chunks are returned and `empty` when retrieval
+  succeeds with no evidence.
+- Each source includes `source_id`, `package`, `document_stem`, `heading_path`,
+  and `citation_label`.
+- Each chunk includes `context_id`, `source_id`, `package`, `document_stem`,
+  `heading_path`, `chunk_id`, `chunk_ordinal`, `text`, `token_count`, and
+  `match_reason` (`primary` or `expanded`).
+- Diagnostics include `total_token_count`, `dropped_after_limit`, and
+  `retrieval_limit`.
 
 **Arguments:**
 - `<query>`: Required free-text query string.
