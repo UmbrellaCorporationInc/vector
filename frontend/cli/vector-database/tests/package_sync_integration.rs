@@ -1,5 +1,5 @@
 //! Integration tests for the `package sync` CLI command.
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::print_stdout, clippy::panic)]
+#![allow(clippy::expect_used, clippy::unwrap_used, clippy::print_stdout)]
 
 use runtime_io::{CommandBuilder, CommandExecutor, ProcessCommandExecutor};
 
