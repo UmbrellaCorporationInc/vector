@@ -31,6 +31,57 @@ orchestration boundaries for Vector.
   validation of the local Phase 6 LanceDB store under
   `.vector-database/rag/lancedb/`, including the primary table contract and the
   full-text index on persisted chunk text.
+- **Phase 7 Incremental Indexing**: `IndexWorkspaceOp` is the single entry point
+  for callers that need both store initialization and incremental indexing.
+  `RagIndexerOp` owns the incremental pass: hash-based skip, chunk-level
+  embedding reuse, stale row deletion, and per-document failure isolation.
+  `IndexResult` summarizes skipped, re-indexed, deleted, and failed document
+  counts so callers can render a run summary without inspecting internal storage.
+
+## Phase 7 Incremental Indexing
+
+`IndexWorkspaceOp` is the orchestrating operation that callers invoke for a full
+incremental indexing run. It composes `InitRagStoreOp` (Phase 6) and
+`RagIndexerOp` (Phase 7) by calling each in sequence using a `CapturingSender`.
+
+`RagIndexerOp` owns the incremental indexing pass:
+
+1. **Discovery**: discovers all governed Markdown files under the corpus roots.
+2. **Stale deletion**: removes rows for source files absent from the current
+   corpus, scoped to `(package, document_stem)`.
+3. **Document-level skip**: compares the current `document_hash` against the
+   stored value; unchanged documents are skipped entirely.
+4. **Chunk-level reuse**: for changed documents, re-embeds only chunks whose
+   `chunk_hash` differs from stored embeddings.
+5. **Delete-before-write**: deletes existing rows for the document before writing
+   replacement rows so a crash leaves an empty state rather than a mixed state.
+6. **Failure isolation**: records per-document failures without aborting the run.
+
+`IndexResult` carries `skipped_count`, `reindexed_count`, `deleted_count`, and
+a `failures` list with per-document package identity, document stem, and error.
+`has_failures()` returns `true` when the failures list is non-empty.
+
+### Known Correctness Risks
+
+Three residual risks are acknowledged but unresolved in Phase 7:
+
+- **Delete-before-write recovery**: a crash between the delete and the
+  subsequent write leaves the document with no indexed rows. The recovery path
+  is a follow-up `update-database` run, which will re-index the document from
+  scratch. No test covers mid-write interruption; recovery correctness relies on
+  the invariant that an empty state for a document is indistinguishable from a
+  new document on the next run.
+
+- **Partial failure visibility**: `IndexResult` is ephemeral. If a document
+  fails on every run, the failure is surfaced only through stderr output during
+  `update-database`. There is no persisted run record. Operators must observe
+  CLI output to detect persistent failures. Persisted run state is deferred to
+  `rfc-00035-incremental-validation-index-phase-2`.
+
+- **Hash algorithm consistency**: `document_hash` is stored as a hex string with
+  no accompanying algorithm identifier. If the hashing algorithm changes between
+  releases, all stored hashes become stale and a full re-index is required. The
+  store does not detect this condition automatically.
 
 ## Phase 6 LanceDB Store Contract
 

@@ -141,9 +141,9 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Verify every acceptance criterion in [[rfc-00039-phase-7-incremental-indexing]] has implementation or test coverage.
-- [ ] Document any unresolved correctness risk around delete-before-write recovery, partial failure visibility, or hash persistence assumptions.
-- [ ] Update README files for `runtime-rag` and `vector-database` if command behavior or operational expectations changed.
+- [x] Verify every acceptance criterion in [[rfc-00039-phase-7-incremental-indexing]] has implementation or test coverage.
+- [x] Document any unresolved correctness risk around delete-before-write recovery, partial failure visibility, or hash persistence assumptions.
+- [x] Update README files for `runtime-rag` and `vector-database` if command behavior or operational expectations changed.
 
 ## 4. Staff Engineer Review
 
