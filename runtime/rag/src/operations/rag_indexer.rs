@@ -123,10 +123,24 @@ pub(crate) async fn run_incremental_indexing_pass(
     }
 
     for record in report.records() {
-        index_document(record, &store_dir, embedder, &mut result).await?;
+        if let Err(failure) = index_document(record, &store_dir, embedder, &mut result).await {
+            result.failures.push(failure);
+        }
     }
 
     Ok(result)
+}
+
+fn make_document_failure(
+    package: Option<&str>,
+    document_stem: &str,
+    error: impl std::fmt::Display,
+) -> IndexFailureRecord {
+    IndexFailureRecord {
+        package: package.map(std::borrow::ToOwned::to_owned),
+        document_stem: document_stem.to_owned(),
+        error: error.to_string(),
+    }
 }
 
 async fn index_document(
@@ -134,24 +148,31 @@ async fn index_document(
     store_dir: &std::path::Path,
     embedder: &(impl Embedder + Sync),
     result: &mut IndexResult,
-) -> Result<(), LanceDbStoreError> {
+) -> Result<(), IndexFailureRecord> {
     let package = record.package();
     let document_stem = record.governed_document_stem();
     let document_hash = record.content_hash().as_hex();
 
-    if query_document_hash_indexed(store_dir, package, document_stem, document_hash).await? {
+    if query_document_hash_indexed(store_dir, package, document_stem, document_hash)
+        .await
+        .map_err(|e| make_document_failure(package, document_stem, e))?
+    {
         result.skipped_count += 1;
         return Ok(());
     }
 
-    let stored_embeddings =
-        query_document_chunk_embeddings(store_dir, package, document_stem).await?;
+    let stored_embeddings = query_document_chunk_embeddings(store_dir, package, document_stem)
+        .await
+        .map_err(|e| make_document_failure(package, document_stem, e))?;
 
-    let source = tokio::fs::read_to_string(record.internal_read_path().as_path()).await.map_err(
-        |error| LanceDbStoreError::InvalidRequest {
-            message: format!("Failed to read '{document_stem}': {error}"),
-        },
-    )?;
+    let source =
+        tokio::fs::read_to_string(record.internal_read_path().as_path()).await.map_err(|e| {
+            make_document_failure(
+                package,
+                document_stem,
+                format!("Failed to read '{document_stem}': {e}"),
+            )
+        })?;
 
     let extraction_outcome = extract_markdown_source(record, &source);
 
@@ -161,15 +182,20 @@ async fn index_document(
         document_stem,
         embedder,
         &stored_embeddings,
-    )?;
+    )
+    .map_err(|e| make_document_failure(package, document_stem, e))?;
 
     let root_dir = root_dir_from_store_dir(store_dir);
 
     // Phase C: explicit delete-before-write so a crash between delete and write
     // leaves the store in an empty state for this document, not a mixed state.
-    delete_indexed_document(store_dir, package, document_stem).await?;
+    delete_indexed_document(store_dir, package, document_stem)
+        .await
+        .map_err(|e| make_document_failure(package, document_stem, e))?;
 
-    persist_embedded_markdown_chunks(&LanceDbChunkWriteRequest { root_dir, batch }).await?;
+    persist_embedded_markdown_chunks(&LanceDbChunkWriteRequest { root_dir, batch })
+        .await
+        .map_err(|e| make_document_failure(package, document_stem, e))?;
 
     result.reindexed_count += 1;
     Ok(())

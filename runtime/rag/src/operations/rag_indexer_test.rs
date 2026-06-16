@@ -389,6 +389,128 @@ async fn run_pass_changed_document_rows_are_replaced_and_subsequent_run_skips() 
     assert_eq!(third.reindexed_count, 0);
 }
 
+// ── Phase D: failure isolation and reporting ──────────────────────────────
+
+/// Embedder that injects a backend failure when any input text contains `fail_marker`.
+struct PartiallyFailingEmbedder {
+    fail_marker: String,
+    dimension: usize,
+}
+
+impl PartiallyFailingEmbedder {
+    fn new(fail_marker: &str, dimension: usize) -> Self {
+        Self { fail_marker: fail_marker.to_owned(), dimension }
+    }
+}
+
+impl Embedder for PartiallyFailingEmbedder {
+    fn model_id(&self) -> &'static str {
+        "partially-failing-model"
+    }
+
+    fn dimension(&self) -> usize {
+        self.dimension
+    }
+
+    fn embed_batch(&self, inputs: &[&str]) -> Result<Vec<EmbeddingVector>, EmbeddingError> {
+        if inputs.iter().any(|t| t.contains(self.fail_marker.as_str())) {
+            return Err(EmbeddingError::Backend {
+                message: format!("injected failure for marker '{}'", self.fail_marker),
+            });
+        }
+        Ok(inputs.iter().map(|_| vec![0.0f32; self.dimension]).collect())
+    }
+}
+
+#[tokio::test]
+async fn per_document_failure_is_recorded_without_aborting_remaining_documents() {
+    let root_dir = unique_fixture_root("failure-isolation");
+    let embedder = PartiallyFailingEmbedder::new("EMBED_FAIL_MARKER", 4);
+    init_store_for_root(&root_dir, &TrackingEmbedder::new("partially-failing-model", 4)).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-good-doc",
+        "---\ntitle: Good document\n---\n\n## Section\n\nThis content will succeed.\n",
+    )
+    .await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00002-failing-doc",
+        "---\ntitle: Failing document\n---\n\n## Section\n\nEMBED_FAIL_MARKER triggers an injected embedding failure.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir, RagDefaults::phase_one());
+    let result = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    assert_eq!(result.reindexed_count, 1, "the healthy document must be re-indexed");
+    assert_eq!(result.skipped_count, 0);
+    assert_eq!(result.failures.len(), 1, "the failing document must be recorded in failures");
+    assert!(result.has_failures(), "has_failures must return true for a partial run");
+
+    let failure = &result.failures[0];
+    assert_eq!(failure.document_stem, "task-00002-failing-doc");
+    assert!(failure.package.is_none());
+    assert!(
+        failure.error.contains("injected failure") || failure.error.contains("EMBED_FAIL_MARKER"),
+        "failure error should contain actionable context: {}",
+        failure.error
+    );
+}
+
+#[tokio::test]
+async fn per_document_failure_leaves_healthy_document_indexed_on_subsequent_skip() {
+    let root_dir = unique_fixture_root("failure-then-skip");
+    let embedder = PartiallyFailingEmbedder::new("EMBED_FAIL_MARKER", 4);
+    init_store_for_root(&root_dir, &TrackingEmbedder::new("partially-failing-model", 4)).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-persistent-doc",
+        "---\ntitle: Persistent document\n---\n\n## Section\n\nThis content remains stable.\n",
+    )
+    .await;
+    create_corpus_file(
+        &root_dir,
+        "task-00002-failing-doc",
+        "---\ntitle: Failing document\n---\n\n## Section\n\nEMBED_FAIL_MARKER triggers failure.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir, RagDefaults::phase_one());
+
+    let first = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(first.reindexed_count, 1, "healthy document indexed on first run");
+    assert_eq!(first.failures.len(), 1, "failing document recorded on first run");
+
+    let second = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(second.skipped_count, 1, "healthy document skipped on second run — hash unchanged");
+    assert_eq!(second.failures.len(), 1, "failing document still fails on second run");
+}
+
+#[tokio::test]
+async fn clean_run_does_not_report_failures() {
+    let root_dir = unique_fixture_root("clean-run");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-clean",
+        "---\ntitle: Clean\n---\n\n## Section\n\nClean content.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir, RagDefaults::phase_one());
+    let result = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    assert!(!result.has_failures(), "a fully successful run must not report failures");
+    assert_eq!(result.reindexed_count, 1);
+    assert!(result.failures.is_empty());
+}
+
 // ── Phase B: deterministic row identity ───────────────────────────────────
 
 #[tokio::test]

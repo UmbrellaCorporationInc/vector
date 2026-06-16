@@ -7,6 +7,7 @@ use runtime_markdown::{
     MarkdownSourceSpan, extract_markdown_source,
 };
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
 
@@ -633,9 +634,11 @@ async fn write_fixture_file(name: &str, source: &str) -> IoPath {
 }
 
 fn unique_fixture_path(name: &str) -> PathBuf {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
     let nanos =
         SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-    std::env::temp_dir().join(format!("vector-runtime-rag-chunking-{name}-{nanos}.md"))
+    std::env::temp_dir().join(format!("vector-runtime-rag-chunking-{name}-{nanos}-{id}.md"))
 }
 
 fn numbered_words(prefix: &str, count: usize) -> String {

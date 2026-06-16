@@ -107,10 +107,10 @@ input:
   language: Rust
 ```
 
-- [ ] Isolate parsing, chunking, embedding, and persistence failures per document so one malformed file does not abort the corpus run.
-- [ ] Record package, document stem, and actionable error details for each failed document.
-- [ ] Return counts for skipped, re-indexed, deleted, and failed documents in `IndexResult`.
-- [ ] Ensure callers can distinguish a successful partial run from a fully clean run without inspecting logs.
+- [x] Isolate parsing, chunking, embedding, and persistence failures per document so one malformed file does not abort the corpus run.
+- [x] Record package, document stem, and actionable error details for each failed document.
+- [x] Return counts for skipped, re-indexed, deleted, and failed documents in `IndexResult`.
+- [x] Ensure callers can distinguish a successful partial run from a fully clean run without inspecting logs.
 
 ### 3.5. Phase E - CLI Integration And Quality Gates
 
