@@ -32,3 +32,4 @@ test_project_dir/
 
 # Local package cache
 .vector-database/
+.fastembed_cache/

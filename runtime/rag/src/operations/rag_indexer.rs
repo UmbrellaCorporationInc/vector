@@ -1,7 +1,22 @@
 //! Plugin operation for Phase 7 incremental indexing.
 
-use crate::RagDefaults;
+use crate::{
+    EmbeddedMarkdownChunkBatch, EmbeddedMarkdownChunkRecord, Embedder, EmbeddingVector,
+    MarkdownChunkRecord, MarkdownChunkingConfig, RagDefaults, WhitespaceMarkdownTokenCounter,
+    lancedb_store_dir,
+    lifecycle::{
+        LanceDbChunkWriteRequest, LanceDbStoreError, StoredChunkEmbeddings,
+        query_document_chunk_embeddings, query_document_hash_indexed,
+    },
+    persist_embedded_markdown_chunks,
+    pipeline::{MarkdownChunkingPipelineOutcome, chunk_markdown_extraction},
+};
 use runtime_core::{RuntimeResult, declare_plugin_operations, plugin::PluginSender};
+use runtime_markdown::{
+    MarkdownDiscoveryFailure, MarkdownDiscoveryRecord, MarkdownDiscoveryRequest,
+    MarkdownExtractionOutcome, PackageMarkdownRoot, discover_markdown_files,
+    extract_markdown_source,
+};
 use std::path::PathBuf;
 
 /// Per-document indexing failure record.
@@ -47,10 +62,201 @@ pub struct RagIndexerInput {
 }
 
 async fn rag_indexer(
-    _input: RagIndexerInput,
+    input: RagIndexerInput,
     output: &mut impl PluginSender<IndexResult>,
 ) -> RuntimeResult<()> {
-    output.send(IndexResult::default()).await
+    use crate::embedding::FastembedBgeSmallEnV15Embedder;
+    use runtime_core::RuntimeError;
+
+    let embedder = FastembedBgeSmallEnV15Embedder::try_new().map_err(|error| {
+        RuntimeError::operation(format!("Embedder initialization failed: {error}"))
+    })?;
+
+    let result = run_incremental_indexing_pass(&input, &embedder)
+        .await
+        .map_err(|error| RuntimeError::operation(error.to_string()))?;
+
+    output.send(result).await
+}
+
+/// Run the incremental indexing pass with an injectable embedder.
+///
+/// Discovers all governed Markdown documents under the corpus roots, skips
+/// documents whose persisted `document_hash` matches the current file hash,
+/// and re-embeds only chunks whose `chunk_hash` is new or changed.
+pub(crate) async fn run_incremental_indexing_pass(
+    input: &RagIndexerInput,
+    embedder: &(impl Embedder + Sync),
+) -> Result<IndexResult, LanceDbStoreError> {
+    let workspace_doc_root = input.root_dir.join(input.config.workspace_corpus_root());
+    let package_roots: Vec<PackageMarkdownRoot> = Vec::new();
+    let discovery_request = MarkdownDiscoveryRequest::new([workspace_doc_root], package_roots);
+    let report = match discover_markdown_files(&discovery_request).await {
+        Ok(report) => report,
+        Err(MarkdownDiscoveryFailure::WorkspaceDiscovery { .. }) => {
+            return Ok(IndexResult::default());
+        }
+        Err(error) => {
+            return Err(LanceDbStoreError::InvalidRequest { message: error.to_string() });
+        }
+    };
+
+    let store_dir = lancedb_store_dir(&input.root_dir);
+    let mut result = IndexResult::default();
+
+    for record in report.records() {
+        index_document(record, &store_dir, embedder, &mut result).await?;
+    }
+
+    Ok(result)
+}
+
+async fn index_document(
+    record: &MarkdownDiscoveryRecord,
+    store_dir: &std::path::Path,
+    embedder: &(impl Embedder + Sync),
+    result: &mut IndexResult,
+) -> Result<(), LanceDbStoreError> {
+    let package = record.package();
+    let document_stem = record.governed_document_stem();
+    let document_hash = record.content_hash().as_hex();
+
+    if query_document_hash_indexed(store_dir, package, document_stem, document_hash).await? {
+        result.skipped_count += 1;
+        return Ok(());
+    }
+
+    let stored_embeddings =
+        query_document_chunk_embeddings(store_dir, package, document_stem).await?;
+
+    let source = tokio::fs::read_to_string(record.internal_read_path().as_path()).await.map_err(
+        |error| LanceDbStoreError::InvalidRequest {
+            message: format!("Failed to read '{document_stem}': {error}"),
+        },
+    )?;
+
+    let extraction_outcome = extract_markdown_source(record, &source);
+
+    let batch = build_embedded_batch(
+        &extraction_outcome,
+        &source,
+        document_stem,
+        embedder,
+        &stored_embeddings,
+    )?;
+
+    let root_dir = root_dir_from_store_dir(store_dir);
+    persist_embedded_markdown_chunks(&LanceDbChunkWriteRequest { root_dir, batch }).await?;
+
+    result.reindexed_count += 1;
+    Ok(())
+}
+
+fn build_embedded_batch(
+    extraction_outcome: &MarkdownExtractionOutcome,
+    source: &str,
+    document_stem: &str,
+    embedder: &impl Embedder,
+    stored_embeddings: &StoredChunkEmbeddings,
+) -> Result<EmbeddedMarkdownChunkBatch, LanceDbStoreError> {
+    let extraction = match extraction_outcome {
+        MarkdownExtractionOutcome::Extracted(record) => record,
+        MarkdownExtractionOutcome::Failed(failure) => {
+            return Err(LanceDbStoreError::InvalidRequest {
+                message: format!(
+                    "Extraction failed for '{document_stem}': {}",
+                    failure.error.message
+                ),
+            });
+        }
+        _ => {
+            return Err(LanceDbStoreError::InvalidRequest {
+                message: format!("Unsupported extraction outcome for '{document_stem}'"),
+            });
+        }
+    };
+
+    let config = MarkdownChunkingConfig::phase_four_defaults();
+    let token_counter = WhitespaceMarkdownTokenCounter;
+    let chunk_batch =
+        match chunk_markdown_extraction(extraction_outcome, source, config, &token_counter) {
+            MarkdownChunkingPipelineOutcome::Chunked(batch) => batch,
+            MarkdownChunkingPipelineOutcome::Failed(failure) => {
+                return Err(LanceDbStoreError::InvalidRequest {
+                    message: format!("Chunking failed for '{document_stem}': {}", failure.error),
+                });
+            }
+        };
+
+    let embedded_chunks =
+        embed_chunks_with_reuse(&chunk_batch.chunks, embedder, stored_embeddings)?;
+
+    Ok(EmbeddedMarkdownChunkBatch {
+        package: extraction.package.clone(),
+        document_stem: extraction.document_stem.clone(),
+        document_hash: extraction.document_hash.clone(),
+        extraction: extraction.clone(),
+        chunks: embedded_chunks,
+    })
+}
+
+fn embed_chunks_with_reuse(
+    chunks: &[MarkdownChunkRecord],
+    embedder: &impl Embedder,
+    stored_embeddings: &StoredChunkEmbeddings,
+) -> Result<Vec<EmbeddedMarkdownChunkRecord>, LanceDbStoreError> {
+    let mut new_chunk_indices: Vec<usize> = Vec::new();
+    let mut new_chunk_texts: Vec<&str> = Vec::new();
+
+    for (index, chunk) in chunks.iter().enumerate() {
+        if !stored_embeddings.contains_key(&chunk.chunk_hash) {
+            new_chunk_indices.push(index);
+            new_chunk_texts.push(chunk.text.as_str());
+        }
+    }
+
+    let new_vectors = if new_chunk_texts.is_empty() {
+        Vec::new()
+    } else {
+        embedder.embed_batch(&new_chunk_texts).map_err(|error| {
+            LanceDbStoreError::InvalidRequest { message: format!("Embedding failed: {error}") }
+        })?
+    };
+
+    let mut new_vector_map: std::collections::HashMap<usize, EmbeddingVector> =
+        new_chunk_indices.into_iter().zip(new_vectors).collect();
+
+    chunks
+        .iter()
+        .enumerate()
+        .map(|(index, chunk)| {
+            let embedding = stored_embeddings
+                .get(&chunk.chunk_hash)
+                .cloned()
+                .or_else(|| new_vector_map.remove(&index))
+                .ok_or_else(|| LanceDbStoreError::InvalidRequest {
+                    message: format!(
+                        "No embedding available for chunk '{}' at index {index}",
+                        chunk.chunk_id
+                    ),
+                })?;
+            Ok(EmbeddedMarkdownChunkRecord {
+                chunk: chunk.clone(),
+                embedding_model: embedder.model_id().to_owned(),
+                embedding_dimension: embedder.dimension(),
+                embedding,
+            })
+        })
+        .collect()
+}
+
+fn root_dir_from_store_dir(store_dir: &std::path::Path) -> PathBuf {
+    // store_dir is root/.vector-database/rag/lancedb — go up 3 levels
+    store_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.parent())
+        .map_or_else(|| store_dir.to_path_buf(), PathBuf::from)
 }
 
 declare_plugin_operations! {

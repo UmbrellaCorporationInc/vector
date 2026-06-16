@@ -1,8 +1,8 @@
 //! `LanceDB` Phase 6 lifecycle boundary for the local RAG store.
 
 use crate::{
-    EmbeddedMarkdownChunkBatch, LANCEDB_PRIMARY_CHUNK_TABLE, LanceDbChunkRow, RagDefaults,
-    lancedb_chunk_row,
+    EmbeddedMarkdownChunkBatch, EmbeddingVector, LANCEDB_PRIMARY_CHUNK_TABLE, LanceDbChunkRow,
+    RagDefaults, lancedb_chunk_row,
 };
 use arrow_array::builder::StringBuilder;
 use arrow_array::types::Float32Type;
@@ -11,6 +11,7 @@ use arrow_array::{
     UInt32Array,
 };
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
+use lancedb::query::{ExecutableQuery, QueryBase};
 use lancedb::{
     Connection, Table, connect,
     index::{Index, scalar::FtsIndexBuilder, vector::IvfFlatIndexBuilder},
@@ -21,6 +22,9 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+/// Stored chunk embeddings indexed by `chunk_hash` for selective re-embedding.
+pub type StoredChunkEmbeddings = HashMap<String, EmbeddingVector>;
 
 const STORE_SCHEMA_VERSION: &str = "phase-6-v1";
 const STORE_METADATA_SCHEMA_VERSION_KEY: &str = "vector.rag.store_schema_version";
@@ -809,6 +813,123 @@ fn sql_string_literal(value: &str) -> String {
 fn already_exists_error(message: &str) -> bool {
     let normalized = message.to_ascii_lowercase();
     normalized.contains("already exists") || normalized.contains("existing index")
+}
+
+/// Check whether a document with the given content hash is already indexed in the store.
+///
+/// Returns `true` when at least one row for `(package, document_stem, document_hash)` exists.
+/// Returns `false` when no rows exist or when the store directory has not been created yet.
+///
+/// # Errors
+/// Returns [`LanceDbStoreError`] when the table cannot be opened.
+pub async fn query_document_hash_indexed(
+    store_dir: &Path,
+    package: Option<&str>,
+    document_stem: &str,
+    document_hash: &str,
+) -> Result<bool, LanceDbStoreError> {
+    if !store_dir.exists() {
+        return Ok(false);
+    }
+    let table = match open_primary_table(store_dir).await {
+        Ok(table) => table,
+        Err(LanceDbStoreError::OpenPrimaryTable { .. }) => return Ok(false),
+        Err(error) => return Err(error),
+    };
+    let predicate = format!(
+        "{} AND document_hash = '{}'",
+        document_predicate(package, document_stem, None),
+        sql_string_literal(document_hash)
+    );
+    let count = table.count_rows(Some(predicate)).await.map_err(|error| {
+        LanceDbStoreError::OpenPrimaryTable {
+            table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+            message: error.to_string(),
+        }
+    })?;
+    Ok(count > 0)
+}
+
+/// Query stored chunk hashes and their embedding vectors for a governed document.
+///
+/// Returns a map from `chunk_hash` to its stored embedding vector. The caller uses
+/// this to skip re-embedding chunks whose text and structural metadata are unchanged.
+/// Returns an empty map when the store directory has not been created yet.
+///
+/// # Errors
+/// Returns [`LanceDbStoreError`] when the table cannot be queried.
+pub async fn query_document_chunk_embeddings(
+    store_dir: &Path,
+    package: Option<&str>,
+    document_stem: &str,
+) -> Result<StoredChunkEmbeddings, LanceDbStoreError> {
+    use arrow_array::cast::AsArray;
+    use futures::TryStreamExt;
+
+    if !store_dir.exists() {
+        return Ok(HashMap::new());
+    }
+    let table = match open_primary_table(store_dir).await {
+        Ok(table) => table,
+        Err(LanceDbStoreError::OpenPrimaryTable { .. }) => return Ok(HashMap::new()),
+        Err(error) => return Err(error),
+    };
+    let predicate = document_predicate(package, document_stem, None);
+    let stream = table
+        .query()
+        .only_if(predicate)
+        .select(lancedb::query::Select::columns(&["chunk_hash", "vector"]))
+        .execute()
+        .await
+        .map_err(|error| LanceDbStoreError::OpenPrimaryTable {
+            table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+            message: error.to_string(),
+        })?;
+
+    let batches: Vec<arrow_array::RecordBatch> =
+        stream.try_collect().await.map_err(|error| LanceDbStoreError::OpenPrimaryTable {
+            table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+            message: error.to_string(),
+        })?;
+
+    let mut result = HashMap::new();
+    for batch in &batches {
+        let chunk_hash_col = batch.column_by_name("chunk_hash").ok_or_else(|| {
+            LanceDbStoreError::OpenPrimaryTable {
+                table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+                message: "chunk_hash column missing in query result".to_owned(),
+            }
+        })?;
+        let vector_col =
+            batch.column_by_name("vector").ok_or_else(|| LanceDbStoreError::OpenPrimaryTable {
+                table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+                message: "vector column missing in query result".to_owned(),
+            })?;
+
+        let chunk_hashes = chunk_hash_col.as_string::<i32>();
+        let vectors =
+            vector_col.as_any().downcast_ref::<FixedSizeListArray>().ok_or_else(|| {
+                LanceDbStoreError::OpenPrimaryTable {
+                    table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+                    message: "vector column is not FixedSizeListArray".to_owned(),
+                }
+            })?;
+
+        for row in 0..batch.num_rows() {
+            let chunk_hash = chunk_hashes.value(row).to_owned();
+            let slot = vectors.value(row);
+            let floats =
+                slot.as_any().downcast_ref::<arrow_array::Float32Array>().ok_or_else(|| {
+                    LanceDbStoreError::OpenPrimaryTable {
+                        table: LANCEDB_PRIMARY_CHUNK_TABLE.to_owned(),
+                        message: "vector slot is not Float32Array".to_owned(),
+                    }
+                })?;
+            let embedding: EmbeddingVector = (0..floats.len()).map(|i| floats.value(i)).collect();
+            result.entry(chunk_hash).or_insert(embedding);
+        }
+    }
+    Ok(result)
 }
 
 /// Resolve the governed `LanceDB` store directory for a workspace root.

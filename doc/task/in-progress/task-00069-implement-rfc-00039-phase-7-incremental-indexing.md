@@ -73,10 +73,10 @@ input:
   language: Rust
 ```
 
-- [ ] Reuse the approved `FileContentHash` and `hash_file_content` contracts for document-level change detection instead of reimplementing hashing.
-- [ ] Skip unchanged documents before parsing, chunking, and embedding when the persisted `document_hash` matches the current file hash.
-- [ ] Recompute chunk output only for changed documents and re-embed only chunks whose `chunk_hash` changed.
-- [ ] Preserve deterministic row identity so repeated runs remain idempotent.
+- [x] Reuse the approved `FileContentHash` and `hash_file_content` contracts for document-level change detection instead of reimplementing hashing.
+- [x] Skip unchanged documents before parsing, chunking, and embedding when the persisted `document_hash` matches the current file hash.
+- [x] Recompute chunk output only for changed documents and re-embed only chunks whose `chunk_hash` changed.
+- [x] Preserve deterministic row identity so repeated runs remain idempotent.
 
 ### 3.3. Phase C - Store Reconciliation And Deletion
 
