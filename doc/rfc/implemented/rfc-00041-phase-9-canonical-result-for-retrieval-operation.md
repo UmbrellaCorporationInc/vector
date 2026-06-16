@@ -5,7 +5,7 @@ code: "00041"
 slug: phase-9-canonical-result-for-retrieval-operation
 title: Phase 9 Canonical Result For Retrieval Operation
 description: Proposes the canonical context result contract produced by the retrieval operation for CLI and MCP consumers.
-status: accepted
+status: implemented
 created: 2026-06-16
 updated: 2026-06-16
 authors: []

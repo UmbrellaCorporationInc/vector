@@ -81,10 +81,10 @@ input:
   language: rust
 ```
 
-- [ ] Add or update CLI JSON tests to assert the Phase 9 canonical context shape or approved compatibility wrapper.
-- [ ] Add or update CLI human-output tests for primary chunks, expanded chunks, repeated sources, package-qualified sources, and diagnostics.
-- [ ] Add or update empty-result tests to assert `status: empty`, zero returned chunks, no sources, and successful command completion.
-- [ ] Run the relevant quality gates for the modified Rust crates.
+- [x] Add or update CLI JSON tests to assert the Phase 9 canonical context shape or approved compatibility wrapper.
+- [x] Add or update CLI human-output tests for primary chunks, expanded chunks, repeated sources, package-qualified sources, and diagnostics.
+- [x] Add or update empty-result tests to assert `status: empty`, zero returned chunks, no sources, and successful command completion.
+- [x] Run the relevant quality gates for the modified Rust crates.
 
 ### 3.4. Phase Z — Wrap-up
 
