@@ -128,11 +128,11 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Add tests for semantic-only hits, lexical-only hits, mixed hits fused by RRF, filter application, section-level deduplication, adjacent chunk expansion, and CLI output behavior.
-- [ ] Cover exact identifier and filename retrieval through lexical matching.
-- [ ] Cover conceptual query retrieval through semantic matching.
-- [ ] Lock the chosen RRF constant behind deterministic tests so future tuning cannot silently change ranking behavior.
-- [ ] Document any LanceDB lexical limitations discovered during implementation instead of hiding them behind score tuning.
+- [x] Add tests for semantic-only hits, lexical-only hits, mixed hits fused by RRF, filter application, section-level deduplication, adjacent chunk expansion, and CLI output behavior.
+- [x] Cover exact identifier and document-stem retrieval through lexical matching. Filename hits remain out of scope for Phase E because governed document lookup already resolves them structurally through MCP.
+- [x] Cover conceptual query retrieval through semantic matching.
+- [x] Lock the chosen RRF constant behind deterministic tests so future tuning cannot silently change ranking behavior.
+- [x] Document any LanceDB lexical limitations discovered during implementation instead of hiding them behind score tuning.
 
 ### 3.6. Phase Z - Wrap-up
 

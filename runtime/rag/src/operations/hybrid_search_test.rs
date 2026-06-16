@@ -388,6 +388,69 @@ async fn run_hybrid_search_returns_lexical_only_hit_when_semantic_branch_limit_e
 }
 
 #[tokio::test]
+async fn run_hybrid_search_retrieves_exact_document_stem_through_lexical_search() {
+    let root = unique_fixture_root("lexical-document-stem");
+    let mut embedder = MappingEmbedder::default()
+        .with_query_vector("spec-00011-rag-plan-implementation", padded_vector(0.0, 0.0, 0.0));
+
+    for index in 0..20 {
+        let stem = format!("task-{:05}-semantic-{index}", index + 1);
+        let marker = format!("SEM{index}");
+        let rank_distance = u16::try_from(index).unwrap();
+        embedder =
+            embedder.with_chunk_vector(&marker, padded_vector(f32::from(rank_distance), 0.0, 0.0));
+        insert_fixture_document(
+            &root,
+            None,
+            &stem,
+            &doc_source("Semantic", &format!("{marker} vector-only content.")),
+            &embedder,
+        )
+        .await;
+    }
+
+    insert_fixture_document(
+        &root,
+        None,
+        "task-00001-noisy-distractor",
+        &doc_source("Distractor", "DISTRACTOR generic text without the governed document stem."),
+        &embedder,
+    )
+    .await;
+    insert_fixture_document(
+        &root,
+        None,
+        "spec-00011-rag-plan-implementation",
+        &doc_source("Target", "Chunk body without the governed stem repeated in prose."),
+        &embedder,
+    )
+    .await;
+
+    let output = run_hybrid_search(
+        &HybridSearchInput::new(
+            root,
+            RagDefaults::phase_one(),
+            "spec-00011-rag-plan-implementation".to_owned(),
+            None,
+            None,
+            Some(8),
+        ),
+        &embedder,
+    )
+    .await
+    .unwrap();
+
+    let lexical_only = output
+        .results
+        .iter()
+        .find(|result| result.document_stem == "spec-00011-rag-plan-implementation")
+        .expect("document_stem match must appear in fused results");
+    assert_eq!(lexical_only.semantic_rank, None);
+    assert_eq!(lexical_only.lexical_rank, Some(1));
+    assert_f32_eq(lexical_only.rrf_score, 1.0 / 61.0);
+}
+
+#[tokio::test]
 async fn run_hybrid_search_fuses_semantic_and_lexical_ranks_with_fixed_rrf_constant() {
     let root = unique_fixture_root("rrf-fusion");
     let embedder = MappingEmbedder::default()

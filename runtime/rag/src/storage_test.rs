@@ -69,6 +69,11 @@ async fn test_lancedb_chunk_row_preserves_required_phase_six_fields() {
         ])))
     );
     assert_eq!(row.text, "## Phase 6\n\nPersist raw chunk text.");
+    assert!(row.search_text.contains("spec-00011-rag-plan-implementation\n"));
+    assert!(row.search_text.contains("spec-00011-rag-plan-implementation.md\n"));
+    assert!(row.search_text.contains("spec 00011 rag plan implementation\n"));
+    assert!(row.search_text.contains("spec 00011 rag plan implementation md\n"));
+    assert!(row.search_text.contains("Title / Phase 6\n## Phase 6\n\nPersist raw chunk text."));
     assert_eq!(row.token_count, 7);
     assert_eq!(row.embedding_model, "BGESmallENV15");
     assert_eq!(row.embedding_dimension, 3);

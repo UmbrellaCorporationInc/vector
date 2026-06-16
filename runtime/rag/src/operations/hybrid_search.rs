@@ -321,18 +321,92 @@ async fn execute_lexical_branch(
     if limit == 0 {
         return Ok(Vec::new());
     }
-    let mut query = table
-        .query()
-        .full_text_search(FullTextSearchQuery::new(query_text.to_owned()))
-        .select(candidate_projection())
-        .limit(limit);
+    let exact_candidates = execute_exact_document_stem_branch(table, query_text, filter).await?;
+    let fts_query = FullTextSearchQuery::new(query_text.to_owned())
+        .with_column("search_text".to_owned())
+        .map_err(|error| RuntimeError::operation(error.to_string()))?;
+    let mut query =
+        table.query().full_text_search(fts_query).select(candidate_projection()).limit(limit);
     if let Some(filter) = filter {
         query = query.only_if(filter);
     }
 
     let stream =
         query.execute().await.map_err(|error| RuntimeError::operation(error.to_string()))?;
-    collect_candidates(stream).await
+    let fts_candidates = collect_candidates(stream).await?;
+    Ok(merge_ranked_candidates(exact_candidates, fts_candidates, limit))
+}
+
+async fn execute_exact_document_stem_branch(
+    table: &lancedb::Table,
+    query_text: &str,
+    filter: Option<&str>,
+) -> RuntimeResult<Vec<RankedCandidate>> {
+    let mut exact_matches = Vec::new();
+    let mut seen_chunk_ids = HashSet::new();
+
+    for document_stem in exact_document_stem_queries(query_text) {
+        let predicate = exact_document_stem_predicate(filter, &document_stem);
+        let stream = table
+            .query()
+            .only_if(predicate)
+            .select(candidate_projection())
+            .execute()
+            .await
+            .map_err(|error| RuntimeError::operation(error.to_string()))?;
+        let mut candidates = collect_candidates(stream).await?;
+        candidates.sort_by(|left, right| {
+            left.chunk_ordinal
+                .cmp(&right.chunk_ordinal)
+                .then_with(|| left.chunk_id.cmp(&right.chunk_id))
+        });
+        if let Some(candidate) = candidates.into_iter().next()
+            && seen_chunk_ids.insert(candidate.chunk_id.clone())
+        {
+            exact_matches.push(candidate);
+        }
+    }
+
+    Ok(exact_matches)
+}
+
+fn exact_document_stem_predicate(filter: Option<&str>, query_text: &str) -> String {
+    let stem_predicate = format!("document_stem = '{}'", sql_string_literal(query_text));
+    filter.map_or_else(|| stem_predicate.clone(), |filter| format!("{filter} AND {stem_predicate}"))
+}
+
+fn exact_document_stem_queries(query_text: &str) -> Vec<String> {
+    let mut queries = vec![query_text.to_owned()];
+    for suffix in [".md", ".markdown"] {
+        if let Some(stripped) = query_text.strip_suffix(suffix)
+            && !stripped.is_empty()
+        {
+            queries.push(stripped.to_owned());
+        }
+    }
+    queries.sort();
+    queries.dedup();
+    queries
+}
+
+fn merge_ranked_candidates(
+    exact_candidates: Vec<RankedCandidate>,
+    fts_candidates: Vec<RankedCandidate>,
+    limit: usize,
+) -> Vec<RankedCandidate> {
+    let mut merged = Vec::new();
+    let mut seen_chunk_ids = HashSet::new();
+
+    for candidate in exact_candidates.into_iter().chain(fts_candidates) {
+        if seen_chunk_ids.insert(candidate.chunk_id.clone()) {
+            merged.push(candidate);
+        }
+        if merged.len() >= limit {
+            break;
+        }
+    }
+
+    merged
 }
 
 async fn collect_candidates(

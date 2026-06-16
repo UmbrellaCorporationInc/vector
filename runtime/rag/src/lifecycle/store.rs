@@ -25,7 +25,7 @@ use std::{
 /// Stored chunk embeddings indexed by `chunk_hash` for selective re-embedding.
 pub type StoredChunkEmbeddings = HashMap<String, EmbeddingVector>;
 
-const STORE_SCHEMA_VERSION: &str = "phase-6-v1";
+const STORE_SCHEMA_VERSION: &str = "phase-6-v2";
 const STORE_METADATA_SCHEMA_VERSION_KEY: &str = "vector.rag.store_schema_version";
 const STORE_METADATA_EMBEDDING_MODEL_KEY: &str = "vector.rag.embedding_model";
 const STORE_METADATA_EMBEDDING_DIMENSION_KEY: &str = "vector.rag.embedding_dimension";
@@ -454,6 +454,7 @@ fn primary_table_schema(request: &LanceDbStoreRequest) -> Result<SchemaRef, Lanc
             Field::new("heading_path", DataType::List(list_item_field), false),
             Field::new("frontmatter", DataType::Utf8, true),
             Field::new("text", DataType::Utf8, false),
+            Field::new("search_text", DataType::Utf8, false),
             Field::new("token_count", DataType::UInt32, false),
             Field::new("embedding_model", DataType::Utf8, false),
             Field::new("embedding_dimension", DataType::UInt32, false),
@@ -541,7 +542,11 @@ fn validate_vector_field(
 }
 
 async fn ensure_text_index(table: &lancedb::Table) -> Result<bool, LanceDbStoreError> {
-    match table.create_index(&["text"], Index::FTS(FtsIndexBuilder::default())).execute().await {
+    match table
+        .create_index(&["search_text"], Index::FTS(FtsIndexBuilder::default()))
+        .execute()
+        .await
+    {
         Ok(()) => Ok(true),
         Err(error) if already_exists_error(&error.to_string()) => Ok(false),
         Err(error) => Err(LanceDbStoreError::CreateTextIndex {
@@ -735,6 +740,8 @@ fn chunk_rows_reader(
             )) as ArrayRef,
             Arc::new(StringArray::from_iter_values(rows.iter().map(|row| row.text.as_str())))
                 as ArrayRef,
+            Arc::new(StringArray::from_iter_values(rows.iter().map(|row| row.search_text.as_str())))
+                as ArrayRef,
             Arc::new(UInt32Array::from(
                 rows.iter().map(|row| u32::try_from(row.token_count).ok()).collect::<Vec<_>>(),
             )) as ArrayRef,
@@ -790,6 +797,7 @@ fn primary_row_batch_schema(rows: &[LanceDbChunkRow]) -> Result<SchemaRef, Lance
         Field::new("heading_path", DataType::List(list_item_field), false),
         Field::new("frontmatter", DataType::Utf8, true),
         Field::new("text", DataType::Utf8, false),
+        Field::new("search_text", DataType::Utf8, false),
         Field::new("token_count", DataType::UInt32, false),
         Field::new("embedding_model", DataType::Utf8, false),
         Field::new("embedding_dimension", DataType::UInt32, false),

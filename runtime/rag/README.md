@@ -114,6 +114,20 @@ The Phase 6 store keeps raw chunk text in `text` for inspection and full-text
 retrieval, and it keeps package, document stem, heading path, tags, and
 selected frontmatter data filterable through persisted metadata columns.
 
+Phase 8 also persists a synthetic `search_text` surface for lexical retrieval.
+That field prepends the governed `document_stem`, a synthetic `.md` filename,
+and the flattened heading path ahead of the raw chunk text so exact identifier
+and filename queries can match even when those strings do not appear verbatim in
+the prose body.
+
+### Known Lexical Limitations
+
+The LanceDB lexical branch remains a baseline, not a tuned search engine.
+`search_text` closes the exact stem and filename gap, but it does not prove that
+LanceDB ranking quality is good enough for identifier-heavy corpora, long error
+messages, or code-shaped queries. Phase 8 intentionally keeps deterministic RRF
+fusion instead of adding score tuning that could hide those shortcomings.
+
 ## Phase 1 Defaults
 
 The first local RAG implementation uses:
