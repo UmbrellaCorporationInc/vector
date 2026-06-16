@@ -16,6 +16,7 @@ tags:
 related:
   - rfc-00038-phase-6-lancedb-integration
   - rfc-00039-phase-7-incremental-indexing
+  - rfc-00040-phase-8-hybrid-search
 supersedes: []
 superseded_by: null
 aliases:
