@@ -223,7 +223,7 @@ input:
 - [ ] Confirm that `vector-database rag update-database` forwards `vector-rag` progress incrementally through the existing passthrough streaming path.
 - [ ] Do not make CLI progress output part of the `RetrievalContext` search contract.
 
-### 3.10. Phase J: Define MCP Index Progress Behavior
+### 3.10. Phase J: Decide the Agent-Facing Index Output Contract
 
 ```vector-agent-action
 label: Execute Phase in Agent
@@ -235,13 +235,15 @@ input:
   language: rust
 ```
 
-- [ ] Verify whether the current `rmcp` server and supported MCP clients can surface tool progress or logging notifications during a long-running tool call.
-- [ ] If MCP progress notifications are supported, emit index lifecycle progress from the `index` tool while `vector-database rag init` and `vector-database rag update-database` run.
-- [ ] If MCP progress notifications are not supported by the current stack, return a structured final response that includes captured command output and document the limitation in the task notes or implementation comments.
-- [ ] Keep the final `index` tool result deterministic even when progress streaming is enabled.
-- [ ] Do not fake streaming by delaying the final MCP response with accumulated logs only.
+- [ ] Evaluate whether agent-facing index output should remain final-response `--json` or introduce a streaming NDJSON event contract.
+- [ ] Compare final-response `--json` against NDJSON streaming for MCP consumption, CLI automation, partial progress visibility, parser stability, and backwards compatibility.
+- [ ] If NDJSON is selected, define stable event names and fields for `started`, `indexed`, `unchanged`, `failed`, `deleted`, and `summary` events.
+- [ ] If final-response `--json` is retained, document how MCP `index` exposes progress without requiring agents to parse human CLI text.
+- [ ] Keep human-oriented CLI output separate from the machine-readable agent contract.
+- [ ] Preserve compatibility for existing JSON consumers or document the migration path explicitly.
+- [ ] Record the chosen contract in the task notes, README, or a follow-up RFC if the decision changes a public CLI/MCP contract.
 
-### 3.11. Phase K: Map Index Operational Failures and Tests
+### 3.11. Phase K: Define MCP Index Progress Behavior
 
 ```vector-agent-action
 label: Execute Phase in Agent
@@ -250,6 +252,24 @@ prompt: prompts-00004-execute-task-phase
 input:
   task: task 00074
   phase: Phase K
+  language: rust
+```
+
+- [ ] Verify whether the current `rmcp` server and supported MCP clients can surface tool progress or logging notifications during a long-running tool call.
+- [ ] If MCP progress notifications are supported, emit index lifecycle progress from the `index` tool while `vector-database rag init` and `vector-database rag update-database` run.
+- [ ] If MCP progress notifications are not supported by the current stack, return a structured final response that includes captured command output and document the limitation in the task notes or implementation comments.
+- [ ] Keep the final `index` tool result deterministic even when progress streaming is enabled.
+- [ ] Do not fake streaming by delaying the final MCP response with accumulated logs only.
+
+### 3.12. Phase L: Map Index Operational Failures and Tests
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00074
+  phase: Phase L
   language: rust
 ```
 
@@ -264,9 +284,10 @@ input:
 - [ ] Add or update tests that prove CLI progress is emitted before indexing completes.
 - [ ] Add or update tests that prove CLI progress reports indexed documents, unchanged skipped documents, and document-level failures separately.
 - [ ] Add or update tests that prove `vector-database rag update-database` forwards `vector-rag` output incrementally.
+- [ ] Add or update tests for the chosen agent-facing output contract, including final-response `--json` or streaming NDJSON behavior.
 - [ ] Add or update MCP progress tests when progress notifications are supported, or a test that proves the final MCP response includes captured command output when they are not supported.
 
-### 3.12. Phase Z: Wrap-Up
+### 3.13. Phase Z: Wrap-Up
 
 ```vector-agent-action
 label: Execute Phase in Agent
