@@ -5,7 +5,7 @@ code: "00073"
 slug: split-rag-cli-installation
 title: Split RAG CLI Installation from Base Vector Tools
 description: Separate the heavy RAG runtime into a dedicated CLI so base Vector installation and MCP updates do not always compile LanceDB, DataFusion, and embedding dependencies.
-status: in-progress
+status: done
 created: 2026-06-17
 updated: 2026-06-17
 tags:
@@ -104,8 +104,8 @@ input:
   language: rust, toml
 ```
 
-- [ ] Run formatting checks.
-- [ ] Run lint checks.
-- [ ] Run targeted CLI tests for `get-vector`, `vector-database`, and `vector-rag`.
-- [ ] Compare install dependency trees before and after the split.
-- [ ] Document the RAG install command in any README or help output touched by the change.
+- [x] Run formatting checks.
+- [x] Run lint checks.
+- [x] Run targeted CLI tests for `get-vector`, `vector-database`, and `vector-rag`.
+- [x] Compare install dependency trees before and after the split.
+- [x] Document the RAG install command in any README or help output touched by the change.

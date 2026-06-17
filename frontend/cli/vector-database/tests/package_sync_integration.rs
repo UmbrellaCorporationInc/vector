@@ -57,6 +57,7 @@ async fn test_package_sync_cli_integration_with_pre_messages() {
     run_cmd("git", &["checkout", "-b", "main"], &git_source_dir).await;
     run_cmd("git", &["config", "user.name", "test"], &git_source_dir).await;
     run_cmd("git", &["config", "user.email", "test@example.com"], &git_source_dir).await;
+    run_cmd("git", &["config", "commit.gpgsign", "false"], &git_source_dir).await;
     run_cmd("git", &["add", "."], &git_source_dir).await;
     run_cmd("git", &["commit", "-m", "initial commit"], &git_source_dir).await;
 
