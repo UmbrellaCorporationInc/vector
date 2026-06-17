@@ -13,6 +13,7 @@ runtime-io = { workspace = true }
 runtime-doc = { workspace = true }
 runtime-language = { workspace = true }
 runtime-project = { workspace = true }
+runtime-rag = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

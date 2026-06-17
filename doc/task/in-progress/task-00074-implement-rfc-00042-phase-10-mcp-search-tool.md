@@ -73,12 +73,12 @@ input:
   language: rust
 ```
 
-- [ ] Add an input shape with required non-empty `query` plus optional `limit`, `package`, and `document` fields.
-- [ ] Reject blank queries before invoking retrieval.
-- [ ] Apply `limit` as an override of the configured final retrieval limit when present.
-- [ ] Apply `package` and `document` filters through the shared retrieval path or bridge command.
-- [ ] Delegate to the shared RAG runtime search operation when available.
-- [ ] If a direct runtime call is not available for this phase, delegate to `vector-database rag search --json` as the bridge command.
+- [x] Add an input shape with required non-empty `query` plus optional `limit`, `package`, and `document` fields.
+- [x] Reject blank queries before invoking retrieval.
+- [x] Apply `limit` as an override of the configured final retrieval limit when present.
+- [x] Apply `package` and `document` filters through the shared retrieval path or bridge command.
+- [x] Delegate to the shared RAG runtime search operation when available.
+- [x] If a direct runtime call is not available for this phase, delegate to `vector-database rag search --json` as the bridge command.
 
 ### 3.3. Phase C: Reuse the Canonical Retrieval Context
 
