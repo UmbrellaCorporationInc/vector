@@ -10,7 +10,7 @@ use runtime_io::{
     CommandExecutor, CommandExit, CommandHandle, CommandSpec, IoError, MockCommandHandleBuilder,
 };
 
-use super::{UpdateError, UpdateOutcome, run};
+use super::{UpdateError, UpdateOutcome, run, run_rag};
 
 // ---------------------------------------------------------------------------
 // Mock executor
@@ -107,6 +107,39 @@ async fn install_command_uses_force_flag_and_correct_package() {
     assert!(args2.contains(&"--force".to_owned()));
     assert!(args2.contains(&"vector-database".to_owned()));
     assert!(args2.contains(&"--git".to_owned()));
+}
+
+#[tokio::test]
+async fn base_install_does_not_install_vector_rag() {
+    let executor = MockExecutor::new(vec![Ok(success_handle()), Ok(success_handle())]);
+
+    run(&executor, |_| {}, |_| {}).await.expect("should succeed");
+
+    let commands = executor.recorded_commands();
+    assert_eq!(commands.len(), 2);
+    assert!(
+        commands.iter().all(|(_, args)| !args.contains(&"vector-rag".to_owned())),
+        "update-mcp-vector should leave RAG support to get-vector install rag"
+    );
+}
+
+#[tokio::test]
+async fn rag_install_command_installs_only_vector_rag() {
+    let executor = MockExecutor::new(vec![Ok(success_handle())]);
+
+    run_rag(&executor, |_| {}, |_| {}).await.expect("should succeed");
+
+    let commands = executor.recorded_commands();
+    assert_eq!(commands.len(), 1);
+
+    let (cmd, args) = &commands[0];
+    assert_eq!(cmd, "cargo");
+    assert!(args.contains(&"install".to_owned()));
+    assert!(args.contains(&"--force".to_owned()));
+    assert!(args.contains(&"vector-rag".to_owned()));
+    assert!(args.contains(&"--git".to_owned()));
+    assert!(!args.contains(&"mcp-vector".to_owned()));
+    assert!(!args.contains(&"vector-database".to_owned()));
 }
 
 #[tokio::test]

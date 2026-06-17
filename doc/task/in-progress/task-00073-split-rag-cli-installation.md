@@ -87,10 +87,10 @@ input:
   language: rust
 ```
 
-- [ ] Update `get-vector update-mcp-vector` so it installs or updates only `mcp-vector` and `vector-database`.
-- [ ] Add `get-vector install rag` to install `vector-rag`.
-- [ ] Ensure installer output explains when RAG is not installed and how to add it.
-- [ ] Add tests for the new installer command routing.
+- [x] Update `get-vector update-mcp-vector` so it installs or updates only `mcp-vector` and `vector-database`.
+- [x] Add `get-vector install rag` to install `vector-rag`.
+- [x] Ensure installer output explains when RAG is not installed and how to add it.
+- [x] Add tests for the new installer command routing.
 
 ### 3.4. Phase D — Quality Gates
 
