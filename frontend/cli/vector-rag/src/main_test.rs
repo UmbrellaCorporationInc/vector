@@ -48,7 +48,15 @@ fn parse_args_routes_rag_search_with_passthrough_args() {
 fn parse_args_routes_rag_update_database() {
     assert_eq!(
         parse_args(&args(&["vector-rag", "rag", "update-database"])),
-        CliAction::RagUpdateDatabase
+        CliAction::RagUpdateDatabase(Vec::new())
+    );
+}
+
+#[test]
+fn parse_args_routes_rag_update_database_with_json_flag() {
+    assert_eq!(
+        parse_args(&args(&["vector-rag", "rag", "update-database", "--json"])),
+        CliAction::RagUpdateDatabase(args(&["--json"]))
     );
 }
 
@@ -110,4 +118,20 @@ async fn rag_dispatch_rejects_search_without_query_before_runtime_execution() {
         .expect_err("missing search query should fail before runtime dispatch");
 
     assert_eq!(error, "missing search query");
+}
+
+#[test]
+fn parse_update_database_args_accepts_json_only() {
+    let parsed =
+        parse_update_database_args(&args(&["--json"])).expect("update-database args should parse");
+
+    assert!(parsed.json_output());
+}
+
+#[test]
+fn parse_update_database_args_rejects_unknown_option() {
+    let error = parse_update_database_args(&args(&["--stream"]))
+        .expect_err("unknown update-database option must fail");
+
+    assert_eq!(error, "unknown rag update-database option '--stream'; only --json is supported");
 }

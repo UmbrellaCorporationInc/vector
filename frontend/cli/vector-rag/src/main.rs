@@ -11,7 +11,7 @@ vector-rag: Companion CLI for local RAG runtime execution.
 Usage:
   vector-rag rag init
   vector-rag rag search <query> [--package <name>] [--document <stem>] [--limit <n>] [--json]
-  vector-rag rag update-database
+  vector-rag rag update-database [--json]
 
 Commands:
   rag init             Create or validate the local RAG LanceDB store
@@ -25,7 +25,7 @@ enum CliAction {
     Version,
     RagInit,
     RagSearch(Vec<String>),
-    RagUpdateDatabase,
+    RagUpdateDatabase(Vec<String>),
     Unknown(String),
     Missing,
 }
@@ -49,7 +49,7 @@ fn parse_rag_args(args: &[String]) -> CliAction {
     match command.as_str() {
         "init" => CliAction::RagInit,
         "search" => CliAction::RagSearch(args[1..].to_vec()),
-        "update-database" => CliAction::RagUpdateDatabase,
+        "update-database" => CliAction::RagUpdateDatabase(args[1..].to_vec()),
         unknown => CliAction::Unknown(format!("rag {unknown}")),
     }
 }
@@ -86,9 +86,9 @@ async fn run_cli(args: &[String]) -> Result<(), String> {
             let root_dir = find_root_dir()?;
             handle_rag_command(&root_dir, CliAction::RagSearch(search_args)).await
         }
-        CliAction::RagUpdateDatabase => {
+        CliAction::RagUpdateDatabase(update_args) => {
             let root_dir = find_root_dir()?;
-            handle_rag_command(&root_dir, CliAction::RagUpdateDatabase).await
+            handle_rag_command(&root_dir, CliAction::RagUpdateDatabase(update_args)).await
         }
         CliAction::Missing => Err("missing command".to_owned()),
         CliAction::Unknown(unknown) => Err(format!("unknown command or option '{unknown}'")),
@@ -102,9 +102,30 @@ async fn handle_rag_command(root_dir: &Path, action: CliAction) -> Result<(), St
             let parsed = rag_search::parse_args(&args)?;
             rag_search::run(root_dir, parsed).await
         }
-        CliAction::RagUpdateDatabase => rag_update_database::run(root_dir).await,
+        CliAction::RagUpdateDatabase(args) => {
+            let parsed = parse_update_database_args(&args)?;
+            rag_update_database::run_with_args(root_dir, parsed).await
+        }
         _ => Err("internal error: non-RAG action routed to RAG handler".to_owned()),
     }
+}
+
+fn parse_update_database_args(
+    args: &[String],
+) -> Result<rag_update_database::RagUpdateDatabaseArgs, String> {
+    let mut json_output = false;
+    for arg in args {
+        match arg.as_str() {
+            "--json" => json_output = true,
+            unknown => {
+                return Err(format!(
+                    "unknown rag update-database option '{unknown}'; only --json is supported"
+                ));
+            }
+        }
+    }
+
+    Ok(rag_update_database::RagUpdateDatabaseArgs::new(json_output))
 }
 
 fn find_root_dir() -> Result<PathBuf, String> {

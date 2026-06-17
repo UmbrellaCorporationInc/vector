@@ -37,6 +37,21 @@ orchestration boundaries for Vector.
   embedding reuse, stale row deletion, and per-document failure isolation.
   `IndexResult` summarizes skipped, re-indexed, deleted, and failed document
   counts so callers can render a run summary without inspecting internal storage.
+- **Phase H Package-Aware Indexing**: `IndexWorkspaceOp` discovers and indexes
+  all synchronized package corpora under `.vector-database/packages/{package}/doc/`
+  in addition to the workspace `doc/` corpus. Package identity is preserved on
+  every indexed chunk. Missing package `doc/` folders are treated as package
+  structure issues rather than workspace discovery failures. Stale chunk deletion
+  is scoped separately for workspace and package document identities so documents
+  with the same governed stem in different packages do not overwrite each other.
+- **Phase I Incremental Progress**: `IndexWorkspaceOutput` is now a streaming
+  enum that emits `Progress(IndexWorkspaceProgress)` events while the operation
+  runs, followed by a `Summary(IndexResult)` terminal event. Each
+  `IndexWorkspaceProgress` carries a stable `label` (`initializing-store`,
+  `indexed`, `unchanged`, `failed`, etc.), optional `package` identity, optional
+  `document_stem`, and an optional human-readable `message`. CLI and MCP adapters
+  consume this stream so users and agents observe progress before the final
+  summary arrives.
 - **Phase 8 Hybrid Retrieval**: `HybridSearchOp` owns query normalization,
   query embedding, semantic and lexical branch execution, deterministic
   Reciprocal Rank Fusion (RRF), section-level deduplication, same-section
@@ -53,7 +68,10 @@ orchestration boundaries for Vector.
 
 `IndexWorkspaceOp` is the orchestrating operation that callers invoke for a full
 incremental indexing run. It composes `InitRagStoreOp` (Phase 6) and
-`RagIndexerOp` (Phase 7) by calling each in sequence using a `CapturingSender`.
+`RagIndexerOp` (Phase 7) by calling each in sequence, emitting
+`IndexWorkspaceProgress` events as it runs and a final `IndexResult` summary
+when complete. Callers receive a stream of `IndexWorkspaceOutput` values — each
+is either a `Progress` variant or the terminal `Summary` variant.
 
 `RagIndexerOp` owns the incremental indexing pass:
 
@@ -202,8 +220,10 @@ chunks. This is distinct from operational failures such as missing stores,
 incompatible embedding metadata, malformed filters, or query execution errors.
 
 The `vector-database rag search <query>` adapter consumes this contract for both
-human-readable output and `--json` serialization. Future MCP retrieval output
-should consume the same shape instead of formatting Phase 8 hits independently.
+human-readable output and `--json` serialization. The `mcp-vector` `rag.search`
+tool (Phase 10) also consumes this shape via the `vector-database rag search
+--json` bridge, keeping CLI JSON and MCP output contract-compatible for the same
+query.
 
 ## Phase 1 Defaults
 

@@ -14,17 +14,19 @@ use crate::{
 };
 use runtime_core::{RuntimeResult, declare_plugin_operations, plugin::PluginSender};
 use runtime_markdown::{
-    MarkdownDiscoveryFailure, MarkdownDiscoveryRecord, MarkdownDiscoveryRequest,
-    MarkdownExtractionOutcome, PackageMarkdownRoot, discover_markdown_files,
-    extract_markdown_source,
+    MarkdownDiscoveryFailure, MarkdownDiscoveryIssue, MarkdownDiscoveryRecord,
+    MarkdownDiscoveryRequest, MarkdownExtractionOutcome, PackageMarkdownRoot,
+    discover_markdown_files, extract_markdown_source,
 };
+use serde::{Deserialize, Serialize};
+use std::future::{Future, ready};
 use std::path::PathBuf;
 
 /// Per-document indexing failure record.
 ///
 /// # DTO(indexing failure boundary consumed by `IndexResult` callers)
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexFailureRecord {
     /// Package identity, or `None` for workspace-local documents.
     pub package: Option<String>,
@@ -38,7 +40,7 @@ pub struct IndexFailureRecord {
 ///
 /// # DTO(indexing result boundary consumed by CLI and other operation callers)
 #[non_exhaustive]
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexResult {
     /// Number of documents skipped because their content hash was unchanged.
     pub skipped_count: usize,
@@ -69,7 +71,8 @@ async fn rag_indexer(
     use runtime_core::RuntimeError;
 
     let embedder = LazyFastembedEmbedder::new();
-    let result = run_incremental_indexing_pass(&input, &embedder)
+    let mut ignore_progress = NoopIndexingProgressSink;
+    let result = run_incremental_indexing_pass(&input, &embedder, &mut ignore_progress)
         .await
         .map_err(|error| RuntimeError::operation(error.to_string()))?;
 
@@ -80,14 +83,70 @@ async fn rag_indexer(
 ///
 /// Skipping initialization on runs with no documents to embed avoids a model
 /// download when the corpus is empty or all documents are unchanged.
-struct LazyFastembedEmbedder {
+pub(crate) struct LazyFastembedEmbedder {
     inner:
         std::sync::Mutex<Option<std::sync::Arc<crate::embedding::FastembedBgeSmallEnV15Embedder>>>,
 }
 
 impl LazyFastembedEmbedder {
-    const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self { inner: std::sync::Mutex::new(None) }
+    }
+}
+
+/// Incremental indexing progress update emitted while a workspace run is active.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndexingProgressUpdate {
+    /// Discovery of governed Markdown files has started.
+    DiscoveringDocuments,
+    /// Discovery completed and document indexing is about to begin.
+    IndexingDocuments {
+        /// Number of governed Markdown documents discovered in this run.
+        discovered_documents: usize,
+    },
+    /// One document was indexed or re-indexed.
+    Indexed {
+        /// Package identity, or `None` for a workspace-local document.
+        package: Option<String>,
+        /// Governed document stem in `<doc-type>-<code>-<slug>` form.
+        document_stem: String,
+    },
+    /// One unchanged document was skipped.
+    Unchanged {
+        /// Package identity, or `None` for a workspace-local document.
+        package: Option<String>,
+        /// Governed document stem in `<doc-type>-<code>-<slug>` form.
+        document_stem: String,
+    },
+    /// One stale indexed document was deleted from the local store.
+    Deleted {
+        /// Package identity, or `None` for a workspace-local document.
+        package: Option<String>,
+        /// Governed document stem in `<doc-type>-<code>-<slug>` form.
+        document_stem: String,
+    },
+    /// One document-level failure was recorded.
+    Failed {
+        /// Package identity, or `None` for a workspace-local document.
+        package: Option<String>,
+        /// Governed document stem in `<doc-type>-<code>-<slug>` form.
+        document_stem: String,
+        /// Actionable document-level failure message.
+        error: String,
+    },
+}
+
+/// Async sink for incremental indexing progress events.
+pub(crate) trait IndexingProgressSink {
+    fn emit(&mut self, progress: IndexingProgressUpdate) -> impl Future<Output = ()> + Send;
+}
+
+pub(crate) struct NoopIndexingProgressSink;
+
+impl IndexingProgressSink for NoopIndexingProgressSink {
+    fn emit(&mut self, _progress: IndexingProgressUpdate) -> impl Future<Output = ()> + Send {
+        ready(())
     }
 }
 
@@ -132,10 +191,14 @@ impl crate::Embedder for LazyFastembedEmbedder {
 pub(crate) async fn run_incremental_indexing_pass(
     input: &RagIndexerInput,
     embedder: &(impl Embedder + Sync),
+    progress: &mut impl IndexingProgressSink,
 ) -> Result<IndexResult, LanceDbStoreError> {
     let workspace_doc_root = input.root_dir.join(input.config.workspace_corpus_root());
-    let package_roots: Vec<PackageMarkdownRoot> = Vec::new();
-    let discovery_request = MarkdownDiscoveryRequest::new([workspace_doc_root], package_roots);
+    let workspace_doc_roots =
+        if workspace_doc_root.exists() { vec![workspace_doc_root] } else { Vec::new() };
+    let package_roots = discover_synchronized_package_roots(&input.root_dir, input.config).await?;
+    let discovery_request = MarkdownDiscoveryRequest::new(workspace_doc_roots, package_roots);
+    progress.emit(IndexingProgressUpdate::DiscoveringDocuments).await;
     let report = match discover_markdown_files(&discovery_request).await {
         Ok(report) => report,
         Err(MarkdownDiscoveryFailure::WorkspaceDiscovery { .. }) => {
@@ -148,6 +211,12 @@ pub(crate) async fn run_incremental_indexing_pass(
 
     let store_dir = lancedb_store_dir(&input.root_dir);
     let mut result = IndexResult::default();
+    progress
+        .emit(IndexingProgressUpdate::IndexingDocuments {
+            discovered_documents: report.records().len(),
+        })
+        .await;
+    append_discovery_issues(report.issues(), &mut result, progress).await;
 
     // Phase C: delete rows for source documents removed from the corpus.
     let discovered: std::collections::HashSet<(Option<String>, String)> = report
@@ -163,16 +232,132 @@ pub(crate) async fn run_incremental_indexing_pass(
             delete_indexed_document(&store_dir, stem.package.as_deref(), &stem.document_stem)
                 .await?;
             result.deleted_count += 1;
+            progress
+                .emit(IndexingProgressUpdate::Deleted {
+                    package: stem.package,
+                    document_stem: stem.document_stem,
+                })
+                .await;
         }
     }
 
     for record in report.records() {
-        if let Err(failure) = index_document(record, &store_dir, embedder, &mut result).await {
+        if let Err(failure) =
+            index_document(record, &store_dir, embedder, &mut result, progress).await
+        {
+            progress
+                .emit(IndexingProgressUpdate::Failed {
+                    package: failure.package.clone(),
+                    document_stem: failure.document_stem.clone(),
+                    error: failure.error.clone(),
+                })
+                .await;
             result.failures.push(failure);
         }
     }
 
     Ok(result)
+}
+
+async fn discover_synchronized_package_roots(
+    root_dir: &std::path::Path,
+    config: RagDefaults,
+) -> Result<Vec<PackageMarkdownRoot>, LanceDbStoreError> {
+    let package_storage_root = root_dir.join(config.package_storage_root());
+    if !package_storage_root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut entries = tokio::fs::read_dir(&package_storage_root).await.map_err(|error| {
+        LanceDbStoreError::InvalidRequest {
+            message: format!(
+                "failed to read synchronized package directory '{}': {error}",
+                package_storage_root.display()
+            ),
+        }
+    })?;
+
+    let mut package_roots = Vec::new();
+    while let Some(entry) =
+        entries.next_entry().await.map_err(|error| LanceDbStoreError::InvalidRequest {
+            message: format!(
+                "failed to enumerate synchronized package directory '{}': {error}",
+                package_storage_root.display()
+            ),
+        })?
+    {
+        let file_type =
+            entry.file_type().await.map_err(|error| LanceDbStoreError::InvalidRequest {
+                message: format!(
+                    "failed to inspect synchronized package entry '{}': {error}",
+                    entry.path().display()
+                ),
+            })?;
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let package_name = entry.file_name().to_string_lossy().into_owned();
+        let doc_root = entry.path().join(config.package_document_dir());
+        package_roots.push(PackageMarkdownRoot::new(package_name, doc_root));
+    }
+
+    package_roots.sort_by(|left, right| left.package().cmp(right.package()));
+    Ok(package_roots)
+}
+
+async fn append_discovery_issues(
+    issues: &[MarkdownDiscoveryIssue],
+    result: &mut IndexResult,
+    progress: &mut impl IndexingProgressSink,
+) {
+    for failure in issues.iter().map(discovery_issue_to_failure) {
+        progress
+            .emit(IndexingProgressUpdate::Failed {
+                package: failure.package.clone(),
+                document_stem: failure.document_stem.clone(),
+                error: failure.error.clone(),
+            })
+            .await;
+        result.failures.push(failure);
+    }
+}
+
+fn discovery_issue_to_failure(issue: &MarkdownDiscoveryIssue) -> IndexFailureRecord {
+    match issue {
+        MarkdownDiscoveryIssue::PackageStructure { package, doc_root, message } => {
+            make_document_failure(
+                Some(package.as_str()),
+                doc_root.as_path().file_name().and_then(|value| value.to_str()).unwrap_or("doc"),
+                format!(
+                    "Package structure issue for '{}': {} ({message})",
+                    package,
+                    doc_root.as_path().display()
+                ),
+            )
+        }
+        MarkdownDiscoveryIssue::InvalidGovernedDocumentStem { package, path, stem } => {
+            make_document_failure(
+                package.as_deref(),
+                stem,
+                format!(
+                    "Invalid governed document stem for '{}': {}",
+                    path.as_path().display(),
+                    stem
+                ),
+            )
+        }
+        MarkdownDiscoveryIssue::ContentHash { package, path, message } => make_document_failure(
+            package.as_deref(),
+            path.as_path().file_stem().and_then(|value| value.to_str()).unwrap_or("<unknown>"),
+            format!("Failed to hash '{}': {message}", path.as_path().display()),
+        ),
+        _ => make_document_failure(
+            None,
+            "<discovery-issue>",
+            "Unsupported Markdown discovery issue reported by runtime-markdown",
+        ),
+    }
 }
 
 fn make_document_failure(
@@ -192,6 +377,7 @@ async fn index_document(
     store_dir: &std::path::Path,
     embedder: &(impl Embedder + Sync),
     result: &mut IndexResult,
+    progress: &mut impl IndexingProgressSink,
 ) -> Result<(), IndexFailureRecord> {
     let package = record.package();
     let document_stem = record.governed_document_stem();
@@ -202,6 +388,12 @@ async fn index_document(
         .map_err(|e| make_document_failure(package, document_stem, e))?
     {
         result.skipped_count += 1;
+        progress
+            .emit(IndexingProgressUpdate::Unchanged {
+                package: package.map(std::borrow::ToOwned::to_owned),
+                document_stem: document_stem.to_owned(),
+            })
+            .await;
         return Ok(());
     }
 
@@ -242,6 +434,12 @@ async fn index_document(
         .map_err(|e| make_document_failure(package, document_stem, e))?;
 
     result.reindexed_count += 1;
+    progress
+        .emit(IndexingProgressUpdate::Indexed {
+            package: package.map(std::borrow::ToOwned::to_owned),
+            document_stem: document_stem.to_owned(),
+        })
+        .await;
     Ok(())
 }
 

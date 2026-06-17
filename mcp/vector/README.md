@@ -46,6 +46,7 @@
 - `ProjectTools` — MCP tool group for the project capability domain
 - `DocumentTools` — MCP tool group for the document capability domain
 - `LanguageTools` — MCP tool group for the language capability domain
+- `RagTools` — MCP tool group for the RAG capability domain
 
 ### Key functions / constructors
 
@@ -67,6 +68,8 @@
 | `replace_doc`           | Document          | Replace a governed document with complete content; resolves the target from `doc_type`, `code`, and optional `package`, validates governed front matter identity, rejects BOM content, and returns the resolved path and final content. Bootstrap companion to `create_doc_prompt`. |
 | `language_quality_gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
 | `language_best_practices` | Language        | Resolve and concatenate governed best-practices prompt bodies for a language list |
+| `rag.search`            | RAG               | Query the local RAG index for this workspace and return relevant governed document context |
+| `rag.index`             | RAG               | Initialize the local RAG store for this workspace and update the workspace RAG index |
 
 ### `find_doc` response contract
 
@@ -136,6 +139,21 @@ Bootstrap example — replacing a newly created RFC document:
 ```
 
 `replace_doc` returns `path` and the final document content after a successful write.
+
+### `rag.search` input and output contract
+
+`rag.search` accepts:
+
+- `query` (string, required): non-empty free-text query sent to the local RAG retrieval operation.
+- `limit` (integer, optional): overrides the configured final retrieval limit when present.
+- `package` (string, optional): filters results to one synchronized package.
+- `document` (string, optional): filters results to one governed document stem.
+
+The workspace root is resolved from MCP runtime context; callers must not supply a path. The tool delegates to `vector-database rag search --json` and returns the canonical Phase 9 `RetrievalContext` shape. Empty results are returned as a successful structured response with `status: empty`. Missing stores, incompatible embedding metadata, invalid filters, query embedding failures, `vector-database` invocation failures, non-zero CLI exits, and JSON parse failures return actionable MCP tool errors.
+
+### `rag.index` input and output contract
+
+`rag.index` accepts no caller-provided input fields. The workspace root is resolved from MCP runtime context. The tool runs `vector-database rag init` followed by `vector-database rag update-database --json` in sequence. If `init` fails, `update-database` is skipped. The tool emits MCP logging notifications for each lifecycle step and each structured progress event from the indexing run. The final tool result is a `RagIndexOutput` value with `init` and `update_database` outcome fields, regardless of whether notifications were delivered. Invocation failures and non-zero exits for either command return actionable MCP tool errors.
 
 ## 4. Usage Example
 

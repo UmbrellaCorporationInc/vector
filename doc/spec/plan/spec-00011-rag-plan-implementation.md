@@ -18,6 +18,7 @@ related:
   - rfc-00039-phase-7-incremental-indexing
   - rfc-00040-phase-8-hybrid-search
   - rfc-00041-phase-9-canonical-result-for-retrieval-operation
+  - rfc-00042-phase-10-mcp-search-tool
 supersedes: []
 superseded_by: null
 aliases:
@@ -219,6 +220,7 @@ Acceptance criteria:
 ### Phase 10: Add MCP Or CLI Query Commands
 
 Expose the RAG workflow through the existing user interface layer.
+See [[rfc-00042-phase-10-mcp-search-tool]] for the proposed MCP `rag.search` tool, `vector-database rag search --json` bridge, and tool error semantics for this phase.
 
 - Index the workspace `doc/` folder and synchronized package `doc/` folders.
 - Query the local index.

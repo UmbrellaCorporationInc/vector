@@ -16,6 +16,14 @@ fn unique_fixture_root(label: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("vector-rag-indexer-test-{label}-{nanos}"))
 }
 
+async fn run_incremental_indexing_pass(
+    input: &RagIndexerInput,
+    embedder: &(impl Embedder + Sync),
+) -> Result<IndexResult, LanceDbStoreError> {
+    let mut ignore_progress = NoopIndexingProgressSink;
+    super::run_incremental_indexing_pass(input, embedder, &mut ignore_progress).await
+}
+
 /// Fake embedder that counts calls and records inputs for assertions.
 #[derive(Debug, Clone)]
 struct TrackingEmbedder {
@@ -64,6 +72,17 @@ impl Embedder for TrackingEmbedder {
 
 async fn create_corpus_file(root_dir: &std::path::Path, stem: &str, content: &str) {
     let doc_dir = root_dir.join("doc");
+    tokio::fs::create_dir_all(&doc_dir).await.unwrap();
+    tokio::fs::write(doc_dir.join(format!("{stem}.md")), content).await.unwrap();
+}
+
+async fn create_package_corpus_file(
+    root_dir: &std::path::Path,
+    package: &str,
+    stem: &str,
+    content: &str,
+) {
+    let doc_dir = root_dir.join(".vector-database").join("packages").join(package).join("doc");
     tokio::fs::create_dir_all(&doc_dir).await.unwrap();
     tokio::fs::write(doc_dir.join(format!("{stem}.md")), content).await.unwrap();
 }
@@ -537,4 +556,174 @@ async fn chunk_ids_are_stable_and_repeated_runs_skip_unchanged_corpus() {
     let third = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
     assert_eq!(third.skipped_count, 1, "third run must also skip; row identity is deterministic");
     assert_eq!(third.reindexed_count, 0);
+}
+
+// Phase H: workspace and synchronized package corpora
+
+#[tokio::test]
+async fn run_pass_indexes_workspace_and_package_documents_together() {
+    use crate::lifecycle::{lancedb_store_dir, query_all_indexed_document_stems};
+
+    let root_dir = unique_fixture_root("workspace-and-package");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00001-workspace-doc",
+        "---\ntitle: Workspace doc\n---\n\n## Section\n\nWorkspace content.\n",
+    )
+    .await;
+    create_package_corpus_file(
+        &root_dir,
+        "shared-docs",
+        "task-00002-package-doc",
+        "---\ntitle: Package doc\n---\n\n## Section\n\nPackage content.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir.clone(), RagDefaults::phase_one());
+    let result = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    assert_eq!(result.reindexed_count, 2);
+    assert_eq!(result.skipped_count, 0);
+    assert!(result.failures.is_empty());
+
+    let stems = query_all_indexed_document_stems(&lancedb_store_dir(&root_dir)).await.unwrap();
+    assert!(
+        stems
+            .iter()
+            .any(|stem| stem.package.is_none() && stem.document_stem == "task-00001-workspace-doc")
+    );
+    assert!(stems.iter().any(|stem| {
+        stem.package.as_deref() == Some("shared-docs")
+            && stem.document_stem == "task-00002-package-doc"
+    }));
+}
+
+#[tokio::test]
+async fn run_pass_skips_unchanged_package_document_on_repeat_runs() {
+    let root_dir = unique_fixture_root("package-skip");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_package_corpus_file(
+        &root_dir,
+        "shared-docs",
+        "task-00003-stable-package-doc",
+        "---\ntitle: Stable package doc\n---\n\n## Section\n\nPackage content.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir, RagDefaults::phase_one());
+
+    let first = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(first.reindexed_count, 1);
+
+    let texts_after_first = embedder.total_texts_embedded();
+    let second = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    assert_eq!(second.skipped_count, 1);
+    assert_eq!(second.reindexed_count, 0);
+    assert_eq!(embedder.total_texts_embedded(), texts_after_first);
+}
+
+#[tokio::test]
+async fn run_pass_deletes_removed_package_document_without_touching_workspace_copy() {
+    let root_dir = unique_fixture_root("package-delete");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00004-shared-stem",
+        "---\ntitle: Workspace copy\n---\n\n## Section\n\nWorkspace content.\n",
+    )
+    .await;
+    create_package_corpus_file(
+        &root_dir,
+        "shared-docs",
+        "task-00005-package-delete-me",
+        "---\ntitle: Package copy\n---\n\n## Section\n\nPackage content.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir.clone(), RagDefaults::phase_one());
+    let first = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(first.reindexed_count, 2);
+
+    let package_doc_path = root_dir
+        .join(".vector-database")
+        .join("packages")
+        .join("shared-docs")
+        .join("doc")
+        .join("task-00005-package-delete-me.md");
+    tokio::fs::remove_file(package_doc_path).await.unwrap();
+
+    let second = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+    assert_eq!(second.deleted_count, 1);
+    assert_eq!(second.skipped_count, 1);
+    assert_eq!(second.reindexed_count, 0);
+}
+
+#[tokio::test]
+async fn run_pass_keeps_workspace_and_package_documents_with_same_stem_distinct() {
+    use crate::lifecycle::{lancedb_store_dir, query_all_indexed_document_stems};
+
+    let root_dir = unique_fixture_root("same-stem");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    create_corpus_file(
+        &root_dir,
+        "task-00006-shared-stem",
+        "---\ntitle: Workspace version\n---\n\n## Section\n\nWorkspace content.\n",
+    )
+    .await;
+    create_package_corpus_file(
+        &root_dir,
+        "shared-docs",
+        "task-00006-shared-stem",
+        "---\ntitle: Package version\n---\n\n## Section\n\nPackage content.\n",
+    )
+    .await;
+
+    let input = RagIndexerInput::new(root_dir.clone(), RagDefaults::phase_one());
+    let result = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    assert_eq!(result.reindexed_count, 2);
+    let stems = query_all_indexed_document_stems(&lancedb_store_dir(&root_dir)).await.unwrap();
+
+    assert_eq!(
+        stems.iter().filter(|stem| stem.document_stem == "task-00006-shared-stem").count(),
+        2,
+        "workspace and package identities must both be preserved"
+    );
+    assert!(
+        stems
+            .iter()
+            .any(|stem| stem.package.is_none() && stem.document_stem == "task-00006-shared-stem")
+    );
+    assert!(stems.iter().any(|stem| {
+        stem.package.as_deref() == Some("shared-docs")
+            && stem.document_stem == "task-00006-shared-stem"
+    }));
+}
+
+#[tokio::test]
+async fn run_pass_reports_missing_package_doc_directory_as_package_structure_issue() {
+    let root_dir = unique_fixture_root("missing-package-doc");
+    let embedder = TrackingEmbedder::new("fake-model", 4);
+    init_store_for_root(&root_dir, &embedder).await;
+
+    let package_root = root_dir.join(".vector-database").join("packages").join("broken-package");
+    tokio::fs::create_dir_all(&package_root).await.unwrap();
+
+    let input = RagIndexerInput::new(root_dir, RagDefaults::phase_one());
+    let result = run_incremental_indexing_pass(&input, &embedder).await.unwrap();
+
+    assert_eq!(result.failures.len(), 1);
+    assert_eq!(result.failures[0].package.as_deref(), Some("broken-package"));
+    assert!(result.failures[0].error.contains("Package structure issue"));
+    assert!(result.has_failures());
 }

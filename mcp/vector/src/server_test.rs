@@ -82,6 +82,30 @@ fn vector_server_exposes_get_version_tool() {
     );
 }
 
+/// Verifies that `get_tool` resolves the RAG `search` tool by its flattened name.
+#[test]
+fn vector_server_exposes_rag_search_tool_with_flattened_name() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("search");
+    assert!(tool.is_some(), "VectorServer must expose the RAG search tool");
+    assert!(
+        server.get_tool("rag.search").is_none(),
+        "rmcp tool registration is flattened today: the RAG category method is exposed as `search`"
+    );
+}
+
+/// Verifies that `get_tool` resolves the RAG `index` tool by its flattened name.
+#[test]
+fn vector_server_exposes_rag_index_tool_with_flattened_name() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("index");
+    assert!(tool.is_some(), "VectorServer must expose the RAG index tool");
+    assert!(
+        server.get_tool("rag.index").is_none(),
+        "rmcp tool registration is flattened today: the RAG category method is exposed as `index`"
+    );
+}
+
 /// Verifies that `get_tool` returns `None` for an unregistered name.
 #[test]
 fn vector_server_returns_none_for_unknown_tool() {
@@ -193,6 +217,131 @@ fn vector_server_get_version_tool_metadata_is_stable() {
         .cloned()
         .unwrap_or_default();
     assert!(properties.is_empty(), "get_version must remain a read-only zero-argument tool");
+}
+
+/// Verifies that the RAG `search` metadata matches the Phase A MCP boundary.
+#[test]
+fn vector_server_rag_search_tool_metadata_is_stable() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("search").expect("VectorServer must expose the RAG search tool");
+    let description = tool.description.as_ref().expect("search tool must expose a description");
+
+    assert_eq!(tool.name, "search");
+    assert_eq!(
+        description,
+        "Query the local RAG index for this workspace and return relevant governed document \
+         context."
+    );
+    assert_eq!(tool.input_schema["type"], "object", "search input schema must be an object");
+    let required = tool
+        .input_schema
+        .get("required")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        required.iter().any(|value| value == "query"),
+        "search schema must require the query field"
+    );
+    assert!(
+        !required.iter().any(|value| value == "root_dir"),
+        "search schema must not accept caller-provided root_dir"
+    );
+    let properties = tool
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    assert!(properties.contains_key("query"), "search schema must expose the query property");
+    assert!(
+        properties.contains_key("limit"),
+        "search schema must expose the optional limit property"
+    );
+    assert!(
+        properties.contains_key("package"),
+        "search schema must expose the optional package property"
+    );
+    assert!(
+        properties.contains_key("document"),
+        "search schema must expose the optional document property"
+    );
+    assert!(
+        !properties.contains_key("root_dir"),
+        "search schema must resolve the workspace root from MCP runtime context"
+    );
+    let output_schema =
+        tool.output_schema.as_ref().expect("search must expose a structured output schema");
+    let output_schema_json =
+        serde_json::to_value(output_schema).expect("search output schema must serialize");
+    assert_eq!(
+        output_schema_json["type"], "object",
+        "search output schema must describe RetrievalContext as an object"
+    );
+    let output_properties = output_schema_json
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        output_properties.contains_key("query"),
+        "search output schema must expose the retrieval query"
+    );
+    assert!(
+        output_properties.contains_key("status"),
+        "search output schema must expose the retrieval status"
+    );
+    assert!(
+        output_properties.contains_key("sources"),
+        "search output schema must expose normalized sources"
+    );
+    assert!(
+        output_properties.contains_key("chunks"),
+        "search output schema must expose evidence chunks"
+    );
+    assert!(
+        output_properties.contains_key("diagnostics"),
+        "search output schema must expose retrieval diagnostics"
+    );
+}
+
+/// Verifies that the RAG `index` metadata matches the Phase F MCP boundary.
+#[test]
+fn vector_server_rag_index_tool_metadata_is_stable() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("index").expect("VectorServer must expose the RAG index tool");
+    let description = tool.description.as_ref().expect("index tool must expose a description");
+
+    assert_eq!(tool.name, "index");
+    assert_eq!(
+        description,
+        "Initialize the local RAG store for this workspace and update the workspace RAG index."
+    );
+    assert_eq!(tool.input_schema["type"], "object", "index input schema must be an object");
+    let required = tool
+        .input_schema
+        .get("required")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        required.is_empty(),
+        "index must not require caller-provided fields for workspace resolution"
+    );
+    let properties = tool
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !properties.contains_key("root_dir"),
+        "index must resolve the workspace root from MCP runtime context"
+    );
+    assert!(
+        !properties.contains_key("query"),
+        "index must remain separate from retrieval query behavior"
+    );
 }
 
 /// Verifies that `get_tool` resolves the `find_doc` tool by name.
@@ -383,6 +532,14 @@ fn vector_server_project_tool_group_remains_intact() {
         server.get_tool("get_version").is_some(),
         "version tools must coexist alongside the project, document, and language tool groups"
     );
+    assert!(
+        server.get_tool("search").is_some(),
+        "RAG tools must coexist alongside the project, document, language, and version tool groups"
+    );
+    assert!(
+        server.get_tool("index").is_some(),
+        "RAG index must coexist alongside the project, document, language, and version tool groups"
+    );
 }
 
 #[tokio::test]
@@ -409,6 +566,16 @@ async fn vector_server_lists_tools_from_both_groups_over_transport() {
     assert!(tool_names.contains(&"find_doc"), "document lookup tool must be listed");
     assert!(tool_names.contains(&"language_quality_gate"), "language tools must be listed");
     assert!(tool_names.contains(&"get_version"), "version tools must be listed");
+    assert!(tool_names.contains(&"search"), "RAG search tool must be listed");
+    assert!(tool_names.contains(&"index"), "RAG index tool must be listed");
+    assert!(
+        !tool_names.contains(&"rag.search"),
+        "RAG search is listed by flattened tool name in the current registry"
+    );
+    assert!(
+        !tool_names.contains(&"rag.index"),
+        "RAG index is listed by flattened tool name in the current registry"
+    );
 
     client.cancel().await.expect("client shutdown must succeed");
     server_handle.abort();
@@ -447,6 +614,72 @@ async fn vector_server_dispatches_version_tool_calls_over_transport() {
         workspace_version(),
         "get_version must return the canonical workspace version string"
     );
+
+    client.cancel().await.expect("client shutdown must succeed");
+    server_handle.abort();
+}
+
+#[tokio::test]
+async fn vector_server_dispatches_rag_search_with_runtime_root_over_transport() {
+    let (server_transport, client_transport) = tokio::io::duplex(4096);
+
+    let server_handle = tokio::spawn(async move {
+        VectorServer::new()
+            .serve(server_transport)
+            .await
+            .expect("server must start")
+            .waiting()
+            .await
+            .expect("server task must complete cleanly");
+    });
+
+    let client = DummyClientHandler.serve(client_transport).await.expect("client must connect");
+
+    let mut args = Map::new();
+    args.insert(
+        "query".to_owned(),
+        serde_json::Value::String("governed document context".to_owned()),
+    );
+
+    let result = client
+        .call_tool(CallToolRequestParams::new("search").with_arguments(args))
+        .await
+        .expect("search tool call must not fail at the MCP transport level");
+
+    // The search may succeed (empty results) or fail with an operational error
+    // when the RAG store is not initialized, but it must never fail with a
+    // parameter deserialization error, which would indicate the input contract
+    // is broken.
+    let content = result.content.first().expect("tool result must contain content");
+    let text = content.raw.as_text().expect("tool content must be text").text.as_str();
+
+    // A blank-query rejection would mention "non-empty query"; a valid query
+    // must pass input validation and reach the bridge step.
+    assert!(
+        !text.contains("non-empty query"),
+        "valid query must pass input validation and reach the bridge command"
+    );
+    if let Some(structured) = result.structured_content.as_ref() {
+        assert!(
+            structured.get("query").is_some(),
+            "structured retrieval content must expose the original query"
+        );
+        assert!(
+            structured.get("status").is_some(),
+            "structured retrieval content must expose retrieval status"
+        );
+        let text_json: serde_json::Value =
+            serde_json::from_str(text).expect("search text content must remain valid JSON");
+        assert_eq!(
+            &text_json, structured,
+            "search text content and structured MCP content must remain contract-compatible"
+        );
+    } else {
+        assert!(
+            text.contains("vector-database") || text.contains("rag.search bridge command failed"),
+            "operational bridge failures must surface actionable CLI bridge context"
+        );
+    }
 
     client.cancel().await.expect("client shutdown must succeed");
     server_handle.abort();

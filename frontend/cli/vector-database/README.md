@@ -85,8 +85,24 @@ Markdown documents, skipping files whose content hash is unchanged.
 - Executes `vector-rag rag update-database` with the workspace root as the
   subprocess working directory.
 - Streams `vector-rag` stdout and stderr without rewriting output.
+- Supports `--json` to emit a final machine-readable payload with captured
+  `progress` events plus the final `summary`.
 - Returns the exact `vector-rag` exit status.
 - Prints an install guidance error when `vector-rag` is not available on `PATH`.
+
+**Arguments:**
+- `--json`: Emit the final indexing contract as JSON instead of human-oriented
+  progress lines and summary text.
+
+**Output Contract:**
+- Default output remains human-oriented streaming text for terminal users.
+- `--json` returns one final JSON document with `progress[]` and `summary`.
+- The project intentionally does not use NDJSON for indexing yet because the
+  current MCP bridge returns a final tool result, not a streamed subprocess
+  event channel. A final JSON payload keeps MCP consumption stable without
+  forcing agents to parse human CLI text.
+- Existing `rag update-database` users remain compatible because plain-text
+  output is still the default path.
 
 **Exit behavior:**
 
@@ -179,4 +195,7 @@ vector-database rag search "hybrid retrieval" --package shared-docs --limit 3 --
 
 # Run the incremental indexing pipeline
 vector-database rag update-database
+
+# Capture a final machine-readable indexing result
+vector-database rag update-database --json
 ```
