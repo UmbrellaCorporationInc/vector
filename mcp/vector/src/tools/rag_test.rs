@@ -1,6 +1,7 @@
 #![allow(clippy::expect_used)]
 
 use std::{
+    collections::VecDeque,
     future::{Future, ready},
     sync::Mutex,
 };
@@ -11,7 +12,8 @@ use runtime_io::{
 };
 
 use super::{
-    RagSearchParams, RagTools, build_search_command, execute_search_bridge, format_bridge_failure,
+    RagSearchParams, RagTools, build_index_command, build_search_command, execute_index_bridge,
+    execute_search_bridge, format_bridge_failure,
 };
 
 #[derive(Debug, Clone)]
@@ -22,13 +24,17 @@ struct RecordedCommand {
 }
 
 struct MockExecutor {
-    response: Mutex<Option<Result<CommandHandle, IoError>>>,
+    responses: Mutex<VecDeque<Result<CommandHandle, IoError>>>,
     recorded: Mutex<Vec<RecordedCommand>>,
 }
 
 impl MockExecutor {
     fn new(response: Result<CommandHandle, IoError>) -> Self {
-        Self { response: Mutex::new(Some(response)), recorded: Mutex::new(Vec::new()) }
+        Self::from_responses(vec![response])
+    }
+
+    fn from_responses(responses: Vec<Result<CommandHandle, IoError>>) -> Self {
+        Self { responses: Mutex::new(responses.into()), recorded: Mutex::new(Vec::new()) }
     }
 
     fn recorded_commands(&self) -> Vec<RecordedCommand> {
@@ -48,10 +54,10 @@ impl CommandExecutor for MockExecutor {
         });
 
         let result = self
-            .response
+            .responses
             .lock()
-            .expect("response lock")
-            .take()
+            .expect("responses lock")
+            .pop_front()
             .unwrap_or_else(|| Err(IoError::Process("mock executor exhausted".into())));
         ready(result)
     }
@@ -139,6 +145,28 @@ fn rag_search_builds_vector_database_bridge_command() {
             "3",
         ]
     );
+    assert_eq!(spec.current_dir(), Some(temp.path()));
+}
+
+#[test]
+fn rag_index_builds_init_bridge_command() {
+    let temp = tempfile::tempdir().expect("tempdir");
+
+    let spec = build_index_command(temp.path(), "init").expect("command should build");
+
+    assert_eq!(spec.command(), "vector-database");
+    assert_eq!(spec.args(), ["rag", "init"]);
+    assert_eq!(spec.current_dir(), Some(temp.path()));
+}
+
+#[test]
+fn rag_index_builds_update_database_bridge_command() {
+    let temp = tempfile::tempdir().expect("tempdir");
+
+    let spec = build_index_command(temp.path(), "update-database").expect("command should build");
+
+    assert_eq!(spec.command(), "vector-database");
+    assert_eq!(spec.args(), ["rag", "update-database"]);
     assert_eq!(spec.current_dir(), Some(temp.path()));
 }
 
@@ -357,6 +385,81 @@ async fn rag_search_bridge_rejects_invalid_json() {
         .expect_err("invalid JSON should fail");
 
     assert!(error.contains("invalid retrieval JSON"), "bridge parse failures must be actionable");
+}
+
+#[tokio::test]
+async fn rag_index_bridge_runs_init_before_update_database() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let init_handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout("init ok\n")
+        .build()
+        .0;
+    let update_handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout("update ok\n")
+        .stderr("indexed 3 documents\n")
+        .build()
+        .0;
+    let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
+
+    let output =
+        execute_index_bridge(&executor, temp.path()).await.expect("index bridge should succeed");
+
+    let commands = executor.recorded_commands();
+    assert_eq!(commands.len(), 2);
+    assert_eq!(commands[0].command, "vector-database");
+    assert_eq!(commands[0].args, vec!["rag", "init"]);
+    assert_eq!(commands[1].command, "vector-database");
+    assert_eq!(commands[1].args, vec!["rag", "update-database"]);
+    assert_eq!(commands[0].current_dir.as_deref(), Some(temp.path()));
+    assert_eq!(commands[1].current_dir.as_deref(), Some(temp.path()));
+
+    assert_eq!(output.init.command, "vector-database");
+    assert_eq!(output.init.args, vec!["rag", "init"]);
+    assert_eq!(output.init.exit_code, Some(0));
+    assert_eq!(output.init.stdout, "init ok\n");
+    assert_eq!(output.init.stderr, "");
+
+    assert_eq!(output.update_database.command, "vector-database");
+    assert_eq!(output.update_database.args, vec!["rag", "update-database"]);
+    assert_eq!(output.update_database.exit_code, Some(0));
+    assert_eq!(output.update_database.stdout, "update ok\n");
+    assert_eq!(output.update_database.stderr, "indexed 3 documents\n");
+}
+
+#[tokio::test]
+async fn rag_index_bridge_skips_update_database_when_init_fails() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let init_handle = MockCommandHandleBuilder::new(CommandExit::new(false, Some(1)))
+        .stderr("init exploded")
+        .build()
+        .0;
+    let executor = MockExecutor::from_responses(vec![Ok(init_handle)]);
+
+    let error = execute_index_bridge(&executor, temp.path())
+        .await
+        .expect_err("init failure must stop the lifecycle");
+
+    let commands = executor.recorded_commands();
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0].args, vec!["rag", "init"]);
+    assert_eq!(
+        error,
+        "rag.index init command failed: rag.search bridge command failed: init exploded"
+    );
+}
+
+#[tokio::test]
+async fn rag_index_bridge_returns_install_guidance_when_vector_database_missing() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let executor = MockExecutor::new(Err(IoError::Process("not found".to_owned())));
+
+    let error =
+        execute_index_bridge(&executor, temp.path()).await.expect_err("spawn failure should fail");
+
+    assert_eq!(
+        error,
+        "vector-database is not available on PATH. Install or expose the CLI bridge and try again."
+    );
 }
 
 #[test]

@@ -41,6 +41,36 @@ pub struct RagSearchParams {
 #[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
 pub struct RagIndexParams {}
 
+/// Structured MCP output for the `index` bridge.
+///
+/// # DTO(machine-readable command results emitted after the init and update-database lifecycle commands succeed)
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RagIndexOutput {
+    /// Result of `vector-database rag init`.
+    pub init: RagIndexCommandOutcome,
+    /// Result of `vector-database rag update-database`.
+    pub update_database: RagIndexCommandOutcome,
+}
+
+/// One command outcome captured by the `index` bridge.
+///
+/// # DTO(machine-readable command execution summary for one bridge subprocess)
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RagIndexCommandOutcome {
+    /// Executed bridge command name.
+    pub command: String,
+    /// Executed bridge command arguments.
+    pub args: Vec<String>,
+    /// Process exit code, when available.
+    pub exit_code: Option<i32>,
+    /// Captured stdout text.
+    pub stdout: String,
+    /// Captured stderr text.
+    pub stderr: String,
+}
+
 /// Canonical retrieval context returned by the MCP `search` bridge.
 ///
 /// # DTO(machine-readable retrieval context parsed from the `vector-database` CLI bridge and emitted as structured MCP output)
@@ -209,6 +239,20 @@ fn build_search_command(
     builder.build().map_err(|error| format!("rag.search failed to prepare bridge command: {error}"))
 }
 
+fn build_index_command(
+    workspace_root: &std::path::Path,
+    subcommand: &'static str,
+) -> Result<CommandSpec, String> {
+    CommandBuilder::new(VECTOR_DATABASE_BINARY)
+        .arg("rag")
+        .arg(subcommand)
+        .current_dir(workspace_root)
+        .build()
+        .map_err(|error| {
+            format!("rag.index failed to prepare `{subcommand}` bridge command: {error}")
+        })
+}
+
 async fn execute_search_bridge<E>(
     executor: &E,
     workspace_root: &std::path::Path,
@@ -228,6 +272,69 @@ where
     serde_json::from_slice::<RetrievalContext>(&output.stdout).map_err(|error| {
         format!("rag.search received invalid retrieval JSON from vector-database: {error}")
     })
+}
+
+async fn execute_index_bridge<E>(
+    executor: &E,
+    workspace_root: &std::path::Path,
+) -> Result<RagIndexOutput, String>
+where
+    E: CommandExecutor + Sync,
+{
+    let init_spec = build_index_command(workspace_root, "init")?;
+    let init_output = execute_index_command(executor, init_spec).await?;
+
+    if !init_output.output.exit.success {
+        return Err(format!(
+            "rag.index init command failed: {}",
+            format_bridge_failure(&init_output.output)
+        ));
+    }
+
+    let update_spec = build_index_command(workspace_root, "update-database")?;
+    let update_output = execute_index_command(executor, update_spec).await?;
+
+    if !update_output.output.exit.success {
+        return Err(format!(
+            "rag.index update-database command failed: {}",
+            format_bridge_failure(&update_output.output)
+        ));
+    }
+
+    Ok(RagIndexOutput {
+        init: into_index_command_outcome(&init_output.spec, &init_output.output),
+        update_database: into_index_command_outcome(&update_output.spec, &update_output.output),
+    })
+}
+
+struct ExecutedBridgeCommand {
+    spec: CommandSpec,
+    output: BridgeCommandOutput,
+}
+
+async fn execute_index_command<E>(
+    executor: &E,
+    spec: CommandSpec,
+) -> Result<ExecutedBridgeCommand, String>
+where
+    E: CommandExecutor + Sync,
+{
+    let handle = executor.spawn(spec.clone()).await.map_err(|_| INSTALL_GUIDANCE.to_owned())?;
+    let output = collect_command_output(handle).await?;
+    Ok(ExecutedBridgeCommand { spec, output })
+}
+
+fn into_index_command_outcome(
+    spec: &CommandSpec,
+    output: &BridgeCommandOutput,
+) -> RagIndexCommandOutcome {
+    RagIndexCommandOutcome {
+        command: spec.command().to_owned(),
+        args: spec.args().to_vec(),
+        exit_code: output.exit.code,
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    }
 }
 
 async fn collect_command_output(mut handle: CommandHandle) -> Result<BridgeCommandOutput, String> {
@@ -337,9 +444,11 @@ impl RagTools {
         &self,
         context: rmcp::service::RequestContext<RoleServer>,
         Parameters(_params): Parameters<RagIndexParams>,
-    ) -> Result<String, String> {
-        let _workspace_root = resolve_workspace_root_from_runtime_context("rag.index", &context)?;
-        Err("rag.index lifecycle execution is not implemented yet; Phase G will add the init and update-database bridge.".to_owned())
+    ) -> Result<Json<RagIndexOutput>, String> {
+        let workspace_root = resolve_workspace_root_from_runtime_context("rag.index", &context)?;
+        let executor = runtime_io::ProcessCommandExecutor::default();
+        let index_result = execute_index_bridge(&executor, &workspace_root).await?;
+        Ok(Json(index_result))
     }
 }
 

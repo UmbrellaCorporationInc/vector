@@ -180,11 +180,13 @@ input:
   language: rust
 ```
 
-- [ ] Run `vector-database rag init` from the resolved workspace root before updating the index.
-- [ ] Run `vector-database rag update-database` from the resolved workspace root after a successful init.
-- [ ] Return a structured MCP success response that includes both command outcomes.
-- [ ] Do not accept caller-provided shell commands or arbitrary command arguments.
-- [ ] Do not query the RAG index or return retrieval context from the `index` tool.
+- [x] Run `vector-database rag init` from the resolved workspace root before updating the index.
+- [x] Run `vector-database rag update-database` from the resolved workspace root after a successful init.
+- [x] Return a structured MCP success response that includes both command outcomes.
+- [x] Do not accept caller-provided shell commands or arbitrary command arguments.
+- [x] Do not query the RAG index or return retrieval context from the `index` tool.
+
+Phase G validated on 2026-06-17 with focused `mcp-vector` Rust tests covering the `rag.index` bridge command construction, ordered `init` then `update-database` execution, install-guidance failures, and skip-on-init-failure behavior. The Rust quality gate prompt was resolved for `rust`. Failure classification for `rag.index` remains intentionally generic until Phase L defines the actionable error mapping contract.
 
 ### 3.8. Phase H: Index Workspace and Package Documents
 
