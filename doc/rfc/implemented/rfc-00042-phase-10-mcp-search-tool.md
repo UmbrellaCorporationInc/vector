@@ -5,7 +5,7 @@ code: "00042"
 slug: phase-10-mcp-search-tool
 title: Phase 10 MCP Search Tool
 description: Proposes a RAG-scoped MCP search tool that queries the local RAG index and returns relevant governed document context.
-status: accepted
+status: implemented
 created: 2026-06-17
 updated: 2026-06-17
 authors: []

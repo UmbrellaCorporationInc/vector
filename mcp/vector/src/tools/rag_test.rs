@@ -477,7 +477,7 @@ async fn rag_index_bridge_skips_update_database_when_init_fails() {
     assert_eq!(commands[0].args, vec!["rag", "init"]);
     assert_eq!(
         error,
-        "rag.index init command failed: rag.search bridge command failed: init exploded"
+        "rag.index init command failed: rag.index bridge command failed: init exploded"
     );
 }
 
@@ -525,7 +525,7 @@ fn format_bridge_failure_strips_cli_help_text_noise() {
         exit: CommandExit::new(false, Some(1)),
     };
 
-    let error = format_bridge_failure(&output);
+    let error = format_bridge_failure("rag.search", &output);
 
     assert_eq!(
         error,
@@ -541,7 +541,7 @@ fn format_bridge_failure_classifies_missing_rag_store() {
         exit: CommandExit::new(false, Some(1)),
     };
 
-    let error = format_bridge_failure(&output);
+    let error = format_bridge_failure("rag.search", &output);
 
     assert_eq!(
         error,
@@ -557,7 +557,7 @@ fn format_bridge_failure_classifies_incompatible_embedding_metadata() {
         exit: CommandExit::new(false, Some(1)),
     };
 
-    let error = format_bridge_failure(&output);
+    let error = format_bridge_failure("rag.search", &output);
 
     assert_eq!(
         error,
@@ -573,7 +573,7 @@ fn format_bridge_failure_classifies_corrupt_lancedb_schema() {
         exit: CommandExit::new(false, Some(1)),
     };
 
-    let error = format_bridge_failure(&output);
+    let error = format_bridge_failure("rag.search", &output);
 
     assert_eq!(
         error,
@@ -589,7 +589,7 @@ fn format_bridge_failure_classifies_query_embedding_failures() {
         exit: CommandExit::new(false, Some(1)),
     };
 
-    let error = format_bridge_failure(&output);
+    let error = format_bridge_failure("rag.search", &output);
 
     assert_eq!(
         error,
@@ -859,4 +859,203 @@ async fn rag_index_bridge_with_progress_notification_failure_does_not_abort_inde
         .expect("index must succeed even when notifications are dropped");
 
     assert_eq!(output.update_database.summary.reindexed_count, 0);
+}
+
+// Phase L: Map Index Operational Failures and Tests.
+
+#[tokio::test]
+async fn rag_index_bridge_returns_install_guidance_when_update_database_cannot_be_invoked() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let init_handle =
+        MockCommandHandleBuilder::new(CommandExit::new(true, Some(0))).stdout("init ok").build().0;
+    let executor = MockExecutor::from_responses(vec![
+        Ok(init_handle),
+        Err(IoError::Process("not found".to_owned())),
+    ]);
+
+    let error = execute_index_bridge_with_progress(&executor, temp.path(), |_| async {})
+        .await
+        .expect_err("update-database spawn failure must fail");
+
+    let commands = executor.recorded_commands();
+    assert_eq!(commands.len(), 2, "both init and update-database must be attempted");
+    assert_eq!(commands[0].args, vec!["rag", "init"]);
+    assert_eq!(commands[1].args, vec!["rag", "update-database", "--json"]);
+    assert_eq!(
+        error,
+        "vector-database is not available on PATH. Install or expose the CLI bridge and try again."
+    );
+}
+
+#[tokio::test]
+async fn rag_index_bridge_surfaces_non_zero_update_database_exit() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let init_handle =
+        MockCommandHandleBuilder::new(CommandExit::new(true, Some(0))).stdout("init ok").build().0;
+    let update_handle = MockCommandHandleBuilder::new(CommandExit::new(false, Some(1)))
+        .stderr("embedding backend offline")
+        .build()
+        .0;
+    let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
+
+    let error = execute_index_bridge_with_progress(&executor, temp.path(), |_| async {})
+        .await
+        .expect_err("non-zero update-database exit must fail");
+
+    let commands = executor.recorded_commands();
+    assert_eq!(commands.len(), 2, "both commands must run when init succeeds");
+    assert!(
+        error.starts_with("rag.index update-database command failed:"),
+        "error must identify the failing subcommand: {error}"
+    );
+    assert!(error.contains("rag.index"), "error must reference rag.index, not rag.search: {error}");
+    assert!(
+        error.contains("embedding backend offline"),
+        "error must include actionable detail: {error}"
+    );
+}
+
+#[tokio::test]
+async fn rag_index_bridge_progress_tracks_document_level_failures() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let init_handle =
+        MockCommandHandleBuilder::new(CommandExit::new(true, Some(0))).stdout("init ok").build().0;
+    let update_stdout = r#"{
+  "progress": [
+    {
+      "label": "indexed",
+      "package": null,
+      "document_stem": "spec-00011-rag-plan-implementation",
+      "message": null
+    },
+    {
+      "label": "unchanged",
+      "package": "shared-docs",
+      "document_stem": "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+      "message": null
+    },
+    {
+      "label": "failed",
+      "package": null,
+      "document_stem": "rfc-00042-phase-10-mcp-search-tool",
+      "message": "embedding backend offline"
+    }
+  ],
+  "summary": {
+    "skipped_count": 1,
+    "reindexed_count": 1,
+    "deleted_count": 0,
+    "failures": [
+      {
+        "package": null,
+        "document_stem": "rfc-00042-phase-10-mcp-search-tool",
+        "error": "embedding backend offline"
+      }
+    ]
+  }
+}"#;
+    let update_handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout(update_stdout)
+        .build()
+        .0;
+    let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
+
+    let output = execute_index_bridge_with_progress(&executor, temp.path(), |_| async {})
+        .await
+        .expect("bridge must succeed even when individual documents fail");
+
+    let progress = &output.update_database.progress;
+    assert_eq!(progress.len(), 3);
+
+    assert_eq!(progress[0].label, "indexed");
+    assert_eq!(progress[0].document_stem.as_deref(), Some("spec-00011-rag-plan-implementation"));
+    assert!(progress[0].message.is_none());
+
+    assert_eq!(progress[1].label, "unchanged");
+    assert_eq!(progress[1].package.as_deref(), Some("shared-docs"));
+    assert_eq!(
+        progress[1].document_stem.as_deref(),
+        Some("rfc-00041-phase-9-canonical-result-for-retrieval-operation")
+    );
+
+    assert_eq!(progress[2].label, "failed");
+    assert_eq!(progress[2].document_stem.as_deref(), Some("rfc-00042-phase-10-mcp-search-tool"));
+    assert_eq!(progress[2].message.as_deref(), Some("embedding backend offline"));
+
+    let summary = &output.update_database.summary;
+    assert_eq!(summary.reindexed_count, 1);
+    assert_eq!(summary.skipped_count, 1);
+    assert_eq!(summary.failures.len(), 1);
+    assert_eq!(summary.failures[0].document_stem, "rfc-00042-phase-10-mcp-search-tool");
+    assert_eq!(summary.failures[0].error, "embedding backend offline");
+    assert!(summary.failures[0].package.is_none());
+}
+
+#[test]
+fn rag_index_output_preserves_agent_facing_json_contract() {
+    let json = r#"{
+  "init": {
+    "command": "vector-database",
+    "args": ["rag", "init"],
+    "exit_code": 0,
+    "stdout": "init ok\n",
+    "stderr": ""
+  },
+  "update_database": {
+    "command": "vector-database",
+    "args": ["rag", "update-database", "--json"],
+    "exit_code": 0,
+    "progress": [
+      {
+        "label": "indexed",
+        "package": null,
+        "document_stem": "spec-00011-rag-plan-implementation",
+        "message": null
+      }
+    ],
+    "summary": {
+      "skipped_count": 0,
+      "reindexed_count": 1,
+      "deleted_count": 0,
+      "failures": []
+    },
+    "stderr": ""
+  }
+}"#;
+
+    let parsed: super::RagIndexOutput =
+        serde_json::from_str(json).expect("MCP bridge must parse canonical index JSON");
+    let reserialized =
+        serde_json::to_string_pretty(&parsed).expect("MCP output must round-trip the contract");
+    let expected: serde_json::Value = serde_json::from_str(json).expect("fixture must be valid");
+    let actual: serde_json::Value =
+        serde_json::from_str(&reserialized).expect("reserialized must be valid");
+
+    assert_eq!(actual, expected, "agent-facing JSON contract must round-trip without data loss");
+    assert_eq!(parsed.update_database.progress[0].label, "indexed");
+    assert_eq!(parsed.update_database.summary.reindexed_count, 1);
+}
+
+#[test]
+fn format_bridge_failure_uses_rag_index_context_for_index_errors() {
+    let output = super::BridgeCommandOutput {
+        stdout: Vec::new(),
+        stderr: b"error: RAG store is missing at '/tmp/.vector-database/rag/lancedb'; run 'vector-database rag init' or 'vector-database rag update-database' first\n".to_vec(),
+        exit: CommandExit::new(false, Some(1)),
+    };
+
+    let error = format_bridge_failure("rag.index", &output);
+
+    assert!(
+        error.starts_with("rag.index"),
+        "index failures must use rag.index context, not rag.search: {error}"
+    );
+    assert!(
+        !error.contains("rag.search"),
+        "index failure messages must not leak rag.search context: {error}"
+    );
+    assert_eq!(
+        error,
+        "rag.index requires an initialized local RAG store: RAG store is missing at '/tmp/.vector-database/rag/lancedb'; run 'vector-database rag init' or 'vector-database rag update-database' first"
+    );
 }

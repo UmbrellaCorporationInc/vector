@@ -362,7 +362,7 @@ where
     let output = collect_command_output(handle).await?;
 
     if !output.exit.success {
-        return Err(format_bridge_failure(&output));
+        return Err(format_bridge_failure("rag.search", &output));
     }
 
     serde_json::from_slice::<RetrievalContext>(&output.stdout).map_err(|error| {
@@ -399,7 +399,7 @@ where
     if !init_output.output.exit.success {
         return Err(format!(
             "rag.index init command failed: {}",
-            format_bridge_failure(&init_output.output)
+            format_bridge_failure("rag.index", &init_output.output)
         ));
     }
 
@@ -411,7 +411,7 @@ where
     if !update_output.output.exit.success {
         return Err(format!(
             "rag.index update-database command failed: {}",
-            format_bridge_failure(&update_output.output)
+            format_bridge_failure("rag.index", &update_output.output)
         ));
     }
 
@@ -490,13 +490,13 @@ async fn collect_command_output(mut handle: CommandHandle) -> Result<BridgeComma
     Ok(BridgeCommandOutput { stdout, stderr, exit })
 }
 
-fn format_bridge_failure(output: &BridgeCommandOutput) -> String {
+fn format_bridge_failure(tool: &str, output: &BridgeCommandOutput) -> String {
     let stderr = sanitize_bridge_stream(&output.stderr);
     let stdout = sanitize_bridge_stream(&output.stdout);
     if !stderr.is_empty() {
-        classify_bridge_failure(&stderr)
+        classify_bridge_failure(tool, &stderr)
     } else if !stdout.is_empty() {
-        classify_bridge_failure(&stdout)
+        classify_bridge_failure(tool, &stdout)
     } else if let Some(code) = output.exit.code {
         format!("vector-database exited with code {code}")
     } else {
@@ -516,15 +516,15 @@ fn sanitize_bridge_stream(bytes: &[u8]) -> String {
     without_help.strip_prefix("error: ").unwrap_or(without_help).trim().to_owned()
 }
 
-fn classify_bridge_failure(detail: &str) -> String {
+fn classify_bridge_failure(tool: &str, detail: &str) -> String {
     if detail.contains("RAG store is missing at") {
-        return format!("rag.search requires an initialized local RAG store: {detail}");
+        return format!("{tool} requires an initialized local RAG store: {detail}");
     }
     if detail.contains("incompatible with embedding contract")
         || detail.contains("embedding_model")
         || detail.contains("embedding_dimension")
     {
-        return format!("rag.search found incompatible RAG embedding metadata: {detail}");
+        return format!("{tool} found incompatible RAG embedding metadata: {detail}");
     }
     if detail.contains("failed to open LanceDB table")
         || detail.contains("failed to connect LanceDB database")
@@ -534,20 +534,20 @@ fn classify_bridge_failure(detail: &str) -> String {
         || detail.contains("chunk_ordinal column")
         || detail.contains("token_count column")
     {
-        return format!("rag.search found a corrupt LanceDB table or schema: {detail}");
+        return format!("{tool} found a corrupt LanceDB table or schema: {detail}");
     }
     if detail.contains("package_filter must not be empty")
         || detail.contains("document_filter must not be empty")
     {
-        return format!("rag.search rejected an invalid package or document filter: {detail}");
+        return format!("{tool} rejected an invalid package or document filter: {detail}");
     }
     if detail.contains("query embedding failed")
         || detail.contains("query embedding returned no vectors")
     {
-        return format!("rag.search failed to embed the query: {detail}");
+        return format!("{tool} failed to embed the query: {detail}");
     }
 
-    format!("rag.search bridge command failed: {detail}")
+    format!("{tool} bridge command failed: {detail}")
 }
 
 #[tool_router]

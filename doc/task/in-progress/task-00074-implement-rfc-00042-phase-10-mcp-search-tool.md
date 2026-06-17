@@ -290,19 +290,19 @@ input:
   language: rust
 ```
 
-- [ ] Return actionable MCP errors when `vector-database rag init` cannot be invoked.
-- [ ] Return actionable MCP errors when `vector-database rag init` exits non-zero.
-- [ ] Return actionable MCP errors when `vector-database rag update-database` cannot be invoked.
-- [ ] Return actionable MCP errors when `vector-database rag update-database` exits non-zero.
-- [ ] Add or update tests that prove `index` runs init before update-database.
-- [ ] Add or update tests that prove update-database is skipped when init fails.
-- [ ] Add or update tests for successful command output mapping.
-- [ ] Add or update tests for invocation failures and non-zero exits for both commands.
-- [ ] Add or update tests that prove CLI progress is emitted before indexing completes.
-- [ ] Add or update tests that prove CLI progress reports indexed documents, unchanged skipped documents, and document-level failures separately.
-- [ ] Add or update tests that prove `vector-database rag update-database` forwards `vector-rag` output incrementally.
-- [ ] Add or update tests for the chosen agent-facing output contract, including final-response `--json` or streaming NDJSON behavior.
-- [ ] Add or update MCP progress tests when progress notifications are supported, or a test that proves the final MCP response includes captured command output when they are not supported.
+- [x] Return actionable MCP errors when `vector-database rag init` cannot be invoked.
+- [x] Return actionable MCP errors when `vector-database rag init` exits non-zero.
+- [x] Return actionable MCP errors when `vector-database rag update-database` cannot be invoked.
+- [x] Return actionable MCP errors when `vector-database rag update-database` exits non-zero.
+- [x] Add or update tests that prove `index` runs init before update-database.
+- [x] Add or update tests that prove update-database is skipped when init fails.
+- [x] Add or update tests for successful command output mapping.
+- [x] Add or update tests for invocation failures and non-zero exits for both commands.
+- [x] Add or update tests that prove CLI progress is emitted before indexing completes.
+- [x] Add or update tests that prove CLI progress reports indexed documents, unchanged skipped documents, and document-level failures separately.
+- [x] Add or update tests that prove `vector-database rag update-database` forwards `vector-rag` output incrementally.
+- [x] Add or update tests for the chosen agent-facing output contract, including final-response `--json` or streaming NDJSON behavior.
+- [x] Add or update MCP progress tests when progress notifications are supported, or a test that proves the final MCP response includes captured command output when they are not supported.
 
 ### 3.13. Phase Z: Wrap-Up
 
