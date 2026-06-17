@@ -8,8 +8,8 @@ use runtime_rag::{IndexWorkspaceInput, IndexWorkspaceOp, RagDefaults};
 
 /// Run the incremental indexing pipeline against the local workspace.
 ///
-/// Initializes the `LanceDB` store (if not already present) then indexes all
-/// governed Markdown documents, skipping files whose content hash is unchanged.
+/// Initializes the `LanceDB` store if needed, then indexes governed Markdown
+/// documents and skips files whose content hash is unchanged.
 ///
 /// # Errors
 ///

@@ -4,9 +4,7 @@
 
 use runtime_io::ProcessCommandExecutor;
 use std::path::PathBuf;
-use vector_database::commands::{
-    package_add, package_sync, rag_init, rag_search, rag_update_database,
-};
+use vector_database::commands::{package_add, package_sync, rag_passthrough};
 
 #[derive(Debug, Default)]
 struct PackageAddArgs {
@@ -34,15 +32,21 @@ async fn main() {
     };
 
     let result = match args[1].as_str() {
-        "package" => handle_package_command(&root_dir, &args).await,
+        "package" => handle_package_command(&root_dir, &args).await.map(|()| 0),
         "rag" => handle_rag_command(&root_dir, &args).await,
         cmd => Err(format!("unknown command group '{cmd}'")),
     };
 
-    if let Err(error) = result {
-        eprintln!("error: {error}");
-        print_usage();
-        std::process::exit(1);
+    match result {
+        Ok(0) => {}
+        Ok(code) => std::process::exit(code),
+        Err(error) => {
+            eprintln!("error: {error}");
+            if args[1].as_str() != "rag" {
+                print_usage();
+            }
+            std::process::exit(1);
+        }
     }
 }
 
@@ -79,16 +83,11 @@ async fn handle_package_command(root_dir: &std::path::Path, args: &[String]) -> 
     }
 }
 
-async fn handle_rag_command(root_dir: &std::path::Path, args: &[String]) -> Result<(), String> {
-    match args[2].as_str() {
-        "init" => rag_init::run(root_dir).await,
-        "search" => {
-            let parsed = rag_search::parse_args(&args[3..])?;
-            rag_search::run(root_dir, parsed).await
-        }
-        "update-database" => rag_update_database::run(root_dir).await,
-        cmd => Err(format!("unknown rag subcommand '{cmd}'")),
-    }
+async fn handle_rag_command(root_dir: &std::path::Path, args: &[String]) -> Result<i32, String> {
+    let executor = ProcessCommandExecutor::default();
+    rag_passthrough::run(&executor, root_dir, &args[2..])
+        .await
+        .map(rag_passthrough::DelegatedExit::code)
 }
 
 fn parse_package_add_args(args: &[String]) -> PackageAddArgs {

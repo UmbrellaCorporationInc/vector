@@ -11,7 +11,8 @@ use runtime_rag::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Parsed arguments for `vector-database rag search`.
+/// Parsed arguments for `vector-rag rag search`.
+#[non_exhaustive]
 pub struct RagSearchArgs {
     /// Required free-text query sent to the hybrid retrieval operation.
     query_text: String,
@@ -25,7 +26,39 @@ pub struct RagSearchArgs {
     json_output: bool,
 }
 
-/// Run the retrieval command through the runtime-rag operations.
+impl RagSearchArgs {
+    /// Return the search query text.
+    #[must_use]
+    pub fn query_text(&self) -> &str {
+        &self.query_text
+    }
+
+    /// Return the optional package filter.
+    #[must_use]
+    pub fn package_filter(&self) -> Option<&str> {
+        self.package_filter.as_deref()
+    }
+
+    /// Return the optional document stem filter.
+    #[must_use]
+    pub fn document_filter(&self) -> Option<&str> {
+        self.document_filter.as_deref()
+    }
+
+    /// Return the optional result limit.
+    #[must_use]
+    pub const fn result_limit(&self) -> Option<usize> {
+        self.result_limit
+    }
+
+    /// Return whether JSON output was requested.
+    #[must_use]
+    pub const fn json_output(&self) -> bool {
+        self.json_output
+    }
+}
+
+/// Run the retrieval command through the `runtime-rag` operations.
 ///
 /// # Errors
 ///
@@ -77,7 +110,7 @@ async fn assemble_retrieval_context(
         .ok_or_else(|| "retrieval context assembly did not produce output".to_owned())
 }
 
-/// Parse CLI arguments for `vector-database rag search`.
+/// Parse CLI arguments for `vector-rag rag search`.
 ///
 /// # Errors
 ///

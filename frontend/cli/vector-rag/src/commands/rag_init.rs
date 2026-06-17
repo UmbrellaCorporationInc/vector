@@ -6,7 +6,7 @@ use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_rag::{InitRagStoreInput, InitRagStoreOp, RagDefaults};
 
-/// Create or validate the local Phase 6 RAG store.
+/// Create or validate the local RAG store.
 ///
 /// # Errors
 ///
