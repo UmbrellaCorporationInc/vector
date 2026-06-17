@@ -247,13 +247,15 @@ input:
   language: rust
 ```
 
-- [ ] Evaluate whether agent-facing index output should remain final-response `--json` or introduce a streaming NDJSON event contract.
-- [ ] Compare final-response `--json` against NDJSON streaming for MCP consumption, CLI automation, partial progress visibility, parser stability, and backwards compatibility.
-- [ ] If NDJSON is selected, define stable event names and fields for `started`, `indexed`, `unchanged`, `failed`, `deleted`, and `summary` events.
-- [ ] If final-response `--json` is retained, document how MCP `index` exposes progress without requiring agents to parse human CLI text.
-- [ ] Keep human-oriented CLI output separate from the machine-readable agent contract.
-- [ ] Preserve compatibility for existing JSON consumers or document the migration path explicitly.
-- [ ] Record the chosen contract in the task notes, README, or a follow-up RFC if the decision changes a public CLI/MCP contract.
+- [x] Evaluate whether agent-facing index output should remain final-response `--json` or introduce a streaming NDJSON event contract.
+- [x] Compare final-response `--json` against NDJSON streaming for MCP consumption, CLI automation, partial progress visibility, parser stability, and backwards compatibility.
+- [x] NDJSON was not selected for this phase, so no new streaming event contract was introduced.
+- [x] If final-response `--json` is retained, document how MCP `index` exposes progress without requiring agents to parse human CLI text.
+- [x] Keep human-oriented CLI output separate from the machine-readable agent contract.
+- [x] Preserve compatibility for existing JSON consumers or document the migration path explicitly.
+- [x] Record the chosen contract in the task notes, README, or a follow-up RFC if the decision changes a public CLI/MCP contract.
+
+Phase J completed on 2026-06-17. The agent-facing contract remains a final-response `--json` payload rather than NDJSON streaming. The decision is specific to the current MCP bridge boundary: `rag.index` returns one final tool result and does not yet expose a streamed subprocess event channel, so NDJSON would add parser complexity without improving MCP observability. The retained contract is `vector-database rag update-database --json`, which returns one JSON document with `progress[]` and `summary`, while the default CLI path keeps the existing human-oriented streaming text. MCP `rag.index` now consumes that final JSON payload and returns structured progress plus summary fields directly, so agents do not need to parse human CLI text. This preserves backward compatibility because plain-text `rag update-database` output remains the default and the new JSON contract is opt-in.
 
 ### 3.11. Phase K: Define MCP Index Progress Behavior
 

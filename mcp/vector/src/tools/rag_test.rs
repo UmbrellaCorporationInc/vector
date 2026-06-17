@@ -166,7 +166,7 @@ fn rag_index_builds_update_database_bridge_command() {
     let spec = build_index_command(temp.path(), "update-database").expect("command should build");
 
     assert_eq!(spec.command(), "vector-database");
-    assert_eq!(spec.args(), ["rag", "update-database"]);
+    assert_eq!(spec.args(), ["rag", "update-database", "--json"]);
     assert_eq!(spec.current_dir(), Some(temp.path()));
 }
 
@@ -394,9 +394,31 @@ async fn rag_index_bridge_runs_init_before_update_database() {
         .stdout("init ok\n")
         .build()
         .0;
+    let update_stdout = r#"{
+  "progress": [
+    {
+      "label": "initializing-store",
+      "package": null,
+      "document_stem": null,
+      "message": "Preparing the local RAG store."
+    },
+    {
+      "label": "indexed",
+      "package": null,
+      "document_stem": "spec-00011-rag-plan-implementation",
+      "message": null
+    }
+  ],
+  "summary": {
+    "skipped_count": 0,
+    "reindexed_count": 1,
+    "deleted_count": 0,
+    "failures": []
+  }
+}"#;
     let update_handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
-        .stdout("update ok\n")
-        .stderr("indexed 3 documents\n")
+        .stdout(update_stdout)
+        .stderr("indexed 1 documents\n")
         .build()
         .0;
     let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
@@ -409,7 +431,7 @@ async fn rag_index_bridge_runs_init_before_update_database() {
     assert_eq!(commands[0].command, "vector-database");
     assert_eq!(commands[0].args, vec!["rag", "init"]);
     assert_eq!(commands[1].command, "vector-database");
-    assert_eq!(commands[1].args, vec!["rag", "update-database"]);
+    assert_eq!(commands[1].args, vec!["rag", "update-database", "--json"]);
     assert_eq!(commands[0].current_dir.as_deref(), Some(temp.path()));
     assert_eq!(commands[1].current_dir.as_deref(), Some(temp.path()));
 
@@ -420,10 +442,16 @@ async fn rag_index_bridge_runs_init_before_update_database() {
     assert_eq!(output.init.stderr, "");
 
     assert_eq!(output.update_database.command, "vector-database");
-    assert_eq!(output.update_database.args, vec!["rag", "update-database"]);
+    assert_eq!(output.update_database.args, vec!["rag", "update-database", "--json"]);
     assert_eq!(output.update_database.exit_code, Some(0));
-    assert_eq!(output.update_database.stdout, "update ok\n");
-    assert_eq!(output.update_database.stderr, "indexed 3 documents\n");
+    assert_eq!(output.update_database.progress.len(), 2);
+    assert_eq!(output.update_database.progress[1].label, "indexed");
+    assert_eq!(
+        output.update_database.progress[1].document_stem.as_deref(),
+        Some("spec-00011-rag-plan-implementation")
+    );
+    assert_eq!(output.update_database.summary.reindexed_count, 1);
+    assert_eq!(output.update_database.stderr, "indexed 1 documents\n");
 }
 
 #[tokio::test]
@@ -445,6 +473,27 @@ async fn rag_index_bridge_skips_update_database_when_init_fails() {
     assert_eq!(
         error,
         "rag.index init command failed: rag.search bridge command failed: init exploded"
+    );
+}
+
+#[tokio::test]
+async fn rag_index_bridge_rejects_invalid_update_database_json() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let init_handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout("init ok\n")
+        .build()
+        .0;
+    let update_handle =
+        MockCommandHandleBuilder::new(CommandExit::new(true, Some(0))).stdout("not json").build().0;
+    let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
+
+    let error = execute_index_bridge(&executor, temp.path())
+        .await
+        .expect_err("invalid update JSON must fail");
+
+    assert!(
+        error.contains("invalid indexing JSON"),
+        "update-database parse failures must be actionable: {error}"
     );
 }
 

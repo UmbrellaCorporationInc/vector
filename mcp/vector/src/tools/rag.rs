@@ -49,8 +49,8 @@ pub struct RagIndexParams {}
 pub struct RagIndexOutput {
     /// Result of `vector-database rag init`.
     pub init: RagIndexCommandOutcome,
-    /// Result of `vector-database rag update-database`.
-    pub update_database: RagIndexCommandOutcome,
+    /// Structured result of `vector-database rag update-database --json`.
+    pub update_database: RagIndexUpdateDatabaseOutcome,
 }
 
 /// One command outcome captured by the `index` bridge.
@@ -69,6 +69,78 @@ pub struct RagIndexCommandOutcome {
     pub stdout: String,
     /// Captured stderr text.
     pub stderr: String,
+}
+
+/// Structured update-database result captured by the `index` bridge.
+///
+/// # DTO(machine-readable indexing contract consumed by MCP without parsing human CLI text)
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RagIndexUpdateDatabaseOutcome {
+    /// Executed bridge command name.
+    pub command: String,
+    /// Executed bridge command arguments.
+    pub args: Vec<String>,
+    /// Process exit code, when available.
+    pub exit_code: Option<i32>,
+    /// Incremental index progress captured from the final JSON contract.
+    pub progress: Vec<RagIndexProgressEvent>,
+    /// Final indexing summary.
+    pub summary: RagIndexSummary,
+    /// Captured stderr text.
+    pub stderr: String,
+}
+
+/// One stable indexing progress event returned to MCP consumers.
+///
+/// # DTO(MCP tool output is serialized through serde, so these fields remain public at the adapter boundary)
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RagIndexProgressEvent {
+    /// Stable progress label such as `indexed`, `unchanged`, or `failed`.
+    pub label: String,
+    /// Package identity when the progress event applies to a synchronized package document.
+    pub package: Option<String>,
+    /// Governed document stem when the progress event applies to one document.
+    pub document_stem: Option<String>,
+    /// Human-readable detail for lifecycle steps or actionable failures.
+    pub message: Option<String>,
+}
+
+/// Final indexing summary returned to MCP consumers.
+///
+/// # DTO(MCP tool output is serialized through serde, so these fields remain public at the adapter boundary)
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RagIndexSummary {
+    /// Number of documents skipped because the indexed content was unchanged.
+    pub skipped_count: usize,
+    /// Number of documents successfully indexed or re-indexed.
+    pub reindexed_count: usize,
+    /// Number of stale indexed documents deleted from the store.
+    pub deleted_count: usize,
+    /// Per-document failures recorded during the indexing run.
+    pub failures: Vec<RagIndexFailureRecord>,
+}
+
+/// One per-document indexing failure returned in the final summary.
+///
+/// # DTO(MCP tool output is serialized through serde, so these fields remain public at the adapter boundary)
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RagIndexFailureRecord {
+    /// Package identity, or `None` for a workspace-local document.
+    pub package: Option<String>,
+    /// Governed document stem in `<doc-type>-<code>-<slug>` form.
+    pub document_stem: String,
+    /// Actionable document-level failure message.
+    pub error: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct RagIndexCliJsonOutput {
+    progress: Vec<RagIndexProgressEvent>,
+    summary: RagIndexSummary,
 }
 
 /// Canonical retrieval context returned by the MCP `search` bridge.
@@ -246,6 +318,7 @@ fn build_index_command(
     CommandBuilder::new(VECTOR_DATABASE_BINARY)
         .arg("rag")
         .arg(subcommand)
+        .args((subcommand == "update-database").then_some("--json"))
         .current_dir(workspace_root)
         .build()
         .map_err(|error| {
@@ -303,7 +376,7 @@ where
 
     Ok(RagIndexOutput {
         init: into_index_command_outcome(&init_output.spec, &init_output.output),
-        update_database: into_index_command_outcome(&update_output.spec, &update_output.output),
+        update_database: parse_update_database_outcome(&update_output.spec, &update_output.output)?,
     })
 }
 
@@ -335,6 +408,24 @@ fn into_index_command_outcome(
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
+}
+
+fn parse_update_database_outcome(
+    spec: &CommandSpec,
+    output: &BridgeCommandOutput,
+) -> Result<RagIndexUpdateDatabaseOutcome, String> {
+    let parsed =
+        serde_json::from_slice::<RagIndexCliJsonOutput>(&output.stdout).map_err(|error| {
+            format!("rag.index received invalid indexing JSON from vector-database: {error}")
+        })?;
+    Ok(RagIndexUpdateDatabaseOutcome {
+        command: spec.command().to_owned(),
+        args: spec.args().to_vec(),
+        exit_code: output.exit.code,
+        progress: parsed.progress,
+        summary: parsed.summary,
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    })
 }
 
 async fn collect_command_output(mut handle: CommandHandle) -> Result<BridgeCommandOutput, String> {

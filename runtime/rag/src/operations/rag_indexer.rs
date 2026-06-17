@@ -18,6 +18,7 @@ use runtime_markdown::{
     MarkdownDiscoveryRequest, MarkdownExtractionOutcome, PackageMarkdownRoot,
     discover_markdown_files, extract_markdown_source,
 };
+use serde::{Deserialize, Serialize};
 use std::future::{Future, ready};
 use std::path::PathBuf;
 
@@ -25,7 +26,7 @@ use std::path::PathBuf;
 ///
 /// # DTO(indexing failure boundary consumed by `IndexResult` callers)
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexFailureRecord {
     /// Package identity, or `None` for workspace-local documents.
     pub package: Option<String>,
@@ -39,7 +40,7 @@ pub struct IndexFailureRecord {
 ///
 /// # DTO(indexing result boundary consumed by CLI and other operation callers)
 #[non_exhaustive]
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexResult {
     /// Number of documents skipped because their content hash was unchanged.
     pub skipped_count: usize,

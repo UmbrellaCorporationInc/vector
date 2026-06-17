@@ -15,6 +15,7 @@ use crate::{
 use runtime_core::{
     FlowOperation, RuntimeError, RuntimeResult, declare_plugin_operations, plugin::PluginSender,
 };
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Input for the `index_workspace` operation.
@@ -33,7 +34,7 @@ pub struct IndexWorkspaceInput {
 ///
 /// # DTO(Plugin operation output contracts use public fields for ergonomic data transfer)
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IndexWorkspaceOutput {
     /// Incremental progress emitted while the indexing operation is still running.
     Progress(IndexWorkspaceProgress),
@@ -45,7 +46,7 @@ pub enum IndexWorkspaceOutput {
 ///
 /// # DTO(progress boundary consumed by the CLI and MCP passthrough layers)
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexWorkspaceProgress {
     /// Stable progress label for scanning or parsing command output.
     pub label: String,
