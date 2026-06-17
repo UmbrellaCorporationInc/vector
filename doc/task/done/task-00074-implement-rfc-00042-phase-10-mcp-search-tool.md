@@ -5,7 +5,7 @@ code: "00074"
 slug: implement-rfc-00042-phase-10-mcp-search-tool
 title: Implement RFC 00042 Phase 10 MCP Search Tool
 description: Implement the RAG-scoped MCP search tool proposed by RFC 00042 and keep its output aligned with the Phase 9 retrieval context contract.
-status: in-progress
+status: done
 created: 2026-06-17
 updated: 2026-06-17
 tags:
@@ -316,10 +316,12 @@ input:
   language: rust
 ```
 
-- [ ] Run the relevant Rust formatting, linting, and test commands for the modified crates.
-- [ ] Run governed document validation after code and document edits.
-- [ ] Update README files for packages whose public MCP or RAG behavior changed.
-- [ ] Confirm [[rfc-00042-phase-10-mcp-search-tool]] acceptance criteria are fully covered or explicitly note any deferred item.
+- [x] Run the relevant Rust formatting, linting, and test commands for the modified crates.
+- [x] Run governed document validation after code and document edits.
+- [x] Update README files for packages whose public MCP or RAG behavior changed.
+- [x] Confirm [[rfc-00042-phase-10-mcp-search-tool]] acceptance criteria are fully covered or explicitly note any deferred item.
+
+Phase Z completed on 2026-06-17. All quality gates passed: `xtask quality-lint` and `xtask quality-test` for `mcp-vector` (149 tests), `runtime-rag` (113 tests), `vector-rag` (17 tests), and `vector-database` (11 tests). `cargo fmt --all` produced no diffs. Governed document validation passed with no issues. READMEs updated for `mcp-vector` (added `RagTools`, `rag.search`, `rag.index` entries and input/output contract sections) and `runtime-rag` (documented Phase H package-aware indexing, Phase I incremental progress streaming, and updated Phase 9 MCP consumer note). All RFC 00042 acceptance criteria are fully covered by Phases A–E for `rag.search` and Phases F–L for `rag.index` with no deferred items.
 
 ## 4. Staff Engineer Review
 
