@@ -1,6 +1,6 @@
 //! MCP tool group for RAG capability domain.
 
-use std::path::PathBuf;
+use std::{future::Future, path::PathBuf};
 
 use rmcp::{
     RoleServer, ServerHandler,
@@ -8,6 +8,7 @@ use rmcp::{
         router::tool::ToolRouter,
         wrapper::{Json, Parameters},
     },
+    model::{LoggingLevel, LoggingMessageNotificationParam},
     schemars, tool, tool_handler, tool_router,
 };
 use runtime_io::{CommandBuilder, CommandExecutor, CommandExit, CommandHandle, CommandSpec};
@@ -247,6 +248,28 @@ pub struct RetrievalContextDiagnostics {
     pub retrieval_limit: usize,
 }
 
+/// Builds a log notification for a single lifecycle step of the `rag.index` bridge.
+fn index_lifecycle_log(step: &str) -> LoggingMessageNotificationParam {
+    LoggingMessageNotificationParam::new(
+        LoggingLevel::Info,
+        serde_json::json!({ "tool": "rag.index", "message": step }),
+    )
+}
+
+/// Builds a log notification from one structured progress event emitted by the `rag.index` bridge.
+fn index_progress_event_log(event: &RagIndexProgressEvent) -> LoggingMessageNotificationParam {
+    LoggingMessageNotificationParam::new(
+        LoggingLevel::Info,
+        serde_json::json!({
+            "tool": "rag.index",
+            "label": event.label,
+            "package": event.package,
+            "document_stem": event.document_stem,
+            "message": event.message,
+        }),
+    )
+}
+
 /// MCP tool group for RAG operations.
 ///
 /// Owns MCP tool definitions for the RAG capability domain.
@@ -347,13 +370,29 @@ where
     })
 }
 
-async fn execute_index_bridge<E>(
+/// Runs the `rag init` then `rag update-database` lifecycle, calling `notify` at each step.
+///
+/// `notify` receives a [`LoggingMessageNotificationParam`] before each command, and once per
+/// progress event from the parsed `update-database --json` output. Notification failures are
+/// silently ignored so a disconnected client cannot abort an in-progress index run.
+///
+/// # Limitation
+/// Per-line subprocess output is not available because [`CommandHandle::stream_output`] only
+/// accepts synchronous callbacks. Notifications are therefore emitted at lifecycle boundaries
+/// (before init, after init/before update-database) and per structured progress event from the
+/// final parsed JSON, not as raw subprocess lines arrive.
+async fn execute_index_bridge_with_progress<E, N, Fut>(
     executor: &E,
     workspace_root: &std::path::Path,
+    notify: N,
 ) -> Result<RagIndexOutput, String>
 where
     E: CommandExecutor + Sync,
+    N: Fn(LoggingMessageNotificationParam) -> Fut,
+    Fut: Future<Output = ()>,
 {
+    notify(index_lifecycle_log("starting rag init")).await;
+
     let init_spec = build_index_command(workspace_root, "init")?;
     let init_output = execute_index_command(executor, init_spec).await?;
 
@@ -363,6 +402,8 @@ where
             format_bridge_failure(&init_output.output)
         ));
     }
+
+    notify(index_lifecycle_log("init complete, starting update-database")).await;
 
     let update_spec = build_index_command(workspace_root, "update-database")?;
     let update_output = execute_index_command(executor, update_spec).await?;
@@ -374,10 +415,16 @@ where
         ));
     }
 
-    Ok(RagIndexOutput {
+    let index_output = RagIndexOutput {
         init: into_index_command_outcome(&init_output.spec, &init_output.output),
         update_database: parse_update_database_outcome(&update_output.spec, &update_output.output)?,
-    })
+    };
+
+    for event in &index_output.update_database.progress {
+        notify(index_progress_event_log(event)).await;
+    }
+
+    Ok(index_output)
 }
 
 struct ExecutedBridgeCommand {
@@ -538,7 +585,15 @@ impl RagTools {
     ) -> Result<Json<RagIndexOutput>, String> {
         let workspace_root = resolve_workspace_root_from_runtime_context("rag.index", &context)?;
         let executor = runtime_io::ProcessCommandExecutor::default();
-        let index_result = execute_index_bridge(&executor, &workspace_root).await?;
+        let peer = context.peer.clone();
+        let index_result =
+            execute_index_bridge_with_progress(&executor, &workspace_root, move |param| {
+                let peer = peer.clone();
+                async move {
+                    let _ = peer.notify_logging_message(param).await;
+                }
+            })
+            .await?;
         Ok(Json(index_result))
     }
 }

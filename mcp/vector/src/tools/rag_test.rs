@@ -3,17 +3,21 @@
 use std::{
     collections::VecDeque,
     future::{Future, ready},
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
-use rmcp::ServerHandler;
+use rmcp::{
+    ServerHandler,
+    model::{LoggingLevel, LoggingMessageNotificationParam},
+};
 use runtime_io::{
     CommandExecutor, CommandExit, CommandHandle, CommandSpec, IoError, MockCommandHandleBuilder,
 };
 
 use super::{
-    RagSearchParams, RagTools, build_index_command, build_search_command, execute_index_bridge,
-    execute_search_bridge, format_bridge_failure,
+    RagIndexProgressEvent, RagSearchParams, RagTools, build_index_command, build_search_command,
+    execute_index_bridge_with_progress, execute_search_bridge, format_bridge_failure,
+    index_lifecycle_log, index_progress_event_log,
 };
 
 #[derive(Debug, Clone)]
@@ -423,8 +427,9 @@ async fn rag_index_bridge_runs_init_before_update_database() {
         .0;
     let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
 
-    let output =
-        execute_index_bridge(&executor, temp.path()).await.expect("index bridge should succeed");
+    let output = execute_index_bridge_with_progress(&executor, temp.path(), |_| async {})
+        .await
+        .expect("index bridge should succeed");
 
     let commands = executor.recorded_commands();
     assert_eq!(commands.len(), 2);
@@ -463,7 +468,7 @@ async fn rag_index_bridge_skips_update_database_when_init_fails() {
         .0;
     let executor = MockExecutor::from_responses(vec![Ok(init_handle)]);
 
-    let error = execute_index_bridge(&executor, temp.path())
+    let error = execute_index_bridge_with_progress(&executor, temp.path(), |_| async {})
         .await
         .expect_err("init failure must stop the lifecycle");
 
@@ -487,7 +492,7 @@ async fn rag_index_bridge_rejects_invalid_update_database_json() {
         MockCommandHandleBuilder::new(CommandExit::new(true, Some(0))).stdout("not json").build().0;
     let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
 
-    let error = execute_index_bridge(&executor, temp.path())
+    let error = execute_index_bridge_with_progress(&executor, temp.path(), |_| async {})
         .await
         .expect_err("invalid update JSON must fail");
 
@@ -502,8 +507,9 @@ async fn rag_index_bridge_returns_install_guidance_when_vector_database_missing(
     let temp = tempfile::tempdir().expect("tempdir");
     let executor = MockExecutor::new(Err(IoError::Process("not found".to_owned())));
 
-    let error =
-        execute_index_bridge(&executor, temp.path()).await.expect_err("spawn failure should fail");
+    let error = execute_index_bridge_with_progress(&executor, temp.path(), |_| async {})
+        .await
+        .expect_err("spawn failure should fail");
 
     assert_eq!(
         error,
@@ -644,4 +650,213 @@ fn rag_search_mcp_output_remains_compatible_with_cli_json_contract() {
         serde_json::from_str(&reserialized).expect("reserialized JSON must remain valid");
 
     assert_eq!(actual, expected);
+}
+
+// Phase K: MCP progress notification tests.
+//
+// rmcp 1.6.0 exposes `Peer<RoleServer>::notify_logging_message` which sends
+// `notifications/message` events independently from the tool-call response.
+// `execute_index_bridge_with_progress` accepts a generic async notify callback so the
+// notification path is testable without constructing a real `Peer<RoleServer>` (whose
+// constructor is `pub(crate)` inside rmcp).  The tests below verify the formatted
+// notification content and the end-to-end lifecycle order.
+
+#[test]
+fn index_lifecycle_log_produces_info_notification_with_tool_and_message() {
+    let param = index_lifecycle_log("starting rag init");
+
+    assert_eq!(param.level, LoggingLevel::Info);
+    let obj = param.data.as_object().expect("data must be a JSON object");
+    assert_eq!(obj["tool"].as_str().expect("tool"), "rag.index");
+    assert_eq!(obj["message"].as_str().expect("message"), "starting rag init");
+}
+
+#[test]
+fn index_lifecycle_log_init_complete_step_is_correctly_labelled() {
+    let param = index_lifecycle_log("init complete, starting update-database");
+
+    let obj = param.data.as_object().expect("data must be a JSON object");
+    assert!(
+        obj["message"].as_str().expect("message").contains("init complete"),
+        "lifecycle log for the update-database step must mention init completion"
+    );
+}
+
+#[test]
+fn index_progress_event_log_includes_label_and_document_stem() {
+    let event = RagIndexProgressEvent {
+        label: "indexed".to_owned(),
+        package: None,
+        document_stem: Some("spec-00011-rag-plan-implementation".to_owned()),
+        message: None,
+    };
+
+    let param = index_progress_event_log(&event);
+
+    assert_eq!(param.level, LoggingLevel::Info);
+    let obj = param.data.as_object().expect("data must be a JSON object");
+    assert_eq!(obj["tool"].as_str().expect("tool"), "rag.index");
+    assert_eq!(obj["label"].as_str().expect("label"), "indexed");
+    assert_eq!(
+        obj["document_stem"].as_str().expect("document_stem"),
+        "spec-00011-rag-plan-implementation"
+    );
+    assert!(obj["package"].is_null(), "package must be null for workspace-local documents");
+}
+
+#[test]
+fn index_progress_event_log_includes_package_when_present() {
+    let event = RagIndexProgressEvent {
+        label: "unchanged".to_owned(),
+        package: Some("shared-docs".to_owned()),
+        document_stem: Some(
+            "rfc-00041-phase-9-canonical-result-for-retrieval-operation".to_owned(),
+        ),
+        message: None,
+    };
+
+    let param = index_progress_event_log(&event);
+
+    let obj = param.data.as_object().expect("data must be a JSON object");
+    assert_eq!(obj["package"].as_str().expect("package"), "shared-docs");
+    assert_eq!(obj["label"].as_str().expect("label"), "unchanged");
+}
+
+#[test]
+fn index_progress_event_log_includes_message_for_lifecycle_steps() {
+    let event = RagIndexProgressEvent {
+        label: "failed".to_owned(),
+        package: None,
+        document_stem: Some("rfc-00042-phase-10-mcp-search-tool".to_owned()),
+        message: Some("embedding backend offline".to_owned()),
+    };
+
+    let param = index_progress_event_log(&event);
+
+    let obj = param.data.as_object().expect("data must be a JSON object");
+    assert_eq!(obj["label"].as_str().expect("label"), "failed");
+    assert_eq!(obj["message"].as_str().expect("message"), "embedding backend offline");
+}
+
+#[tokio::test]
+async fn rag_index_bridge_with_progress_emits_lifecycle_and_event_notifications_in_order() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let init_handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout("init ok\n")
+        .build()
+        .0;
+    let update_stdout = r#"{
+  "progress": [
+    {
+      "label": "initializing-store",
+      "package": null,
+      "document_stem": null,
+      "message": "Preparing the local RAG store."
+    },
+    {
+      "label": "indexed",
+      "package": null,
+      "document_stem": "spec-00011-rag-plan-implementation",
+      "message": null
+    },
+    {
+      "label": "unchanged",
+      "package": "shared-docs",
+      "document_stem": "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+      "message": null
+    }
+  ],
+  "summary": {
+    "skipped_count": 1,
+    "reindexed_count": 1,
+    "deleted_count": 0,
+    "failures": []
+  }
+}"#;
+    let update_handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout(update_stdout)
+        .build()
+        .0;
+    let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
+
+    let captured: Arc<Mutex<Vec<LoggingMessageNotificationParam>>> =
+        Arc::new(Mutex::new(Vec::new()));
+    let captured_ref = captured.clone();
+
+    let output = execute_index_bridge_with_progress(&executor, temp.path(), move |param| {
+        let sink = captured_ref.clone();
+        async move {
+            sink.lock().expect("lock").push(param);
+        }
+    })
+    .await
+    .expect("bridge with progress should succeed");
+
+    let notifications = captured.lock().expect("lock");
+    // Expected order: "starting rag init", "init complete, starting update-database",
+    // then one notification per progress event (3 events).
+    assert_eq!(notifications.len(), 5, "two lifecycle + three progress event notifications");
+
+    // Lifecycle: starting init
+    let data0 = notifications[0].data.as_object().expect("data[0] must be object");
+    assert!(
+        data0["message"].as_str().expect("message").contains("starting rag init"),
+        "first notification must announce init start"
+    );
+
+    // Lifecycle: init complete
+    let data1 = notifications[1].data.as_object().expect("data[1] must be object");
+    assert!(
+        data1["message"].as_str().expect("message").contains("init complete"),
+        "second notification must announce init completion"
+    );
+
+    // Progress events from parsed JSON
+    let data2 = notifications[2].data.as_object().expect("data[2] must be object");
+    assert_eq!(data2["label"].as_str().expect("label"), "initializing-store");
+
+    let data3 = notifications[3].data.as_object().expect("data[3] must be object");
+    assert_eq!(data3["label"].as_str().expect("label"), "indexed");
+    assert_eq!(
+        data3["document_stem"].as_str().expect("document_stem"),
+        "spec-00011-rag-plan-implementation"
+    );
+
+    let data4 = notifications[4].data.as_object().expect("data[4] must be object");
+    assert_eq!(data4["label"].as_str().expect("label"), "unchanged");
+    assert_eq!(data4["package"].as_str().expect("package"), "shared-docs");
+    drop(notifications);
+
+    // Final result must be deterministic regardless of notification emission.
+    assert_eq!(output.update_database.summary.reindexed_count, 1);
+    assert_eq!(output.update_database.summary.skipped_count, 1);
+    assert_eq!(output.update_database.progress.len(), 3);
+}
+
+#[tokio::test]
+async fn rag_index_bridge_with_progress_notification_failure_does_not_abort_index_run() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let init_handle =
+        MockCommandHandleBuilder::new(CommandExit::new(true, Some(0))).stdout("init ok").build().0;
+    let update_stdout = r#"{
+  "progress": [],
+  "summary": {
+    "skipped_count": 0,
+    "reindexed_count": 0,
+    "deleted_count": 0,
+    "failures": []
+  }
+}"#;
+    let update_handle = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout(update_stdout)
+        .build()
+        .0;
+    let executor = MockExecutor::from_responses(vec![Ok(init_handle), Ok(update_handle)]);
+
+    // Notify callback that drops notifications immediately (simulates a disconnected peer).
+    let output = execute_index_bridge_with_progress(&executor, temp.path(), |_param| async {})
+        .await
+        .expect("index must succeed even when notifications are dropped");
+
+    assert_eq!(output.update_database.summary.reindexed_count, 0);
 }

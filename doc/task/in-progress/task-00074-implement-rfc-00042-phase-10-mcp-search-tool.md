@@ -269,11 +269,14 @@ input:
   language: rust
 ```
 
-- [ ] Verify whether the current `rmcp` server and supported MCP clients can surface tool progress or logging notifications during a long-running tool call.
-- [ ] If MCP progress notifications are supported, emit index lifecycle progress from the `index` tool while `vector-database rag init` and `vector-database rag update-database` run.
-- [ ] If MCP progress notifications are not supported by the current stack, return a structured final response that includes captured command output and document the limitation in the task notes or implementation comments.
-- [ ] Keep the final `index` tool result deterministic even when progress streaming is enabled.
-- [ ] Do not fake streaming by delaying the final MCP response with accumulated logs only.
+- [x] Verify whether the current `rmcp` server and supported MCP clients can surface tool progress or logging notifications during a long-running tool call.
+- [x] If MCP progress notifications are supported, emit index lifecycle progress from the `index` tool while `vector-database rag init` and `vector-database rag update-database` run.
+- [x] If MCP progress notifications are not supported by the current stack, return a structured final response that includes captured command output and document the limitation in the task notes or implementation comments.
+- [x] Keep the final `index` tool result deterministic even when progress streaming is enabled.
+- [x] Do not fake streaming by delaying the final MCP response with accumulated logs only.
+
+### 3.12. Phase L: Map Index Operational Failures and Tests
+Phase K validated on 2026-06-17. `rmcp` 1.6.0 exposes `Peer<RoleServer>::notify_logging_message` which sends `notifications/message` events independently from the tool-call response — MCP logging notifications are fully supported. The `index` tool handler was refactored to call `execute_index_bridge_with_progress`, which accepts a generic async notify callback and emits two lifecycle notifications (before init, before update-database) plus one `notify_logging_message` per structured progress event from the parsed `update-database --json` output. The final `RagIndexOutput` is returned unchanged so the tool result is deterministic regardless of notification delivery. Per-line subprocess output during execution is not available without restructuring `CommandHandle::stream_output` to support async callbacks; this limitation is documented in the implementation. All 137 `mcp-vector` tests pass; `xtask quality-lint -p mcp-vector`, `xtask quality-test -p mcp-vector`, and `cargo fmt --all` passed.
 
 ### 3.12. Phase L: Map Index Operational Failures and Tests
 
