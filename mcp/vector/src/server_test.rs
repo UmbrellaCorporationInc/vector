@@ -258,6 +258,39 @@ fn vector_server_rag_search_tool_metadata_is_stable() {
         !properties.contains_key("root_dir"),
         "search schema must resolve the workspace root from MCP runtime context"
     );
+    let output_schema =
+        tool.output_schema.as_ref().expect("search must expose a structured output schema");
+    let output_schema_json =
+        serde_json::to_value(output_schema).expect("search output schema must serialize");
+    assert_eq!(
+        output_schema_json["type"], "object",
+        "search output schema must describe RetrievalContext as an object"
+    );
+    let output_properties = output_schema_json
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        output_properties.contains_key("query"),
+        "search output schema must expose the retrieval query"
+    );
+    assert!(
+        output_properties.contains_key("status"),
+        "search output schema must expose the retrieval status"
+    );
+    assert!(
+        output_properties.contains_key("sources"),
+        "search output schema must expose normalized sources"
+    );
+    assert!(
+        output_properties.contains_key("chunks"),
+        "search output schema must expose evidence chunks"
+    );
+    assert!(
+        output_properties.contains_key("diagnostics"),
+        "search output schema must expose retrieval diagnostics"
+    );
 }
 
 /// Verifies that `get_tool` resolves the `find_doc` tool by name.
@@ -561,11 +594,32 @@ async fn vector_server_dispatches_rag_search_with_runtime_root_over_transport() 
     let text = content.raw.as_text().expect("tool content must be text").text.as_str();
 
     // A blank-query rejection would mention "non-empty query"; a valid query
-    // must pass input validation and reach the retrieval step.
+    // must pass input validation and reach the bridge step.
     assert!(
         !text.contains("non-empty query"),
-        "valid query must pass input validation and reach retrieval"
+        "valid query must pass input validation and reach the bridge command"
     );
+    if let Some(structured) = result.structured_content.as_ref() {
+        assert!(
+            structured.get("query").is_some(),
+            "structured retrieval content must expose the original query"
+        );
+        assert!(
+            structured.get("status").is_some(),
+            "structured retrieval content must expose retrieval status"
+        );
+        let text_json: serde_json::Value =
+            serde_json::from_str(text).expect("search text content must remain valid JSON");
+        assert_eq!(
+            &text_json, structured,
+            "search text content and structured MCP content must remain contract-compatible"
+        );
+    } else {
+        assert!(
+            text.contains("vector-database") || text.contains("rag.search bridge command failed"),
+            "operational bridge failures must surface actionable CLI bridge context"
+        );
+    }
 
     client.cancel().await.expect("client shutdown must succeed");
     server_handle.abort();

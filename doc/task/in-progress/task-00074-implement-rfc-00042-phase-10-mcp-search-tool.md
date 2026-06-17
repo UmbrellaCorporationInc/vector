@@ -92,11 +92,11 @@ input:
   language: rust
 ```
 
-- [ ] Return the Phase 9 `RetrievalContext` shape defined by [[rfc-00041-phase-9-canonical-result-for-retrieval-operation]].
-- [ ] Preserve query, retrieval status, effective limit, source entries, evidence chunks, package identity, governed document stems, heading paths, token counts, and diagnostics.
-- [ ] Keep empty results as successful structured responses with `status: empty`.
-- [ ] Do not generate answers, summarize evidence chunks, rewrite retrieved text, or decide evidence sufficiency inside the MCP tool.
-- [ ] Keep CLI JSON output and MCP output contract-compatible for the same query.
+- [x] Return the Phase 9 `RetrievalContext` shape defined by [[rfc-00041-phase-9-canonical-result-for-retrieval-operation]].
+- [x] Preserve query, retrieval status, effective limit, source entries, evidence chunks, package identity, governed document stems, heading paths, token counts, and diagnostics.
+- [x] Keep empty results as successful structured responses with `status: empty`.
+- [x] Do not generate answers, summarize evidence chunks, rewrite retrieved text, or decide evidence sufficiency inside the MCP tool.
+- [x] Keep CLI JSON output and MCP output contract-compatible for the same query.
 
 ### 3.4. Phase D: Map Operational Failures
 
