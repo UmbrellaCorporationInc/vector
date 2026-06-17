@@ -1,7 +1,10 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use super::*;
-use runtime_rag::{HybridSearchOutput, HybridSearchResult};
+use runtime_rag::{
+    HybridSearchOutput, HybridSearchResult, RetrievalContext, RetrievalContextChunk,
+    RetrievalContextDiagnostics, RetrievalContextSource, RetrievalMatchReason,
+};
 use serde_json::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -31,6 +34,99 @@ fn sample_output() -> HybridSearchOutput {
         Some("task-00070-implement-rfc-00040-phase-8-hybrid-search".to_owned()),
         3,
         vec![sample_result()],
+    )
+}
+
+fn sample_context() -> RetrievalContext {
+    RetrievalContext::new(
+        "hybrid retrieval".to_owned(),
+        3,
+        vec![RetrievalContextSource::new(
+            "src-1".to_owned(),
+            Some("shared-docs".to_owned()),
+            "task-00070-implement-rfc-00040-phase-8-hybrid-search".to_owned(),
+            vec!["Phase D".to_owned()],
+            "shared-docs/task-00070-implement-rfc-00040-phase-8-hybrid-search > Phase D".to_owned(),
+        )],
+        vec![RetrievalContextChunk::new(
+            "ctx-1".to_owned(),
+            "src-1".to_owned(),
+            Some("shared-docs".to_owned()),
+            "task-00070-implement-rfc-00040-phase-8-hybrid-search".to_owned(),
+            vec!["Phase D".to_owned()],
+            "chunk-001".to_owned(),
+            1,
+            "Hybrid retrieval result text.".to_owned(),
+            42,
+            RetrievalMatchReason::Primary,
+        )],
+        RetrievalContextDiagnostics::new(42, 0, 3),
+    )
+}
+
+fn empty_context() -> RetrievalContext {
+    RetrievalContext::empty("no matches".to_owned(), 3)
+}
+
+fn expanded_context() -> RetrievalContext {
+    RetrievalContext::new(
+        "expanded context".to_owned(),
+        4,
+        vec![
+            RetrievalContextSource::new(
+                "src-1".to_owned(),
+                Some("shared-docs".to_owned()),
+                "spec-00011-rag-plan-implementation".to_owned(),
+                vec!["Phase 9".to_owned()],
+                "shared-docs/spec-00011-rag-plan-implementation > Phase 9".to_owned(),
+            ),
+            RetrievalContextSource::new(
+                "src-2".to_owned(),
+                None,
+                "rfc-00041-phase-9-canonical-result-for-retrieval-operation".to_owned(),
+                vec!["Source Attribution Contract".to_owned()],
+                "rfc-00041-phase-9-canonical-result-for-retrieval-operation > Source Attribution Contract".to_owned(),
+            ),
+        ],
+        vec![
+            RetrievalContextChunk::new(
+                "ctx-1".to_owned(),
+                "src-1".to_owned(),
+                Some("shared-docs".to_owned()),
+                "spec-00011-rag-plan-implementation".to_owned(),
+                vec!["Phase 9".to_owned()],
+                "chunk-package-primary".to_owned(),
+                7,
+                "Package primary evidence.".to_owned(),
+                11,
+                RetrievalMatchReason::Primary,
+            ),
+            RetrievalContextChunk::new(
+                "ctx-2".to_owned(),
+                "src-1".to_owned(),
+                Some("shared-docs".to_owned()),
+                "spec-00011-rag-plan-implementation".to_owned(),
+                vec!["Phase 9".to_owned()],
+                "chunk-package-expanded".to_owned(),
+                8,
+                "Package expanded evidence.".to_owned(),
+                13,
+                RetrievalMatchReason::Expanded,
+            ),
+            RetrievalContextChunk::new(
+                "ctx-3".to_owned(),
+                "src-2".to_owned(),
+                None,
+                "rfc-00041-phase-9-canonical-result-for-retrieval-operation".to_owned(),
+                vec!["Source Attribution Contract".to_owned()],
+                "chunk-workspace-primary".to_owned(),
+                2,
+                "Workspace primary evidence.".to_owned(),
+                17,
+                RetrievalMatchReason::Primary,
+            ),
+        ],
+        RetrievalContextDiagnostics::new(41, 2, 4),
     )
 }
 
@@ -78,26 +174,199 @@ fn parse_args_rejects_missing_query_and_zero_limit() {
 }
 
 #[test]
-fn render_human_output_includes_identity_score_and_text() {
-    let rendered = render_human_output(&sample_output());
+fn render_human_output_includes_context_identity_and_text() {
+    let rendered = render_human_output(&sample_context());
 
-    assert!(rendered.contains("Retrieved 1 result(s) for 'hybrid retrieval'"));
+    assert!(rendered.contains("Retrieval Context"));
+    assert!(rendered.contains("status=has_results query='hybrid retrieval' limit=3 returned=1"));
+    assert!(rendered.contains("Sources:"));
+    assert!(rendered.contains("- src-1 [shared-docs]"));
     assert!(
         rendered.contains("[shared-docs] task-00070-implement-rfc-00040-phase-8-hybrid-search")
     );
-    assert!(rendered.contains("score=0.032500"));
+    assert!(rendered.contains("Chunks:"));
+    assert!(rendered.contains("- ctx-1 [shared-docs]"));
+    assert!(rendered.contains("source=src-1 chunk=chunk-001 ordinal=1 tokens=42"));
+    assert!(rendered.contains("match_reason=primary"));
     assert!(rendered.contains("Hybrid retrieval result text."));
+    assert!(rendered.contains("Diagnostics:"));
+    assert!(rendered.contains("total_token_count=42 dropped_after_limit=0 retrieval_limit=3"));
 }
 
 #[test]
-fn render_json_output_preserves_machine_readable_payload() {
-    let rendered = render_json_output(&sample_output()).expect("json rendering should succeed");
+fn render_human_output_includes_primary_expanded_repeated_sources_packages_and_diagnostics() {
+    let rendered = render_human_output(&expanded_context());
+
+    assert!(rendered.contains("status=has_results query='expanded context' limit=4 returned=3"));
+    assert!(rendered.contains(
+        "- src-1 [shared-docs] spec-00011-rag-plan-implementation :: Phase 9 \
+         (shared-docs/spec-00011-rag-plan-implementation > Phase 9)"
+    ));
+    assert!(rendered.contains(
+        "- src-2 [<workspace>] rfc-00041-phase-9-canonical-result-for-retrieval-operation \
+         :: Source Attribution Contract \
+         (rfc-00041-phase-9-canonical-result-for-retrieval-operation > Source Attribution Contract)"
+    ));
+    assert!(
+        rendered.contains("- ctx-1 [shared-docs] spec-00011-rag-plan-implementation :: Phase 9")
+    );
+    assert!(rendered.contains(
+        "source=src-1 chunk=chunk-package-primary ordinal=7 tokens=11 match_reason=primary"
+    ));
+    assert!(rendered.contains(
+        "source=src-1 chunk=chunk-package-expanded ordinal=8 tokens=13 match_reason=expanded"
+    ));
+    assert!(rendered.contains(
+        "source=src-2 chunk=chunk-workspace-primary ordinal=2 tokens=17 match_reason=primary"
+    ));
+    assert!(rendered.contains("Package primary evidence."));
+    assert!(rendered.contains("Package expanded evidence."));
+    assert!(rendered.contains("Workspace primary evidence."));
+    assert!(rendered.contains("total_token_count=41 dropped_after_limit=2 retrieval_limit=4"));
+}
+
+#[test]
+fn render_human_output_preserves_empty_retrieval_as_successful_context() {
+    let rendered = render_human_output(&empty_context());
+
+    assert!(rendered.contains("status=empty query='no matches' limit=3 returned=0"));
+    assert!(rendered.contains("Sources:\n\n- none"));
+    assert!(rendered.contains("Chunks:\n\n- none"));
+    assert!(rendered.contains("total_token_count=0 dropped_after_limit=0 retrieval_limit=3"));
+}
+
+#[test]
+fn render_json_output_serializes_retrieval_context_payload() {
+    let rendered = render_json_output(&sample_context()).expect("json rendering should succeed");
     let payload: Value = serde_json::from_str(&rendered).expect("json payload should parse");
 
-    assert_eq!(payload["query_text"], "hybrid retrieval");
-    assert_eq!(payload["package_filter"], "shared-docs");
-    assert_eq!(payload["results"][0]["chunk_id"], "chunk-001");
-    assert_eq!(payload["results"][0]["lexical_rank"], 1);
+    assert_eq!(payload["query"], "hybrid retrieval");
+    assert_eq!(payload["status"], "has_results");
+    assert_eq!(payload["limit"], 3);
+    assert_eq!(payload["returned"], 1);
+    assert_eq!(payload["sources"][0]["package"], "shared-docs");
+    assert_eq!(payload["sources"][0]["source_id"], "src-1");
+    assert_eq!(
+        payload["sources"][0]["citation_label"],
+        "shared-docs/task-00070-implement-rfc-00040-phase-8-hybrid-search > Phase D"
+    );
+    assert_eq!(payload["chunks"][0]["context_id"], "ctx-1");
+    assert_eq!(payload["chunks"][0]["source_id"], "src-1");
+    assert_eq!(payload["chunks"][0]["chunk_id"], "chunk-001");
+    assert_eq!(payload["chunks"][0]["token_count"], 42);
+    assert_eq!(payload["chunks"][0]["match_reason"], "primary");
+    assert_eq!(payload["diagnostics"]["total_token_count"], 42);
+    assert_eq!(payload["diagnostics"]["dropped_after_limit"], 0);
+    assert_eq!(payload["diagnostics"]["retrieval_limit"], 3);
+}
+
+#[test]
+fn render_json_output_serializes_full_phase_nine_canonical_context_shape() {
+    let rendered = render_json_output(&expanded_context()).expect("json rendering should succeed");
+    let payload: Value = serde_json::from_str(&rendered).expect("json payload should parse");
+
+    assert_eq!(payload["query"], "expanded context");
+    assert_eq!(payload["status"], "has_results");
+    assert_eq!(payload["limit"], 4);
+    assert_eq!(payload["returned"], 3);
+    assert_eq!(
+        payload["sources"],
+        serde_json::json!([
+            {
+                "source_id": "src-1",
+                "package": "shared-docs",
+                "document_stem": "spec-00011-rag-plan-implementation",
+                "heading_path": ["Phase 9"],
+                "citation_label": "shared-docs/spec-00011-rag-plan-implementation > Phase 9"
+            },
+            {
+                "source_id": "src-2",
+                "package": null,
+                "document_stem": "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+                "heading_path": ["Source Attribution Contract"],
+                "citation_label": "rfc-00041-phase-9-canonical-result-for-retrieval-operation > Source Attribution Contract"
+            }
+        ])
+    );
+    assert_eq!(
+        payload["chunks"],
+        serde_json::json!([
+            {
+                "context_id": "ctx-1",
+                "source_id": "src-1",
+                "package": "shared-docs",
+                "document_stem": "spec-00011-rag-plan-implementation",
+                "heading_path": ["Phase 9"],
+                "chunk_id": "chunk-package-primary",
+                "chunk_ordinal": 7,
+                "text": "Package primary evidence.",
+                "token_count": 11,
+                "match_reason": "primary"
+            },
+            {
+                "context_id": "ctx-2",
+                "source_id": "src-1",
+                "package": "shared-docs",
+                "document_stem": "spec-00011-rag-plan-implementation",
+                "heading_path": ["Phase 9"],
+                "chunk_id": "chunk-package-expanded",
+                "chunk_ordinal": 8,
+                "text": "Package expanded evidence.",
+                "token_count": 13,
+                "match_reason": "expanded"
+            },
+            {
+                "context_id": "ctx-3",
+                "source_id": "src-2",
+                "package": null,
+                "document_stem": "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+                "heading_path": ["Source Attribution Contract"],
+                "chunk_id": "chunk-workspace-primary",
+                "chunk_ordinal": 2,
+                "text": "Workspace primary evidence.",
+                "token_count": 17,
+                "match_reason": "primary"
+            }
+        ])
+    );
+    assert_eq!(
+        payload["diagnostics"],
+        serde_json::json!({
+            "total_token_count": 41,
+            "dropped_after_limit": 2,
+            "retrieval_limit": 4
+        })
+    );
+}
+
+#[test]
+fn render_json_output_preserves_empty_retrieval_context() {
+    let rendered = render_json_output(&empty_context()).expect("json rendering should succeed");
+    let payload: Value = serde_json::from_str(&rendered).expect("json payload should parse");
+
+    assert_eq!(payload["query"], "no matches");
+    assert_eq!(payload["status"], "empty");
+    assert_eq!(payload["limit"], 3);
+    assert_eq!(payload["returned"], 0);
+    assert_eq!(payload["sources"], serde_json::json!([]));
+    assert_eq!(payload["chunks"], serde_json::json!([]));
+    assert_eq!(payload["diagnostics"]["total_token_count"], 0);
+    assert_eq!(payload["diagnostics"]["dropped_after_limit"], 0);
+    assert_eq!(payload["diagnostics"]["retrieval_limit"], 3);
+}
+
+#[tokio::test]
+async fn assemble_retrieval_context_converts_hybrid_search_output_before_rendering() {
+    let context =
+        assemble_retrieval_context(sample_output()).await.expect("context assembly should succeed");
+
+    assert_eq!(context.query, "hybrid retrieval");
+    assert_eq!(context.limit, 3);
+    assert_eq!(context.returned, 1);
+    assert_eq!(context.sources[0].source_id, "src-1");
+    assert_eq!(context.chunks[0].context_id, "ctx-1");
+    assert_eq!(context.chunks[0].chunk_id, "chunk-001");
+    assert_eq!(context.chunks[0].match_reason, RetrievalMatchReason::Primary);
 }
 
 #[tokio::test]

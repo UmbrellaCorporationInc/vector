@@ -13,6 +13,7 @@ futures = { workspace = true }
 lancedb = { workspace = true }
 runtime-core = { workspace = true }
 runtime-markdown = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["fs"] }
 
