@@ -178,6 +178,88 @@ async fn rag_search_bridge_parses_cli_retrieval_context() {
 }
 
 #[tokio::test]
+async fn rag_search_bridge_parses_non_empty_query_results() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let stdout = r#"{
+  "query": "governed document context",
+  "status": "has_results",
+  "limit": 3,
+  "returned": 1,
+  "sources": [
+    {
+      "source_id": "src-1",
+      "package": "shared-docs",
+      "document_stem": "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+      "heading_path": ["Proposal", "Canonical Output Shape"],
+      "citation_label": "shared-docs/rfc-00041-phase-9-canonical-result-for-retrieval-operation > Proposal > Canonical Output Shape"
+    }
+  ],
+  "chunks": [
+    {
+      "context_id": "ctx-1",
+      "source_id": "src-1",
+      "package": "shared-docs",
+      "document_stem": "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+      "heading_path": ["Proposal", "Canonical Output Shape"],
+      "chunk_id": "chunk-1",
+      "chunk_ordinal": 0,
+      "text": "RetrievalContext separates metadata from evidence chunks.",
+      "token_count": 8,
+      "match_reason": "primary"
+    }
+  ],
+  "diagnostics": {
+    "total_token_count": 8,
+    "dropped_after_limit": 0,
+    "retrieval_limit": 3
+  }
+}"#;
+    let executor =
+        MockExecutor::new(Ok(MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+            .stdout(stdout)
+            .build()
+            .0));
+    let params = RagSearchParams {
+        query: "governed document context".to_owned(),
+        limit: Some(3),
+        package: Some("shared-docs".to_owned()),
+        document: Some("rfc-00041-phase-9-canonical-result-for-retrieval-operation".to_owned()),
+    };
+
+    let context = execute_search_bridge(&executor, temp.path(), &params)
+        .await
+        .expect("bridge should parse non-empty retrieval context");
+
+    assert_eq!(context.status, super::RetrievalContextStatus::HasResults);
+    assert_eq!(context.returned, 1);
+    assert_eq!(context.limit, 3);
+    assert_eq!(context.sources.len(), 1);
+    assert_eq!(context.chunks.len(), 1);
+    assert_eq!(context.sources[0].package.as_deref(), Some("shared-docs"));
+    assert_eq!(
+        context.sources[0].document_stem,
+        "rfc-00041-phase-9-canonical-result-for-retrieval-operation"
+    );
+    assert_eq!(context.chunks[0].match_reason, super::RetrievalMatchReason::Primary);
+    let commands = executor.recorded_commands();
+    assert_eq!(
+        commands[0].args,
+        vec![
+            "rag",
+            "search",
+            "governed document context",
+            "--json",
+            "--package",
+            "shared-docs",
+            "--document",
+            "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+            "--limit",
+            "3",
+        ]
+    );
+}
+
+#[tokio::test]
 async fn rag_search_bridge_returns_install_guidance_when_vector_database_missing() {
     let temp = tempfile::tempdir().expect("tempdir");
     let executor = MockExecutor::new(Err(IoError::Process("not found".to_owned())));
@@ -320,4 +402,59 @@ fn format_bridge_failure_classifies_query_embedding_failures() {
         error,
         "rag.search failed to embed the query: query embedding failed: backend offline"
     );
+}
+
+#[test]
+fn rag_search_mcp_output_remains_compatible_with_cli_json_contract() {
+    let cli_json = r#"{
+  "query": "governed document context",
+  "status": "has_results",
+  "limit": 2,
+  "returned": 1,
+  "sources": [
+    {
+      "source_id": "src-1",
+      "package": "shared-docs",
+      "document_stem": "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+      "heading_path": [
+        "Proposal",
+        "Canonical Output Shape"
+      ],
+      "citation_label": "shared-docs/rfc-00041-phase-9-canonical-result-for-retrieval-operation > Proposal > Canonical Output Shape"
+    }
+  ],
+  "chunks": [
+    {
+      "context_id": "ctx-1",
+      "source_id": "src-1",
+      "package": "shared-docs",
+      "document_stem": "rfc-00041-phase-9-canonical-result-for-retrieval-operation",
+      "heading_path": [
+        "Proposal",
+        "Canonical Output Shape"
+      ],
+      "chunk_id": "chunk-1",
+      "chunk_ordinal": 0,
+      "text": "RetrievalContext separates metadata from evidence chunks.",
+      "token_count": 8,
+      "match_reason": "primary"
+    }
+  ],
+  "diagnostics": {
+    "total_token_count": 8,
+    "dropped_after_limit": 0,
+    "retrieval_limit": 2
+  }
+}"#;
+
+    let parsed: super::RetrievalContext =
+        serde_json::from_str(cli_json).expect("MCP bridge must parse canonical CLI retrieval JSON");
+    let reserialized = serde_json::to_string_pretty(&parsed)
+        .expect("MCP output should preserve the same contract");
+    let expected: serde_json::Value =
+        serde_json::from_str(cli_json).expect("fixture JSON must remain valid");
+    let actual: serde_json::Value =
+        serde_json::from_str(&reserialized).expect("reserialized JSON must remain valid");
+
+    assert_eq!(actual, expected);
 }

@@ -120,6 +120,8 @@ input:
 - [x] If using the bridge command, return actionable MCP errors for invalid or incompatible JSON output.
 - [x] Do not collapse operational failures into empty retrieval responses.
 
+Phase D validated on 2026-06-17 with the MCP RAG bridge test suite and Rust quality gates.
+
 ### 3.5. Phase E: Test the MCP Search Tool
 
 ```vector-agent-action
@@ -132,17 +134,19 @@ input:
   language: rust
 ```
 
-- [ ] Add or update tests for valid query results.
-- [ ] Add or update tests for empty result responses.
-- [ ] Add or update tests for `limit` overrides.
-- [ ] Add or update tests for package filters.
-- [ ] Add or update tests for document filters.
-- [ ] Add or update tests for invalid filters.
-- [ ] Add or update tests for missing index failures.
-- [ ] If using the bridge command, add or update tests for `vector-database` execution failures.
-- [ ] If using the bridge command, add or update tests for non-zero CLI exits.
-- [ ] If using the bridge command, add or update tests for bridge JSON parse failures.
-- [ ] Add or update a compatibility test that proves CLI JSON output and MCP output use the same retrieval context contract.
+- [x] Add or update tests for valid query results.
+- [x] Add or update tests for empty result responses.
+- [x] Add or update tests for `limit` overrides.
+- [x] Add or update tests for package filters.
+- [x] Add or update tests for document filters.
+- [x] Add or update tests for invalid filters.
+- [x] Add or update tests for missing index failures.
+- [x] If using the bridge command, add or update tests for `vector-database` execution failures.
+- [x] If using the bridge command, add or update tests for non-zero CLI exits.
+- [x] If using the bridge command, add or update tests for bridge JSON parse failures.
+- [x] Add or update a compatibility test that proves CLI JSON output and MCP output use the same retrieval context contract.
+
+Phase E validated on 2026-06-17 with the MCP `rag.search` bridge test suite. The focused Rust tests passed. The broader Rust quality-gate commands remain blocked in this environment because `protoc` is not installed and an agent-generated workspace `.cargo-target/` directory is being scanned by the repository lint rules.
 
 ### 3.6. Phase F: Locate the MCP Index Tool Boundary
 
