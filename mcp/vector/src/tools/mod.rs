@@ -2,4 +2,5 @@
 pub mod document;
 pub mod language;
 pub mod project;
+pub mod rag;
 pub mod version;

@@ -82,6 +82,18 @@ fn vector_server_exposes_get_version_tool() {
     );
 }
 
+/// Verifies that `get_tool` resolves the RAG `search` tool by its flattened name.
+#[test]
+fn vector_server_exposes_rag_search_tool_with_flattened_name() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("search");
+    assert!(tool.is_some(), "VectorServer must expose the RAG search tool");
+    assert!(
+        server.get_tool("rag.search").is_none(),
+        "rmcp tool registration is flattened today: the RAG category method is exposed as `search`"
+    );
+}
+
 /// Verifies that `get_tool` returns `None` for an unregistered name.
 #[test]
 fn vector_server_returns_none_for_unknown_tool() {
@@ -193,6 +205,42 @@ fn vector_server_get_version_tool_metadata_is_stable() {
         .cloned()
         .unwrap_or_default();
     assert!(properties.is_empty(), "get_version must remain a read-only zero-argument tool");
+}
+
+/// Verifies that the RAG `search` metadata matches the Phase A MCP boundary.
+#[test]
+fn vector_server_rag_search_tool_metadata_is_stable() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("search").expect("VectorServer must expose the RAG search tool");
+    let description = tool.description.as_ref().expect("search tool must expose a description");
+
+    assert_eq!(tool.name, "search");
+    assert_eq!(
+        description,
+        "Query the local RAG index for this workspace and return relevant governed document \
+         context."
+    );
+    assert_eq!(tool.input_schema["type"], "object", "search input schema must be an object");
+    let required = tool
+        .input_schema
+        .get("required")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !required.iter().any(|value| value == "root_dir"),
+        "search schema must not accept caller-provided root_dir"
+    );
+    let properties = tool
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !properties.contains_key("root_dir"),
+        "search schema must resolve the workspace root from MCP runtime context"
+    );
 }
 
 /// Verifies that `get_tool` resolves the `find_doc` tool by name.
@@ -383,6 +431,10 @@ fn vector_server_project_tool_group_remains_intact() {
         server.get_tool("get_version").is_some(),
         "version tools must coexist alongside the project, document, and language tool groups"
     );
+    assert!(
+        server.get_tool("search").is_some(),
+        "RAG tools must coexist alongside the project, document, language, and version tool groups"
+    );
 }
 
 #[tokio::test]
@@ -409,6 +461,11 @@ async fn vector_server_lists_tools_from_both_groups_over_transport() {
     assert!(tool_names.contains(&"find_doc"), "document lookup tool must be listed");
     assert!(tool_names.contains(&"language_quality_gate"), "language tools must be listed");
     assert!(tool_names.contains(&"get_version"), "version tools must be listed");
+    assert!(tool_names.contains(&"search"), "RAG search tool must be listed");
+    assert!(
+        !tool_names.contains(&"rag.search"),
+        "RAG search is listed by flattened tool name in the current registry"
+    );
 
     client.cancel().await.expect("client shutdown must succeed");
     server_handle.abort();
@@ -446,6 +503,48 @@ async fn vector_server_dispatches_version_tool_calls_over_transport() {
         text,
         workspace_version(),
         "get_version must return the canonical workspace version string"
+    );
+
+    client.cancel().await.expect("client shutdown must succeed");
+    server_handle.abort();
+}
+
+#[tokio::test]
+async fn vector_server_dispatches_rag_search_with_runtime_root_over_transport() {
+    let (server_transport, client_transport) = tokio::io::duplex(4096);
+
+    let server_handle = tokio::spawn(async move {
+        VectorServer::new()
+            .serve(server_transport)
+            .await
+            .expect("server must start")
+            .waiting()
+            .await
+            .expect("server task must complete cleanly");
+    });
+
+    let client = DummyClientHandler.serve(client_transport).await.expect("client must connect");
+
+    let result = client
+        .call_tool(CallToolRequestParams::new("search").with_arguments(Map::new()))
+        .await
+        .expect("search tool call must succeed");
+
+    let text = result
+        .content
+        .first()
+        .and_then(|content| content.raw.as_text())
+        .map(|text| text.text.as_str())
+        .expect("tool result must contain text content");
+    let current_dir = std::env::current_dir().expect("test process must expose current dir");
+
+    assert!(
+        text.contains("rag.search is registered"),
+        "search call must be routed to the RAG tool group"
+    );
+    assert!(
+        text.contains(&current_dir.display().to_string()),
+        "search must resolve the workspace root from MCP runtime context"
     );
 
     client.cancel().await.expect("client shutdown must succeed");

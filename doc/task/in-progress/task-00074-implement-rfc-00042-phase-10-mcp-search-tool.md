@@ -56,10 +56,10 @@ input:
   language: rust
 ```
 
-- [ ] Identify the existing MCP tool registration pattern and add the RAG category tool named `search` in the same style.
-- [ ] Ensure the user-facing tool description states that it queries the local RAG index and returns relevant governed document context.
-- [ ] Resolve the workspace root from MCP runtime context instead of accepting a caller-provided path.
-- [ ] Confirm whether the MCP registry exposes the tool as `rag.search` or flattens category and name into a single identifier.
+- [x] Identify the existing MCP tool registration pattern and add the RAG category tool named `search` in the same style.
+- [x] Ensure the user-facing tool description states that it queries the local RAG index and returns relevant governed document context.
+- [x] Resolve the workspace root from MCP runtime context instead of accepting a caller-provided path.
+- [x] Confirm whether the MCP registry exposes the tool as `rag.search` or flattens category and name into a single identifier.
 
 ### 3.2. Phase B: Implement the Input and Execution Contract
 
