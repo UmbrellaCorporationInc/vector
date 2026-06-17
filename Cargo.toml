@@ -75,5 +75,5 @@ cast_sign_loss = "warn"
 missing_docs = "warn"
 
 [profile.release]
-lto = true
-strip = true
+lto = false
+strip = false
