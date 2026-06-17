@@ -77,6 +77,41 @@ fn rag_tools_exposes_search_metadata() {
 }
 
 #[test]
+fn rag_tools_exposes_index_metadata() {
+    let tools = RagTools::new();
+    let index = tools.get_tool("index").expect("RagTools must expose index");
+    let description = index.description.as_ref().expect("index must expose a description");
+
+    assert_eq!(index.name, "index");
+    assert_eq!(
+        description,
+        "Initialize the local RAG store for this workspace and update the workspace RAG index."
+    );
+    assert!(
+        tools.get_tool("rag.index").is_none(),
+        "the current rmcp registry exposes the RAG tool by flattened name"
+    );
+    assert_eq!(index.input_schema["type"], "object", "index input schema must be an object");
+    let required = index
+        .input_schema
+        .get("required")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    assert!(required.is_empty(), "index must not require caller-provided inputs");
+    let properties = index
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !properties.contains_key("root_dir"),
+        "index must resolve the workspace root from MCP runtime context"
+    );
+}
+
+#[test]
 fn rag_search_builds_vector_database_bridge_command() {
     let temp = tempfile::tempdir().expect("tempdir");
     let params = RagSearchParams {

@@ -160,11 +160,13 @@ input:
   language: rust
 ```
 
-- [ ] Add the RAG category tool named `index` in the same MCP tool group and registration style as `search`.
-- [ ] Ensure the user-facing tool description states that it initializes the local RAG store and updates the workspace RAG index.
-- [ ] Resolve the workspace root from MCP runtime context instead of accepting a caller-provided path.
-- [ ] Confirm whether the MCP registry exposes the tool as `rag.index` or flattens category and name into a single identifier.
-- [ ] Keep the `index` tool focused on index lifecycle work and separate from query retrieval behavior.
+- [x] Add the RAG category tool named `index` in the same MCP tool group and registration style as `search`.
+- [x] Ensure the user-facing tool description states that it initializes the local RAG store and updates the workspace RAG index.
+- [x] Resolve the workspace root from MCP runtime context instead of accepting a caller-provided path.
+- [x] Confirm whether the MCP registry exposes the tool as `rag.index` or flattens category and name into a single identifier.
+- [x] Keep the `index` tool focused on index lifecycle work and separate from query retrieval behavior.
+
+Phase F validated on 2026-06-17 with focused `mcp-vector` Rust tests covering the new RAG `index` tool metadata, flattened MCP registration, and transport listing. The Rust quality gate prompt was resolved for `rust`. `xtask quality-lint -p mcp-vector` still fails because repository lint rules scan the agent-generated workspace `.cargo-target/` directory and report third-party generated files outside this task's scope.
 
 ### 3.7. Phase G: Implement the Index Execution Contract
 

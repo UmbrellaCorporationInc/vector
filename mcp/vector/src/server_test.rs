@@ -94,6 +94,18 @@ fn vector_server_exposes_rag_search_tool_with_flattened_name() {
     );
 }
 
+/// Verifies that `get_tool` resolves the RAG `index` tool by its flattened name.
+#[test]
+fn vector_server_exposes_rag_index_tool_with_flattened_name() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("index");
+    assert!(tool.is_some(), "VectorServer must expose the RAG index tool");
+    assert!(
+        server.get_tool("rag.index").is_none(),
+        "rmcp tool registration is flattened today: the RAG category method is exposed as `index`"
+    );
+}
+
 /// Verifies that `get_tool` returns `None` for an unregistered name.
 #[test]
 fn vector_server_returns_none_for_unknown_tool() {
@@ -293,6 +305,45 @@ fn vector_server_rag_search_tool_metadata_is_stable() {
     );
 }
 
+/// Verifies that the RAG `index` metadata matches the Phase F MCP boundary.
+#[test]
+fn vector_server_rag_index_tool_metadata_is_stable() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("index").expect("VectorServer must expose the RAG index tool");
+    let description = tool.description.as_ref().expect("index tool must expose a description");
+
+    assert_eq!(tool.name, "index");
+    assert_eq!(
+        description,
+        "Initialize the local RAG store for this workspace and update the workspace RAG index."
+    );
+    assert_eq!(tool.input_schema["type"], "object", "index input schema must be an object");
+    let required = tool
+        .input_schema
+        .get("required")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        required.is_empty(),
+        "index must not require caller-provided fields for workspace resolution"
+    );
+    let properties = tool
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !properties.contains_key("root_dir"),
+        "index must resolve the workspace root from MCP runtime context"
+    );
+    assert!(
+        !properties.contains_key("query"),
+        "index must remain separate from retrieval query behavior"
+    );
+}
+
 /// Verifies that `get_tool` resolves the `find_doc` tool by name.
 #[test]
 fn vector_server_exposes_find_doc_tool() {
@@ -485,6 +536,10 @@ fn vector_server_project_tool_group_remains_intact() {
         server.get_tool("search").is_some(),
         "RAG tools must coexist alongside the project, document, language, and version tool groups"
     );
+    assert!(
+        server.get_tool("index").is_some(),
+        "RAG index must coexist alongside the project, document, language, and version tool groups"
+    );
 }
 
 #[tokio::test]
@@ -512,9 +567,14 @@ async fn vector_server_lists_tools_from_both_groups_over_transport() {
     assert!(tool_names.contains(&"language_quality_gate"), "language tools must be listed");
     assert!(tool_names.contains(&"get_version"), "version tools must be listed");
     assert!(tool_names.contains(&"search"), "RAG search tool must be listed");
+    assert!(tool_names.contains(&"index"), "RAG index tool must be listed");
     assert!(
         !tool_names.contains(&"rag.search"),
         "RAG search is listed by flattened tool name in the current registry"
+    );
+    assert!(
+        !tool_names.contains(&"rag.index"),
+        "RAG index is listed by flattened tool name in the current registry"
     );
 
     client.cancel().await.expect("client shutdown must succeed");

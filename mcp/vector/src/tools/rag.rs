@@ -34,6 +34,13 @@ pub struct RagSearchParams {
     pub document: Option<String>,
 }
 
+/// MCP-facing parameters for the `index` tool.
+///
+/// # DTO(MCP protocol input mapped at the adapter boundary; the index lifecycle is rooted in runtime context, so no caller-provided fields are accepted)
+#[non_exhaustive]
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
+pub struct RagIndexParams {}
+
 /// Canonical retrieval context returned by the MCP `search` bridge.
 ///
 /// # DTO(machine-readable retrieval context parsed from the `vector-database` CLI bridge and emitted as structured MCP output)
@@ -169,10 +176,11 @@ struct BridgeCommandOutput {
 }
 
 fn resolve_workspace_root_from_runtime_context(
+    tool_name: &str,
     _context: &rmcp::service::RequestContext<RoleServer>,
 ) -> Result<PathBuf, String> {
     std::env::current_dir().map_err(|error| {
-        format!("rag.search failed to resolve the MCP runtime workspace root: {error}")
+        format!("{tool_name} failed to resolve the MCP runtime workspace root: {error}")
     })
 }
 
@@ -309,7 +317,7 @@ impl RagTools {
         context: rmcp::service::RequestContext<RoleServer>,
         Parameters(params): Parameters<RagSearchParams>,
     ) -> Result<Json<RetrievalContext>, String> {
-        let workspace_root = resolve_workspace_root_from_runtime_context(&context)?;
+        let workspace_root = resolve_workspace_root_from_runtime_context("rag.search", &context)?;
 
         if params.query.trim().is_empty() {
             return Err("rag.search requires a non-empty query".to_owned());
@@ -318,6 +326,20 @@ impl RagTools {
         let executor = runtime_io::ProcessCommandExecutor::default();
         let context_result = execute_search_bridge(&executor, &workspace_root, &params).await?;
         Ok(Json(context_result))
+    }
+
+    /// Initialize and update the local RAG index for this workspace.
+    #[tool(
+        name = "index",
+        description = "Initialize the local RAG store for this workspace and update the workspace RAG index."
+    )]
+    async fn index(
+        &self,
+        context: rmcp::service::RequestContext<RoleServer>,
+        Parameters(_params): Parameters<RagIndexParams>,
+    ) -> Result<String, String> {
+        let _workspace_root = resolve_workspace_root_from_runtime_context("rag.index", &context)?;
+        Err("rag.index lifecycle execution is not implemented yet; Phase G will add the init and update-database bridge.".to_owned())
     }
 }
 
