@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 const VECTOR_DATABASE_BINARY: &str = "vector-database";
 const INSTALL_GUIDANCE: &str = "vector-database is not available on PATH. \
 Install or expose the CLI bridge and try again.";
+const VECTOR_RAG_HELP_BANNER: &str = "vector-rag: Companion CLI for local RAG runtime execution.";
 
 /// MCP-facing parameters for the `search` tool.
 ///
@@ -237,17 +238,61 @@ async fn collect_command_output(mut handle: CommandHandle) -> Result<BridgeComma
 }
 
 fn format_bridge_failure(output: &BridgeCommandOutput) -> String {
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    let detail = if !stderr.is_empty() {
-        stderr
+    let stderr = sanitize_bridge_stream(&output.stderr);
+    let stdout = sanitize_bridge_stream(&output.stdout);
+    if !stderr.is_empty() {
+        classify_bridge_failure(&stderr)
     } else if !stdout.is_empty() {
-        stdout
+        classify_bridge_failure(&stdout)
     } else if let Some(code) = output.exit.code {
         format!("vector-database exited with code {code}")
     } else {
         "vector-database exited without an exit code".to_owned()
-    };
+    }
+}
+
+fn sanitize_bridge_stream(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let without_help =
+        trimmed.split_once(VECTOR_RAG_HELP_BANNER).map_or(trimmed, |(before, _)| before.trim_end());
+    without_help.strip_prefix("error: ").unwrap_or(without_help).trim().to_owned()
+}
+
+fn classify_bridge_failure(detail: &str) -> String {
+    if detail.contains("RAG store is missing at") {
+        return format!("rag.search requires an initialized local RAG store: {detail}");
+    }
+    if detail.contains("incompatible with embedding contract")
+        || detail.contains("embedding_model")
+        || detail.contains("embedding_dimension")
+    {
+        return format!("rag.search found incompatible RAG embedding metadata: {detail}");
+    }
+    if detail.contains("failed to open LanceDB table")
+        || detail.contains("failed to connect LanceDB database")
+        || detail.contains("invalid vector column")
+        || detail.contains("candidate query result is missing")
+        || detail.contains("heading_path column")
+        || detail.contains("chunk_ordinal column")
+        || detail.contains("token_count column")
+    {
+        return format!("rag.search found a corrupt LanceDB table or schema: {detail}");
+    }
+    if detail.contains("package_filter must not be empty")
+        || detail.contains("document_filter must not be empty")
+    {
+        return format!("rag.search rejected an invalid package or document filter: {detail}");
+    }
+    if detail.contains("query embedding failed")
+        || detail.contains("query embedding returned no vectors")
+    {
+        return format!("rag.search failed to embed the query: {detail}");
+    }
 
     format!("rag.search bridge command failed: {detail}")
 }

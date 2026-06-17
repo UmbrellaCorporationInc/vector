@@ -110,15 +110,15 @@ input:
   language: rust
 ```
 
-- [ ] Return actionable MCP errors for missing RAG stores.
-- [ ] Return actionable MCP errors for missing or incompatible embedding model metadata.
-- [ ] Return actionable MCP errors for corrupt LanceDB tables.
-- [ ] Return actionable MCP errors for invalid package or document filters.
-- [ ] Return actionable MCP errors for query embedding failures.
-- [ ] If using the bridge command, return actionable MCP errors for `vector-database` invocation failures.
-- [ ] If using the bridge command, return actionable MCP errors for non-zero CLI exits.
-- [ ] If using the bridge command, return actionable MCP errors for invalid or incompatible JSON output.
-- [ ] Do not collapse operational failures into empty retrieval responses.
+- [x] Return actionable MCP errors for missing RAG stores.
+- [x] Return actionable MCP errors for missing or incompatible embedding model metadata.
+- [x] Return actionable MCP errors for corrupt LanceDB tables.
+- [x] Return actionable MCP errors for invalid package or document filters.
+- [x] Return actionable MCP errors for query embedding failures.
+- [x] If using the bridge command, return actionable MCP errors for `vector-database` invocation failures.
+- [x] If using the bridge command, return actionable MCP errors for non-zero CLI exits.
+- [x] If using the bridge command, return actionable MCP errors for invalid or incompatible JSON output.
+- [x] Do not collapse operational failures into empty retrieval responses.
 
 ### 3.5. Phase E: Test the MCP Search Tool
 

@@ -10,7 +10,9 @@ use runtime_io::{
     CommandExecutor, CommandExit, CommandHandle, CommandSpec, IoError, MockCommandHandleBuilder,
 };
 
-use super::{RagSearchParams, RagTools, build_search_command, execute_search_bridge};
+use super::{
+    RagSearchParams, RagTools, build_search_command, execute_search_bridge, format_bridge_failure,
+};
 
 #[derive(Debug, Clone)]
 struct RecordedCommand {
@@ -238,4 +240,84 @@ async fn rag_search_bridge_rejects_invalid_json() {
         .expect_err("invalid JSON should fail");
 
     assert!(error.contains("invalid retrieval JSON"), "bridge parse failures must be actionable");
+}
+
+#[test]
+fn format_bridge_failure_strips_cli_help_text_noise() {
+    let output = super::BridgeCommandOutput {
+        stdout: Vec::new(),
+        stderr: b"error: package_filter must not be empty\nvector-rag: Companion CLI for local RAG runtime execution.\n\nUsage:\n  vector-rag rag search <query>\n".to_vec(),
+        exit: CommandExit::new(false, Some(1)),
+    };
+
+    let error = format_bridge_failure(&output);
+
+    assert_eq!(
+        error,
+        "rag.search rejected an invalid package or document filter: package_filter must not be empty"
+    );
+}
+
+#[test]
+fn format_bridge_failure_classifies_missing_rag_store() {
+    let output = super::BridgeCommandOutput {
+        stdout: Vec::new(),
+        stderr: b"error: RAG store is missing at '/tmp/.vector-database/rag/lancedb'; run 'vector-database rag init' or 'vector-database rag update-database' first\n".to_vec(),
+        exit: CommandExit::new(false, Some(1)),
+    };
+
+    let error = format_bridge_failure(&output);
+
+    assert_eq!(
+        error,
+        "rag.search requires an initialized local RAG store: RAG store is missing at '/tmp/.vector-database/rag/lancedb'; run 'vector-database rag init' or 'vector-database rag update-database' first"
+    );
+}
+
+#[test]
+fn format_bridge_failure_classifies_incompatible_embedding_metadata() {
+    let output = super::BridgeCommandOutput {
+        stdout: Vec::new(),
+        stderr: b"error: LanceDB table 'chunks' is incompatible with embedding contract: expected model 'BGESmallENV15' and dimension 384, found model 'DifferentModel' and dimension 768\n".to_vec(),
+        exit: CommandExit::new(false, Some(1)),
+    };
+
+    let error = format_bridge_failure(&output);
+
+    assert_eq!(
+        error,
+        "rag.search found incompatible RAG embedding metadata: LanceDB table 'chunks' is incompatible with embedding contract: expected model 'BGESmallENV15' and dimension 384, found model 'DifferentModel' and dimension 768"
+    );
+}
+
+#[test]
+fn format_bridge_failure_classifies_corrupt_lancedb_schema() {
+    let output = super::BridgeCommandOutput {
+        stdout: Vec::new(),
+        stderr: b"error: candidate query result is missing 'token_count'\n".to_vec(),
+        exit: CommandExit::new(false, Some(1)),
+    };
+
+    let error = format_bridge_failure(&output);
+
+    assert_eq!(
+        error,
+        "rag.search found a corrupt LanceDB table or schema: candidate query result is missing 'token_count'"
+    );
+}
+
+#[test]
+fn format_bridge_failure_classifies_query_embedding_failures() {
+    let output = super::BridgeCommandOutput {
+        stdout: Vec::new(),
+        stderr: b"error: query embedding failed: backend offline\n".to_vec(),
+        exit: CommandExit::new(false, Some(1)),
+    };
+
+    let error = format_bridge_failure(&output);
+
+    assert_eq!(
+        error,
+        "rag.search failed to embed the query: query embedding failed: backend offline"
+    );
 }
