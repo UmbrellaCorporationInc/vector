@@ -14,9 +14,9 @@ use crate::{
 };
 use runtime_core::{RuntimeResult, declare_plugin_operations, plugin::PluginSender};
 use runtime_markdown::{
-    MarkdownDiscoveryFailure, MarkdownDiscoveryRecord, MarkdownDiscoveryRequest,
-    MarkdownExtractionOutcome, PackageMarkdownRoot, discover_markdown_files,
-    extract_markdown_source,
+    MarkdownDiscoveryFailure, MarkdownDiscoveryIssue, MarkdownDiscoveryRecord,
+    MarkdownDiscoveryRequest, MarkdownExtractionOutcome, PackageMarkdownRoot,
+    discover_markdown_files, extract_markdown_source,
 };
 use std::path::PathBuf;
 
@@ -134,8 +134,10 @@ pub(crate) async fn run_incremental_indexing_pass(
     embedder: &(impl Embedder + Sync),
 ) -> Result<IndexResult, LanceDbStoreError> {
     let workspace_doc_root = input.root_dir.join(input.config.workspace_corpus_root());
-    let package_roots: Vec<PackageMarkdownRoot> = Vec::new();
-    let discovery_request = MarkdownDiscoveryRequest::new([workspace_doc_root], package_roots);
+    let workspace_doc_roots =
+        if workspace_doc_root.exists() { vec![workspace_doc_root] } else { Vec::new() };
+    let package_roots = discover_synchronized_package_roots(&input.root_dir, input.config).await?;
+    let discovery_request = MarkdownDiscoveryRequest::new(workspace_doc_roots, package_roots);
     let report = match discover_markdown_files(&discovery_request).await {
         Ok(report) => report,
         Err(MarkdownDiscoveryFailure::WorkspaceDiscovery { .. }) => {
@@ -148,6 +150,7 @@ pub(crate) async fn run_incremental_indexing_pass(
 
     let store_dir = lancedb_store_dir(&input.root_dir);
     let mut result = IndexResult::default();
+    append_discovery_issues(report.issues(), &mut result);
 
     // Phase C: delete rows for source documents removed from the corpus.
     let discovered: std::collections::HashSet<(Option<String>, String)> = report
@@ -173,6 +176,94 @@ pub(crate) async fn run_incremental_indexing_pass(
     }
 
     Ok(result)
+}
+
+async fn discover_synchronized_package_roots(
+    root_dir: &std::path::Path,
+    config: RagDefaults,
+) -> Result<Vec<PackageMarkdownRoot>, LanceDbStoreError> {
+    let package_storage_root = root_dir.join(config.package_storage_root());
+    if !package_storage_root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut entries = tokio::fs::read_dir(&package_storage_root).await.map_err(|error| {
+        LanceDbStoreError::InvalidRequest {
+            message: format!(
+                "failed to read synchronized package directory '{}': {error}",
+                package_storage_root.display()
+            ),
+        }
+    })?;
+
+    let mut package_roots = Vec::new();
+    while let Some(entry) =
+        entries.next_entry().await.map_err(|error| LanceDbStoreError::InvalidRequest {
+            message: format!(
+                "failed to enumerate synchronized package directory '{}': {error}",
+                package_storage_root.display()
+            ),
+        })?
+    {
+        let file_type =
+            entry.file_type().await.map_err(|error| LanceDbStoreError::InvalidRequest {
+                message: format!(
+                    "failed to inspect synchronized package entry '{}': {error}",
+                    entry.path().display()
+                ),
+            })?;
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let package_name = entry.file_name().to_string_lossy().into_owned();
+        let doc_root = entry.path().join(config.package_document_dir());
+        package_roots.push(PackageMarkdownRoot::new(package_name, doc_root));
+    }
+
+    package_roots.sort_by(|left, right| left.package().cmp(right.package()));
+    Ok(package_roots)
+}
+
+fn append_discovery_issues(issues: &[MarkdownDiscoveryIssue], result: &mut IndexResult) {
+    result.failures.extend(issues.iter().map(discovery_issue_to_failure));
+}
+
+fn discovery_issue_to_failure(issue: &MarkdownDiscoveryIssue) -> IndexFailureRecord {
+    match issue {
+        MarkdownDiscoveryIssue::PackageStructure { package, doc_root, message } => {
+            make_document_failure(
+                Some(package.as_str()),
+                doc_root.as_path().file_name().and_then(|value| value.to_str()).unwrap_or("doc"),
+                format!(
+                    "Package structure issue for '{}': {} ({message})",
+                    package,
+                    doc_root.as_path().display()
+                ),
+            )
+        }
+        MarkdownDiscoveryIssue::InvalidGovernedDocumentStem { package, path, stem } => {
+            make_document_failure(
+                package.as_deref(),
+                stem,
+                format!(
+                    "Invalid governed document stem for '{}': {}",
+                    path.as_path().display(),
+                    stem
+                ),
+            )
+        }
+        MarkdownDiscoveryIssue::ContentHash { package, path, message } => make_document_failure(
+            package.as_deref(),
+            path.as_path().file_stem().and_then(|value| value.to_str()).unwrap_or("<unknown>"),
+            format!("Failed to hash '{}': {message}", path.as_path().display()),
+        ),
+        _ => make_document_failure(
+            None,
+            "<discovery-issue>",
+            "Unsupported Markdown discovery issue reported by runtime-markdown",
+        ),
+    }
 }
 
 fn make_document_failure(

@@ -200,13 +200,15 @@ input:
   language: rust
 ```
 
-- [ ] Update `vector-rag rag update-database` so the indexing pass includes the workspace `doc/` corpus and every synchronized package `doc/` corpus under `.vector-database/packages/{package}/doc/`.
-- [ ] Derive package document roots from the synchronized package directory layout instead of requiring caller-provided package paths.
-- [ ] Preserve package identity on every indexed chunk so retrieval, filtering, and citations remain package-aware.
-- [ ] Treat missing package `doc/` folders as package-structure issues, not as workspace discovery failures.
-- [ ] Reconcile deleted documents separately for workspace-local and package-qualified document identities.
-- [ ] Add or update tests that prove package documents are discovered, indexed, skipped when unchanged, and deleted when removed.
-- [ ] Add or update tests that prove workspace and package documents with the same governed document stem do not overwrite each other.
+- [x] Update `vector-rag rag update-database` so the indexing pass includes the workspace `doc/` corpus and every synchronized package `doc/` corpus under `.vector-database/packages/{package}/doc/`.
+- [x] Derive package document roots from the synchronized package directory layout instead of requiring caller-provided package paths.
+- [x] Preserve package identity on every indexed chunk so retrieval, filtering, and citations remain package-aware.
+- [x] Treat missing package `doc/` folders as package-structure issues, not as workspace discovery failures.
+- [x] Reconcile deleted documents separately for workspace-local and package-qualified document identities.
+- [x] Add or update tests that prove package documents are discovered, indexed, skipped when unchanged, and deleted when removed.
+- [x] Add or update tests that prove workspace and package documents with the same governed document stem do not overwrite each other.
+
+Phase H validated on 2026-06-17 with focused `runtime-rag` package-indexing tests plus full `cargo test -p runtime-rag` coverage. The Rust quality gate prompt was resolved for `rust`. `xtask quality-lint` remains blocked by repository-wide rule violations under the generated workspace `.cargo-target/` directory, while `xtask quality-test` and `cargo fmt --all` passed.
 
 ### 3.9. Phase I: Stream Index Progress in the CLI
 
