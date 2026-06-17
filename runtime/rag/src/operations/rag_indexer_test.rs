@@ -16,6 +16,14 @@ fn unique_fixture_root(label: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("vector-rag-indexer-test-{label}-{nanos}"))
 }
 
+async fn run_incremental_indexing_pass(
+    input: &RagIndexerInput,
+    embedder: &(impl Embedder + Sync),
+) -> Result<IndexResult, LanceDbStoreError> {
+    let mut ignore_progress = NoopIndexingProgressSink;
+    super::run_incremental_indexing_pass(input, embedder, &mut ignore_progress).await
+}
+
 /// Fake embedder that counts calls and records inputs for assertions.
 #[derive(Debug, Clone)]
 struct TrackingEmbedder {

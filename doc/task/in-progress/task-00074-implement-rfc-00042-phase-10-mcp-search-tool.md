@@ -222,16 +222,18 @@ input:
   language: rust
 ```
 
-- [ ] Change `vector-rag rag update-database` so indexing progress is emitted while the operation is running instead of only after the final operation output is received.
-- [ ] Preserve the existing final summary with re-indexed, skipped, and deleted document counts.
-- [ ] Emit useful progress for long-running steps such as store initialization, document discovery, document indexing, skipped unchanged documents, deleted stale chunks, and document-level failures when that information is available.
-- [ ] Emit one progress line for each newly indexed or re-indexed document, including package identity when present and governed document stem.
-- [ ] Emit one progress line for each unchanged document that was already indexed and skipped, including package identity when present and governed document stem.
-- [ ] Emit one progress line for each document-level indexing error, including package identity when present, governed document stem, and the actionable error message.
-- [ ] Use stable progress labels such as `indexed`, `unchanged`, and `failed` so CLI users and MCP consumers can parse or scan progress consistently.
-- [ ] Flush CLI progress output so users can tell the command is still running.
-- [ ] Confirm that `vector-database rag update-database` forwards `vector-rag` progress incrementally through the existing passthrough streaming path.
-- [ ] Do not make CLI progress output part of the `RetrievalContext` search contract.
+- [x] Change `vector-rag rag update-database` so indexing progress is emitted while the operation is running instead of only after the final operation output is received.
+- [x] Preserve the existing final summary with re-indexed, skipped, and deleted document counts.
+- [x] Emit useful progress for long-running steps such as store initialization, document discovery, document indexing, skipped unchanged documents, deleted stale chunks, and document-level failures when that information is available.
+- [x] Emit one progress line for each newly indexed or re-indexed document, including package identity when present and governed document stem.
+- [x] Emit one progress line for each unchanged document that was already indexed and skipped, including package identity when present and governed document stem.
+- [x] Emit one progress line for each document-level indexing error, including package identity when present, governed document stem, and the actionable error message.
+- [x] Use stable progress labels such as `indexed`, `unchanged`, and `failed` so CLI users and MCP consumers can parse or scan progress consistently.
+- [x] Flush CLI progress output so users can tell the command is still running.
+- [x] Confirm that `vector-database rag update-database` forwards `vector-rag` progress incrementally through the existing passthrough streaming path.
+- [x] Do not make CLI progress output part of the `RetrievalContext` search contract.
+
+Phase I validated on 2026-06-17 with focused `runtime-rag`, `vector-rag`, and `vector-database` Rust tests covering incremental progress events, unchanged-document reporting, document-level failures, preserved final summaries, and passthrough chunk forwarding. The Rust quality gate prompt was resolved for `rust`. `xtask quality-lint`, `xtask quality-test`, and `cargo fmt --all` passed.
 
 ### 3.10. Phase J: Decide the Agent-Facing Index Output Contract
 

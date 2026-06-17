@@ -109,6 +109,34 @@ async fn streams_companion_stdout_and_stderr() {
 }
 
 #[tokio::test]
+async fn forwards_multiple_stdout_chunks_incrementally() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let companion = MockCommandHandleBuilder::new(CommandExit::new(true, Some(0)))
+        .stdout("indexed doc-1\n")
+        .stdout("unchanged doc-2\n")
+        .build()
+        .0;
+    let executor = MockExecutor::new(Ok(companion));
+    let args = vec!["update-database".to_owned()];
+    let mut stdout_chunks = Vec::new();
+
+    let exit = run_with_output(
+        &executor,
+        temp.path(),
+        &args,
+        &mut |bytes| stdout_chunks.push(bytes.to_vec()),
+        &mut |_bytes| {},
+    )
+    .await
+    .expect("delegation should succeed");
+
+    assert_eq!(exit, DelegatedExit::Success);
+    assert_eq!(stdout_chunks.len(), 2, "expected one callback per stdout chunk");
+    assert_eq!(stdout_chunks[0], b"indexed doc-1\n");
+    assert_eq!(stdout_chunks[1], b"unchanged doc-2\n");
+}
+
+#[tokio::test]
 async fn returns_install_guidance_when_vector_rag_cannot_spawn() {
     let temp = tempfile::tempdir().expect("tempdir");
     let executor = MockExecutor::new(Err(IoError::Process("not found".to_owned())));

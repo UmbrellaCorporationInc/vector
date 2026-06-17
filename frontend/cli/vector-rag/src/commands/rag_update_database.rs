@@ -4,7 +4,11 @@
 
 use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
-use runtime_rag::{IndexWorkspaceInput, IndexWorkspaceOp, RagDefaults};
+use runtime_rag::{
+    IndexResult, IndexWorkspaceInput, IndexWorkspaceOp, IndexWorkspaceOutput,
+    IndexWorkspaceProgress, RagDefaults,
+};
+use std::io::Write;
 
 /// Run the incremental indexing pipeline against the local workspace.
 ///
@@ -16,6 +20,16 @@ use runtime_rag::{IndexWorkspaceInput, IndexWorkspaceOp, RagDefaults};
 /// Returns an actionable error when the dispatcher fails, the operation emits
 /// no output, or one or more documents fail during indexing.
 pub async fn run(root_dir: &std::path::Path) -> Result<(), String> {
+    let mut stdout = std::io::stdout();
+    let mut stderr = std::io::stderr();
+    run_with_writers(root_dir, &mut stdout, &mut stderr).await
+}
+
+async fn run_with_writers(
+    root_dir: &std::path::Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> Result<(), String> {
     let config = RagDefaults::phase_one();
     let input = IndexWorkspaceInput::new(root_dir.to_path_buf(), config);
 
@@ -24,27 +38,87 @@ pub async fn run(root_dir: &std::path::Path) -> Result<(), String> {
         .build()
         .map_err(|error| format!("failed to prepare indexing operation: {error}"))?;
 
-    let output = receiver
-        .recv()
-        .await
-        .map_err(|error| format!("incremental indexing failed: {error}"))?
-        .ok_or_else(|| "incremental indexing did not produce output".to_owned())?;
+    let mut final_result = None;
+    while let Some(output) =
+        receiver.recv().await.map_err(|error| format!("incremental indexing failed: {error}"))?
+    {
+        match output {
+            IndexWorkspaceOutput::Progress(progress) => write_progress_line(stdout, &progress)?,
+            IndexWorkspaceOutput::Summary(result) => {
+                write_summary_line(stdout, &result)?;
+                final_result = Some(result);
+            }
+            _ => {}
+        }
+    }
 
-    let result = &output.result;
-    println!(
-        "Indexed: {} re-indexed, {} skipped, {} deleted.",
-        result.reindexed_count, result.skipped_count, result.deleted_count
-    );
+    let result =
+        final_result.ok_or_else(|| "incremental indexing did not produce output".to_owned())?;
 
     if result.has_failures() {
-        for failure in &result.failures {
-            let pkg = failure.package.as_deref().unwrap_or("<workspace>");
-            eprintln!("  failed [{}] {}: {}", pkg, failure.document_stem, failure.error);
-        }
+        write_failure_details(stderr, &result)?;
         return Err(format!("{} document(s) failed during indexing", result.failures.len()));
     }
 
     Ok(())
+}
+
+fn write_progress_line(
+    writer: &mut impl Write,
+    progress: &IndexWorkspaceProgress,
+) -> Result<(), String> {
+    let line = format_progress_line(progress);
+    writer
+        .write_all(line.as_bytes())
+        .map_err(|error| format!("failed to write progress output: {error}"))?;
+    writer.write_all(b"\n").map_err(|error| format!("failed to write progress output: {error}"))?;
+    writer.flush().map_err(|error| format!("failed to flush progress output: {error}"))?;
+    Ok(())
+}
+
+fn write_summary_line(writer: &mut impl Write, result: &IndexResult) -> Result<(), String> {
+    let line = format!(
+        "Indexed: {} re-indexed, {} skipped, {} deleted.",
+        result.reindexed_count, result.skipped_count, result.deleted_count
+    );
+    writer
+        .write_all(line.as_bytes())
+        .map_err(|error| format!("failed to write summary output: {error}"))?;
+    writer.write_all(b"\n").map_err(|error| format!("failed to write summary output: {error}"))?;
+    writer.flush().map_err(|error| format!("failed to flush summary output: {error}"))?;
+    Ok(())
+}
+
+fn write_failure_details(writer: &mut impl Write, result: &IndexResult) -> Result<(), String> {
+    for failure in &result.failures {
+        let pkg = failure.package.as_deref().unwrap_or("<workspace>");
+        let line = format!("  failed [{pkg}] {}: {}", failure.document_stem, failure.error);
+        writer
+            .write_all(line.as_bytes())
+            .map_err(|error| format!("failed to write failure output: {error}"))?;
+        writer
+            .write_all(b"\n")
+            .map_err(|error| format!("failed to write failure output: {error}"))?;
+    }
+    writer.flush().map_err(|error| format!("failed to flush failure output: {error}"))?;
+    Ok(())
+}
+
+fn format_progress_line(progress: &IndexWorkspaceProgress) -> String {
+    let mut line = progress.label.clone();
+    if let Some(package) = progress.package.as_deref() {
+        line.push_str(" package=");
+        line.push_str(package);
+    }
+    if let Some(document_stem) = progress.document_stem.as_deref() {
+        line.push_str(" document=");
+        line.push_str(document_stem);
+    }
+    if let Some(message) = progress.message.as_deref() {
+        line.push_str(" message=");
+        line.push_str(message);
+    }
+    line
 }
 
 #[cfg(test)]
