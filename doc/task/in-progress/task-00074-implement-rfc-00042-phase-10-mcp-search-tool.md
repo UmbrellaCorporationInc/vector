@@ -144,7 +144,129 @@ input:
 - [ ] If using the bridge command, add or update tests for bridge JSON parse failures.
 - [ ] Add or update a compatibility test that proves CLI JSON output and MCP output use the same retrieval context contract.
 
-### 3.6. Phase Z: Wrap-Up
+### 3.6. Phase F: Locate the MCP Index Tool Boundary
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00074
+  phase: Phase F
+  language: rust
+```
+
+- [ ] Add the RAG category tool named `index` in the same MCP tool group and registration style as `search`.
+- [ ] Ensure the user-facing tool description states that it initializes the local RAG store and updates the workspace RAG index.
+- [ ] Resolve the workspace root from MCP runtime context instead of accepting a caller-provided path.
+- [ ] Confirm whether the MCP registry exposes the tool as `rag.index` or flattens category and name into a single identifier.
+- [ ] Keep the `index` tool focused on index lifecycle work and separate from query retrieval behavior.
+
+### 3.7. Phase G: Implement the Index Execution Contract
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00074
+  phase: Phase G
+  language: rust
+```
+
+- [ ] Run `vector-database rag init` from the resolved workspace root before updating the index.
+- [ ] Run `vector-database rag update-database` from the resolved workspace root after a successful init.
+- [ ] Return a structured MCP success response that includes both command outcomes.
+- [ ] Do not accept caller-provided shell commands or arbitrary command arguments.
+- [ ] Do not query the RAG index or return retrieval context from the `index` tool.
+
+### 3.8. Phase H: Index Workspace and Package Documents
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00074
+  phase: Phase H
+  language: rust
+```
+
+- [ ] Update `vector-rag rag update-database` so the indexing pass includes the workspace `doc/` corpus and every synchronized package `doc/` corpus under `.vector-database/packages/{package}/doc/`.
+- [ ] Derive package document roots from the synchronized package directory layout instead of requiring caller-provided package paths.
+- [ ] Preserve package identity on every indexed chunk so retrieval, filtering, and citations remain package-aware.
+- [ ] Treat missing package `doc/` folders as package-structure issues, not as workspace discovery failures.
+- [ ] Reconcile deleted documents separately for workspace-local and package-qualified document identities.
+- [ ] Add or update tests that prove package documents are discovered, indexed, skipped when unchanged, and deleted when removed.
+- [ ] Add or update tests that prove workspace and package documents with the same governed document stem do not overwrite each other.
+
+### 3.9. Phase I: Stream Index Progress in the CLI
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00074
+  phase: Phase I
+  language: rust
+```
+
+- [ ] Change `vector-rag rag update-database` so indexing progress is emitted while the operation is running instead of only after the final operation output is received.
+- [ ] Preserve the existing final summary with re-indexed, skipped, and deleted document counts.
+- [ ] Emit useful progress for long-running steps such as store initialization, document discovery, document indexing, skipped unchanged documents, deleted stale chunks, and document-level failures when that information is available.
+- [ ] Emit one progress line for each newly indexed or re-indexed document, including package identity when present and governed document stem.
+- [ ] Emit one progress line for each unchanged document that was already indexed and skipped, including package identity when present and governed document stem.
+- [ ] Emit one progress line for each document-level indexing error, including package identity when present, governed document stem, and the actionable error message.
+- [ ] Use stable progress labels such as `indexed`, `unchanged`, and `failed` so CLI users and MCP consumers can parse or scan progress consistently.
+- [ ] Flush CLI progress output so users can tell the command is still running.
+- [ ] Confirm that `vector-database rag update-database` forwards `vector-rag` progress incrementally through the existing passthrough streaming path.
+- [ ] Do not make CLI progress output part of the `RetrievalContext` search contract.
+
+### 3.10. Phase J: Define MCP Index Progress Behavior
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00074
+  phase: Phase J
+  language: rust
+```
+
+- [ ] Verify whether the current `rmcp` server and supported MCP clients can surface tool progress or logging notifications during a long-running tool call.
+- [ ] If MCP progress notifications are supported, emit index lifecycle progress from the `index` tool while `vector-database rag init` and `vector-database rag update-database` run.
+- [ ] If MCP progress notifications are not supported by the current stack, return a structured final response that includes captured command output and document the limitation in the task notes or implementation comments.
+- [ ] Keep the final `index` tool result deterministic even when progress streaming is enabled.
+- [ ] Do not fake streaming by delaying the final MCP response with accumulated logs only.
+
+### 3.11. Phase K: Map Index Operational Failures and Tests
+
+```vector-agent-action
+label: Execute Phase in Agent
+profile: code
+prompt: prompts-00004-execute-task-phase
+input:
+  task: task 00074
+  phase: Phase K
+  language: rust
+```
+
+- [ ] Return actionable MCP errors when `vector-database rag init` cannot be invoked.
+- [ ] Return actionable MCP errors when `vector-database rag init` exits non-zero.
+- [ ] Return actionable MCP errors when `vector-database rag update-database` cannot be invoked.
+- [ ] Return actionable MCP errors when `vector-database rag update-database` exits non-zero.
+- [ ] Add or update tests that prove `index` runs init before update-database.
+- [ ] Add or update tests that prove update-database is skipped when init fails.
+- [ ] Add or update tests for successful command output mapping.
+- [ ] Add or update tests for invocation failures and non-zero exits for both commands.
+- [ ] Add or update tests that prove CLI progress is emitted before indexing completes.
+- [ ] Add or update tests that prove CLI progress reports indexed documents, unchanged skipped documents, and document-level failures separately.
+- [ ] Add or update tests that prove `vector-database rag update-database` forwards `vector-rag` output incrementally.
+- [ ] Add or update MCP progress tests when progress notifications are supported, or a test that proves the final MCP response includes captured command output when they are not supported.
+
+### 3.12. Phase Z: Wrap-Up
 
 ```vector-agent-action
 label: Execute Phase in Agent
