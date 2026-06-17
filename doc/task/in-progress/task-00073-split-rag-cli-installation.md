@@ -23,7 +23,7 @@ superseded_by: null
 ## 1. Prime Directive
 
 > [!Prime Directive]
-> Base Vector installs and MCP updates currently pay the full compile and binary-size cost of `runtime-rag`, including LanceDB, Lance, DataFusion, FastEmbed, ONNX Runtime, and tokenizer dependencies. Split RAG execution into a dedicated `vector-rag` CLI so users only pay that cost when they explicitly install RAG support.
+> Base Vector installs and MCP updates currently pay the full compile and binary-size cost of `runtime-rag`, including LanceDB, Lance, DataFusion, FastEmbed, ONNX Runtime, and tokenizer dependencies. Split RAG execution into a dedicated `vector-rag` companion CLI while keeping `vector-database rag ...` as the public command surface, so users only pay the heavy RAG install cost when they explicitly install RAG support.
 
 ## 2. Specs
 
@@ -31,7 +31,10 @@ superseded_by: null
 - **Dependencies:** `runtime-rag`, `lancedb`, `fastembed`
 - **Install contract:** `get-vector update-mcp-vector` installs or updates `mcp-vector` and `vector-database` only.
 - **RAG install contract:** `get-vector install rag` installs `vector-rag`.
-- **Compatibility contract:** `vector-database rag ...` either delegates to `vector-rag` or returns an actionable error telling the user to run `get-vector install rag`.
+- **Public UX contract:** `vector-database` keeps the user-facing `rag init`, `rag search`, and `rag update-database` commands.
+- **Execution contract:** `vector-rag` is a companion CLI intended to be consumed by `vector-database` and `mcp-vector`, not the primary user-facing command surface.
+- **Passthrough contract:** `vector-database rag ...` delegates the command invocation to `vector-rag` and preserves stdout, stderr, exit status, and actionable errors.
+- **Compatibility contract:** when `vector-rag` is missing, `vector-database rag ...` returns an actionable error telling the user to run `get-vector install rag`.
 - **Initial path contract:** tool discovery may depend on the user's `PATH` for this version.
 
 ## 3. Checklist
@@ -48,10 +51,11 @@ input:
   language: rust, toml
 ```
 
-- [ ] Add a new `frontend/cli/vector-rag` workspace crate with a `vector-rag` binary.
-- [ ] Move `rag init`, `rag search`, and `rag update-database` command ownership into `vector-rag`.
-- [ ] Keep `runtime-rag` as the only crate that directly owns LanceDB and embedding runtime integration.
-- [ ] Add focused CLI tests for `vector-rag` command parsing and command dispatch.
+- [x] Add a new `frontend/cli/vector-rag` workspace crate with a `vector-rag` binary.
+- [x] Move the heavy `rag init`, `rag search`, and `rag update-database` runtime execution into `vector-rag`.
+- [x] Keep user-facing command names and help output in `vector-database`.
+- [x] Keep `runtime-rag` as the only crate that directly owns LanceDB and embedding runtime integration.
+- [x] Add focused CLI tests for `vector-rag` command parsing and command dispatch.
 
 ### 3.2. Phase B — Slim Base CLI
 
@@ -66,7 +70,8 @@ input:
 ```
 
 - [ ] Remove the direct `runtime-rag` dependency from `frontend/cli/vector-database`.
-- [ ] Replace `vector-database rag ...` implementations with delegation to `vector-rag` through process execution.
+- [ ] Replace `vector-database rag ...` implementations with passthrough delegation to `vector-rag` through process execution.
+- [ ] Preserve `vector-rag` stdout, stderr, and exit status when delegating from `vector-database`.
 - [ ] Return a clear install guidance error when `vector-rag` is not available on `PATH`.
 - [ ] Verify `cargo tree -p vector-database` no longer includes `lancedb`, `fastembed`, `datafusion`, or `ort`.
 
