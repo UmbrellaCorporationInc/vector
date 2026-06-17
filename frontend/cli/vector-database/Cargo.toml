@@ -10,13 +10,9 @@ name = "vector-database"
 path = "src/main.rs"
 
 [dependencies]
-runtime-channel = { workspace = true }
 runtime-core = { workspace = true }
 runtime-io = { workspace = true }
 runtime-packages = { workspace = true }
-runtime-rag = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

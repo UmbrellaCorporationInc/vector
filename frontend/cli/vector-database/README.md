@@ -6,8 +6,8 @@
 
 It also exposes the Phase 6 local RAG store initialization command, the Phase 7
 incremental indexing command, and the Phase 9 canonical retrieval context search
-command by delegating store lifecycle, indexing, retrieval, and context assembly
-ownership to `runtime-rag`.
+command by delegating `vector-database rag ...` invocations to the `vector-rag`
+companion CLI.
 
 ## 2. Boundaries
 
@@ -15,9 +15,9 @@ ownership to `runtime-rag`.
 
 - Running package synchronization (`sync` command) which executes `git clone`, `git fetch`, and file copy operations.
 - Interfacing with `runtime-packages` to add new dependencies into `.vector/packages.yaml` via CLI arguments.
-- Triggering the RAG-owned LanceDB lifecycle operation that creates or validates the local retrieval store.
-- Running the Phase 7 incremental indexing pipeline via `update-database`, which delegates all orchestration to `runtime-rag::IndexWorkspaceOp`.
-- Running the RAG search command via `rag search`, which delegates ranking, filtering, deduplication, expansion, and canonical context assembly to `runtime-rag`.
+- Triggering the RAG-owned LanceDB lifecycle operation through `vector-rag`.
+- Running the Phase 7 incremental indexing pipeline via `rag update-database` through `vector-rag`.
+- Running the RAG search command via `rag search` through `vector-rag`.
 - Streaming subprocess execution logs and print messages before running actions.
 - Rejecting invalid package structures (i.e. making sure synchronized packages contain `doc/` and `.vector/`).
 
@@ -32,9 +32,8 @@ ownership to `runtime-rag`.
 | Dependency | Role |
 |---|---|
 | `runtime-packages` | Manifest contracts and `sync-packages` / `add-package` operations |
-| `runtime-rag` | Phase 6 RAG store lifecycle and Phase 7 incremental indexing operations |
 | `runtime-channel` | Standard dispatcher used to execute plugin operations |
-| `runtime-io` | Terminal commands execution, path helpers, and IO |
+| `runtime-io` | Terminal command execution, path helpers, and IO |
 | `runtime-core` | Core runtime types and traits |
 | `tokio` | Async runtime execution |
 | `thiserror` | Custom error type formatting |
@@ -83,16 +82,11 @@ Initializes the LanceDB store if not already present, then indexes all governed
 Markdown documents, skipping files whose content hash is unchanged.
 
 **Execution Details:**
-- Delegates to `runtime-rag::IndexWorkspaceOp`, which composes `InitRagStoreOp`
-  (Phase 6 store initialization) and `RagIndexerOp` (Phase 7 incremental pass)
-  in sequence using a `CapturingSender`.
-- Skips documents whose persisted `document_hash` matches the current file hash;
-  re-embeds only chunks whose `chunk_hash` changed.
-- Deletes rows for source documents removed from the corpus during the run.
-- Isolates per-document failures so one malformed file does not abort the run.
-- Prints a summary line: `Indexed: N re-indexed, N skipped, N deleted.`
-- Prints per-document failure details to stderr if any failures were recorded.
-- No indexing or schema logic resides in the CLI adapter.
+- Executes `vector-rag rag update-database` with the workspace root as the
+  subprocess working directory.
+- Streams `vector-rag` stdout and stderr without rewriting output.
+- Returns the exact `vector-rag` exit status.
+- Prints an install guidance error when `vector-rag` is not available on `PATH`.
 
 **Exit behavior:**
 
@@ -104,40 +98,14 @@ Markdown documents, skipping files whose content hash is unchanged.
 
 ### `rag search`
 
-Executes hybrid retrieval against the local RAG store and renders the Phase 9
-canonical `RetrievalContext` produced by `runtime-rag`.
+Executes hybrid retrieval against the local RAG store through `vector-rag`.
 
 **Execution Details:**
-- Delegates to `runtime-rag::HybridSearchOp` through the standard
-  `PluginDispatcher`.
-- Passes hybrid retrieval output through `runtime-rag::AssembleRetrievalContextOp`
-  before rendering human output or serializing JSON.
-- Reuses governed Phase 1 RAG defaults for semantic candidate limit, lexical
-  candidate limit, and final retrieval limit unless `--limit` overrides the
-  final result count.
-- Forwards `--package` and `--document` filters directly to the runtime
-  retrieval operation so the CLI does not fork filtering semantics.
-- Prints human-readable retrieval context by default and serializes the canonical
-  `RetrievalContext` JSON payload when `--json` is set.
-- Does not implement ranking, score fusion, deduplication, adjacent chunk
-  expansion, source attribution, empty-result semantics, or final limit
-  enforcement in the CLI layer.
-
-**Output contract:**
-- Human-readable output starts with `Retrieval Context`, then prints status,
-  query, final limit, returned chunk count, normalized sources, evidence chunks,
-  and diagnostics.
-- `--json` emits the canonical `RetrievalContext` fields: `query`, `status`,
-  `limit`, `returned`, `sources`, `chunks`, and `diagnostics`.
-- `status` is `has_results` when chunks are returned and `empty` when retrieval
-  succeeds with no evidence.
-- Each source includes `source_id`, `package`, `document_stem`, `heading_path`,
-  and `citation_label`.
-- Each chunk includes `context_id`, `source_id`, `package`, `document_stem`,
-  `heading_path`, `chunk_id`, `chunk_ordinal`, `text`, `token_count`, and
-  `match_reason` (`primary` or `expanded`).
-- Diagnostics include `total_token_count`, `dropped_after_limit`, and
-  `retrieval_limit`.
+- Executes `vector-rag rag search ...` with the workspace root as the subprocess
+  working directory.
+- Streams `vector-rag` stdout and stderr without rewriting output.
+- Returns the exact `vector-rag` exit status.
+- Prints an install guidance error when `vector-rag` is not available on `PATH`.
 
 **Arguments:**
 - `<query>`: Required free-text query string.
@@ -160,10 +128,11 @@ Creates or validates the local Phase 6 LanceDB store under
 `.vector-database/rag/lancedb/`.
 
 **Execution Details:**
-- Delegates store lifecycle work to `runtime-rag::InitRagStoreOp` through the standard `PluginDispatcher`.
-- Uses the governed Phase 1 RAG defaults for embedding model and dimension.
-- Does not implement separate table, schema, or index creation logic in the CLI.
-- Prints the resolved store path and primary table name after the operation completes.
+- Executes `vector-rag rag init` with the workspace root as the subprocess
+  working directory.
+- Streams `vector-rag` stdout and stderr without rewriting output.
+- Returns the exact `vector-rag` exit status.
+- Prints an install guidance error when `vector-rag` is not available on `PATH`.
 
 **Phase 6 Store Contract:**
 - The local retrieval store lives only under `.vector-database/rag/lancedb/`.
@@ -173,9 +142,9 @@ Creates or validates the local Phase 6 LanceDB store under
 - Full-text indexing over `text` and vector indexing over `vector` are owned by `runtime-rag`, not by the CLI layer.
 
 **Ownership Boundary:**
-- `vector-database` is only the execution surface for the RAG store lifecycle command.
+- `vector-database` is only the user-facing command surface for RAG commands.
+- `vector-rag` owns command parsing and runtime execution for RAG commands.
 - `runtime-rag` owns LanceDB compatibility validation, schema rules, index creation, and actionable persistence errors.
-- Any future store contract changes must be implemented in `runtime-rag` first and then consumed by this CLI boundary.
 
 **Exit behavior:**
 

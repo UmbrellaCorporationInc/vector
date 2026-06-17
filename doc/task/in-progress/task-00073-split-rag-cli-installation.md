@@ -69,11 +69,11 @@ input:
   language: rust, toml
 ```
 
-- [ ] Remove the direct `runtime-rag` dependency from `frontend/cli/vector-database`.
-- [ ] Replace `vector-database rag ...` implementations with passthrough delegation to `vector-rag` through process execution.
-- [ ] Preserve `vector-rag` stdout, stderr, and exit status when delegating from `vector-database`.
-- [ ] Return a clear install guidance error when `vector-rag` is not available on `PATH`.
-- [ ] Verify `cargo tree -p vector-database` no longer includes `lancedb`, `fastembed`, `datafusion`, or `ort`.
+- [x] Remove the direct `runtime-rag` dependency from `frontend/cli/vector-database`.
+- [x] Replace `vector-database rag ...` implementations with passthrough delegation to `vector-rag` through process execution.
+- [x] Preserve `vector-rag` stdout, stderr, and exit status when delegating from `vector-database`.
+- [x] Return a clear install guidance error when `vector-rag` is not available on `PATH`.
+- [x] Verify `cargo tree -p vector-database` no longer includes `lancedb`, `fastembed`, `datafusion`, or `ort`.
 
 ### 3.3. Phase C — Update Installer Flow
 
