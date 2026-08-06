@@ -117,10 +117,10 @@ input:
   language: TypeScript, Rust, Markdown
 ```
 
-- [ ] Verify the complete frontend-to-MCP flow while preserving the distinct responsibilities of `.agents/mcp_config.json` and `.vector/agents.yaml`.
-- [ ] Document the breaking migration, supported `${system-temp}` syntax, lifecycle ownership, retry behavior, size bound, and platform-specific filesystem guarantees.
-- [ ] Document the single-governed-project workspace scope, the absence of cleanup telemetry, and the deferral of shared cross-language fixture infrastructure.
-- [ ] Confirm existing MCP tools and unaffected VS Code agent behavior remain covered by regression tests.
+- [x] Verify the complete frontend-to-MCP flow while preserving the distinct responsibilities of `.agents/mcp_config.json` and `.vector/agents.yaml`.
+- [x] Document the breaking migration, supported `${system-temp}` syntax, lifecycle ownership, retry behavior, size bound, and platform-specific filesystem guarantees.
+- [x] Document the single-governed-project workspace scope, the absence of cleanup telemetry, and the deferral of shared cross-language fixture infrastructure.
+- [x] Confirm existing MCP tools and unaffected VS Code agent behavior remain covered by regression tests.
 
 ### 3.5. Phase Z — Wrap-up
 
