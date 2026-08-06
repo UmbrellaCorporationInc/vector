@@ -14,6 +14,8 @@ export interface AgentsYaml {
     profiles: Record<string, string[]>;
     /** Resolved value of `instructions-dir` from the YAML (variable already expanded). */
     instructionsDir: string;
+    /** Optional root-level launch prompt template. When present, overrides the built-in default. */
+    prompt?: string;
 }
 
 export interface ResolvedAgent {
@@ -114,7 +116,20 @@ export function loadAgentsConfig(workspaceRoot: string): AgentsConfigLoad {
         };
     }
 
-    return { ok: true, config: { agents: agents.value, profiles, instructionsDir } };
+    const promptRaw = map["prompt"];
+    if (promptRaw !== undefined && typeof promptRaw !== "string") {
+        return {
+            ok: false,
+            missing: false,
+            error: `${AGENTS_YAML_DISPLAY_PATH}: 'prompt' must be a string`,
+        };
+    }
+
+    const config: AgentsYaml = { agents: agents.value, profiles, instructionsDir };
+    if (typeof promptRaw === "string") {
+        config.prompt = promptRaw;
+    }
+    return { ok: true, config };
 }
 
 /**

@@ -190,7 +190,7 @@ suite("Task 00075 Phase D — complete frontend-to-MCP flow", () => {
 
         // 3. Resolve the prompt content that the frontend would produce.
         const promptContent =
-            "Using the Vector MCP server, call get_instruction with id " +
+            "Using Vector MCP, call get_instruction with id " +
             `"${uuid}" and execute the returned instructions.`;
 
         // 4. Create the instruction file in the configured directory.

@@ -3639,8 +3639,7 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
     });
 
     test("spawnAgentTerminal sends the pre-resolved command to the VS Code terminal", () => {
-        const resolvedCommand =
-            'claude "Using the Vector MCP server, call get_instruction with id \\"abc\\""';
+        const resolvedCommand = 'claude "Using Vector MCP, call get_instruction with id \\"abc\\""';
         const tempFilePath = path.join(os.tmpdir(), "vector-agent-terminal-test.txt");
         fs.writeFileSync(tempFilePath, "instruction content", "utf-8");
 

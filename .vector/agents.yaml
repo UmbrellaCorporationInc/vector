@@ -1,17 +1,36 @@
 instructions-dir: "${system-temp}/vector/instructions"
+
+# Optional: override the launch prompt sent to the agent when a Vector action is triggered.
+# The <instruction-id> placeholder is replaced with the UUID of the generated instruction file.
+# When this field is absent the built-in default is used:
+#   Using Vector MCP, call get_instruction with id "<instruction-id>" and execute the returned instructions.
+#
+# Example:
+#   prompt: 'Using Vector MCP, call get_instruction with id "<instruction-id>" and execute the returned instructions.'
+
 agents:
   claude:
     type: cli
     command: claude '<instruction>'
+  fable:
+    type: cli
+    command: claude --model fable '<instruction>'
+  opus:
+    type: cli
+    command: claude --model opus '<instruction>'
+  sol:
+    type: cli
+    command: codex --model gpt-5.6-sol '<instruction>'
+  codex:
+    type: cli
+    command: codex --model gpt-5.6-terra '<instruction>'
   antigravity:
     type: cli
     command: agy -i '<instruction>'
-  codex:
-    type: cli
-    command: codex '<instruction>'
   opencode:
     type: cli
     command: opencode --prompt '<instruction>'
 profiles:
-  create-doc: [antigravity, claude, codex]
-  code: [antigravity, claude, codex, opencode]
+  create-doc: [antigravity, claude, opus, sol, fable, codex]
+  discuss-doc: [antigravity, claude, opus, sol, fable, codex, opencode]
+  code: [antigravity, claude, sol, opus, codex, opencode]

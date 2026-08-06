@@ -100,6 +100,8 @@ export {
     isCommandInPath,
 } from "./document-actions/agentsConfig.js";
 export {
+    DEFAULT_AGENT_PROMPT,
+    resolveAgentPrompt,
     renderInstructionDirective,
     writeInstructionFile,
     cleanupStaleInstructionFiles,
