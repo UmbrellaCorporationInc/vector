@@ -68,6 +68,7 @@
 | `replace_doc`           | Document          | Replace a governed document with complete content; resolves the target from `doc_type`, `code`, and optional `package`, validates governed front matter identity, rejects BOM content, and returns the resolved path and final content. Bootstrap companion to `create_doc_prompt`. |
 | `language_quality_gate` | Language          | Resolve and concatenate governed quality-gate prompt bodies for a language list |
 | `language_best_practices` | Language        | Resolve and concatenate governed best-practices prompt bodies for a language list |
+| `get_instruction`       | Document          | Read a UUID-scoped instruction written by the Vector VS Code extension; the caller supplies only the canonical UUID and the server constructs the file path internally |
 | `rag.search`            | RAG               | Query the local RAG index for this workspace and return relevant governed document context |
 | `rag.index`             | RAG               | Initialize the local RAG store for this workspace and update the workspace RAG index |
 
@@ -139,6 +140,34 @@ Bootstrap example — replacing a newly created RFC document:
 ```
 
 `replace_doc` returns `path` and the final document content after a successful write.
+
+### `get_instruction` input and output contract
+
+`get_instruction` accepts:
+
+- `id` (string, required): canonical lowercase hyphenated UUID in the form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`. The caller controls only the UUID; the server constructs the filename (`vector-instruction-<uuid>.txt`), the directory, and all path components internally.
+
+The workspace root is resolved from the MCP process working directory. The tool loads `instructions-dir` from `.vector/agents.yaml`, validates it, and constructs the full path. The instruction file is **not deleted** after a successful read — repeated reads succeed for the terminal lifetime. The size limit is a fixed 1 MiB; oversized files are rejected before and during reading.
+
+Actionable errors are returned for: invalid or noncanonical UUIDs, missing or malformed `.vector/agents.yaml`, missing or invalid `instructions-dir`, missing or expired instruction files, non-regular targets (symbolic links, reparse points, directories), content exceeding 1 MiB, invalid UTF-8, and read failures. Errors do not reveal unrelated paths or filesystem contents.
+
+#### Platform guarantees
+
+| Platform | Protection mechanism |
+|---|---|
+| **Windows** | Opens with `FILE_FLAG_OPEN_REPARSE_POINT` to avoid reparse-point redirection; inspects handle attributes with `GetFileInformationByHandle` to reject reparse points and directories; validates the opened handle's canonical location with `GetFinalPathNameByHandleW`. Hard links across the boundary require elevated privileges under default Windows policies. |
+| **Unix** | Uses `symlink_metadata` to detect and reject symbolic links before opening. A TOCTOU window exists between the metadata call and the open. |
+
+#### Dependency boundary
+
+All filesystem access, configuration loading, UUID validation, containment enforcement, size enforcement, encoding checks, and platform-specific link protection live in `runtime-doc` (`GetInstructionOp`). The `mcp-vector` adapter maps the UUID parameter to the operation input and returns the content as MCP text only.
+
+#### Distinct configuration responsibilities
+
+| File | Purpose |
+|---|---|
+| `.agents/mcp_config.json` | Declares the MCP server process — command and transport. Contains no instruction-directory or agent-command configuration. |
+| `.vector/agents.yaml` | Configures agents, profiles, and the `instructions-dir` (`${system-temp}/vector/instructions`) used by both the VS Code extension and `get_instruction`. |
 
 ### `rag.search` input and output contract
 

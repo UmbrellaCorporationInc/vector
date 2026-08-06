@@ -73,6 +73,16 @@ let input = ReplaceDocInput::new(
 );
 ```
 
+### Instruction capability
+
+- **`get_instruction`**: Reads a UUID-scoped instruction file written by the Vector VS Code extension. Accepts only a canonical lowercase hyphenated UUID; constructs the filename (`vector-instruction-<uuid>.txt`) and directory path internally from `instructions-dir` in `.vector/agents.yaml`. The file is not deleted after a successful read — repeated reads succeed for the terminal lifetime. Enforces a fixed 1 MiB size limit before and during reading and requires valid UTF-8. Returns the exact content verbatim.
+
+  Platform protections (see `operations/get_instruction.rs` for full details):
+  - **Windows**: Opens with `FILE_FLAG_OPEN_REPARSE_POINT`; inspects handle attributes via `GetFileInformationByHandle` to reject reparse points and directories; validates the opened handle's canonical final path with `GetFinalPathNameByHandleW`. Hard links require elevated privileges under default Windows policies (residual limitation).
+  - **Unix**: Uses `symlink_metadata` to detect symbolic links before opening. A TOCTOU window exists between the metadata call and the open; this is the strongest portable protection available in `std`.
+
+  Actionable errors are returned for: invalid UUIDs, malformed or missing `agents.yaml`, missing or invalid `instructions-dir`, missing or expired instruction files, non-regular targets, oversized content, invalid UTF-8, and read failures.
+
 ### Discovery
 
 - **`find_doc`**: Locates a document by type and code. Returns `path` (absolute, canonicalized), `package` (the package name, or empty for workspace-local lookup), and `content` (full document text read in the same lookup). The optional input `package` field allows resolving against the synchronized package location under `.vector-database/packages/{package}/` when set, rather than performing a workspace-local lookup. See RFC 00030 for package-qualified lookup semantics.

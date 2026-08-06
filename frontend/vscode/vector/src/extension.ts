@@ -17,10 +17,15 @@ import {
 } from "./document-viewer/index.js";
 import {
     cleanupAllTempFiles,
+    cleanupStaleInstructionFiles,
     writeTempDocument,
 } from "./document-viewer/document-actions/agentExecutor.js";
+import { loadAgentsConfig } from "./document-viewer/document-actions/agentsConfig.js";
 import { substituteVariables } from "./document-viewer/document-actions/variableSubstitution.js";
 import { DashboardViewerController } from "./dashboard-viewer/index.js";
+
+/** Diagnostic output channel for cleanup failures. Never emits telemetry. */
+let _diagOutput: vscode.OutputChannel | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -39,6 +44,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const hasConfig = loadDocumentTypes(workspaceRoot) !== null;
     void vscode.commands.executeCommand("setContext", "vector.hasConfig", hasConfig);
+
+    // Create a local diagnostic output channel for cleanup failures (no telemetry).
+    _diagOutput = vscode.window.createOutputChannel("Vector");
+    context.subscriptions.push(_diagOutput);
+
+    // Best-effort stale instruction file cleanup from previous sessions.
+    // If agents.yaml is missing or invalid, activation proceeds without cleanup.
+    const agentsLoad = loadAgentsConfig(workspaceRoot);
+    if (agentsLoad.ok) {
+        cleanupStaleInstructionFiles(agentsLoad.config.instructionsDir, undefined, _diagOutput);
+    }
 
     // Phase D (RFC 00017): dashboard viewer controller.
     const dashboardController = new DashboardViewerController(workspaceRoot, context.extensionUri);
@@ -364,5 +380,5 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-    cleanupAllTempFiles();
+    cleanupAllTempFiles(_diagOutput);
 }

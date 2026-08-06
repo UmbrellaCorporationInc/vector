@@ -25,6 +25,24 @@ use runtime_project::{CreateProjectOp, CreateProjectInput};
 // ... running the operation via a dispatcher or directly in tests
 ```
 
+## Bootstrap Asset: `.vector/agents.yaml`
+
+The provisioned `.vector/agents.yaml` configures agent execution and the instruction capability for the Vector VS Code extension and `mcp-vector`. Every bootstrapped project receives:
+
+```yaml
+instructions-dir: "${system-temp}/vector/instructions"
+agents:
+  claude:
+    type: cli
+    command: claude '<instruction>'
+  ...
+```
+
+- `instructions-dir` is required and must begin with `${system-temp}`. The VS Code extension writes a UUID-scoped instruction file to this directory before spawning an agent terminal; `mcp-vector` reads it back through `get_instruction`. Omitting this field or using the obsolete `<file>` placeholder is a validation failure that prevents terminal creation.
+- `<instruction>` is the only supported placeholder for agent commands. The frontend renders the complete MCP directive and substitutes it as one shell-safe argument.
+
+This is a **breaking change** from the legacy `<file>` path handoff. Projects bootstrapped before this change must add `instructions-dir` and replace every `<file>` placeholder with `<instruction>` to restore agent execution.
+
 ## Policy: Skip Existing
 
 By default, the `create_project` operation will skip any file that already exists at the target path. It will continue provisioning the rest of the skeleton and report all skipped files in the output.

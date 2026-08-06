@@ -355,6 +355,57 @@ fn vector_server_exposes_find_doc_tool() {
     );
 }
 
+/// Verifies that `get_tool` resolves the `get_instruction` tool by name.
+#[test]
+fn vector_server_exposes_get_instruction_tool() {
+    let server = VectorServer::new();
+    let tool = server.get_tool("get_instruction");
+    assert!(
+        tool.is_some(),
+        "VectorServer must expose the get_instruction tool registered by DocumentTools"
+    );
+}
+
+/// Verifies that the `get_instruction` tool schema requires only the `id` field,
+/// does not expose a `root_dir`, and carries an actionable description.
+#[test]
+fn vector_server_get_instruction_tool_schema_is_correct() {
+    let server = VectorServer::new();
+    let tool =
+        server.get_tool("get_instruction").expect("VectorServer must expose get_instruction");
+
+    let description =
+        tool.description.as_ref().expect("get_instruction tool must expose a description");
+    assert!(
+        description.contains("UUID"),
+        "get_instruction description must reference UUID; got: {description}"
+    );
+
+    let required =
+        tool.input_schema["required"].as_array().expect("required must be an array of field names");
+    assert!(required.iter().any(|v| v == "id"), "get_instruction schema must require the id field");
+    assert!(
+        !required.iter().any(|v| v == "root_dir"),
+        "get_instruction schema must not require root_dir — the server resolves it from cwd"
+    );
+    assert_eq!(
+        required.len(),
+        1,
+        "get_instruction schema must require only the id field; got: {required:?}"
+    );
+
+    let properties = tool
+        .input_schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+        .expect("get_instruction schema must expose input properties");
+    assert!(properties.contains_key("id"), "get_instruction schema must expose the id property");
+    assert!(
+        !properties.contains_key("root_dir"),
+        "get_instruction schema must not expose root_dir — the server controls path construction"
+    );
+}
+
 /// Verifies that `get_tool` resolves the `create_doc_prompt` tool by name.
 #[test]
 fn vector_server_exposes_create_doc_prompt_tool() {
@@ -564,6 +615,7 @@ async fn vector_server_lists_tools_from_both_groups_over_transport() {
     assert!(tool_names.contains(&"create_project"), "project tools must be listed");
     assert!(tool_names.contains(&"validate"), "document tools must be listed");
     assert!(tool_names.contains(&"find_doc"), "document lookup tool must be listed");
+    assert!(tool_names.contains(&"get_instruction"), "instruction retrieval tool must be listed");
     assert!(tool_names.contains(&"language_quality_gate"), "language tools must be listed");
     assert!(tool_names.contains(&"get_version"), "version tools must be listed");
     assert!(tool_names.contains(&"search"), "RAG search tool must be listed");

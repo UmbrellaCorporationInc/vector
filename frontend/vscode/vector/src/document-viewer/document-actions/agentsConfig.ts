@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { spawnSync } from "child_process";
 import * as yaml from "js-yaml";
@@ -11,6 +12,8 @@ export interface AgentDefinition {
 export interface AgentsYaml {
     agents: Record<string, AgentDefinition>;
     profiles: Record<string, string[]>;
+    /** Resolved value of `instructions-dir` from the YAML (variable already expanded). */
+    instructionsDir: string;
 }
 
 export interface ResolvedAgent {
@@ -25,14 +28,25 @@ export type AgentsConfigLoad =
     | { ok: false; missing: false; error: string };
 
 const AGENTS_YAML_PATH = [".vector", "agents.yaml"];
-const FILE_PLACEHOLDER = "<file>";
 const AGENTS_YAML_DISPLAY_PATH = ".vector/agents.yaml";
+
+/** The required placeholder that must appear exactly once per agent command. */
+const INSTRUCTION_PLACEHOLDER = "<instruction>";
+/** Legacy placeholder rejected by the new contract. */
+const LEGACY_FILE_PLACEHOLDER = "<file>";
+/** Legacy placeholder rejected by the new contract. */
+const LEGACY_INSTRUCTION_ID_PLACEHOLDER = "<instruction-id>";
+
+/** The only supported variable expression in `instructions-dir`. */
+const SYSTEM_TEMP_VAR = "${system-temp}";
+/** Matches any `${...}` variable expression. */
+const VAR_PATTERN = /\$\{[^}]+\}/g;
 
 /**
  * Loads and parses `.vector/agents.yaml` from the workspace root.
  *
  * Returns:
- *   { ok: true, config }      — file found and valid
+ *   { ok: true, config }         — file found and valid
  *   { ok: false, missing: true } — file does not exist (not an error)
  *   { ok: false, missing: false, error } — file exists but could not be parsed
  */
@@ -75,6 +89,13 @@ export function loadAgentsConfig(workspaceRoot: string): AgentsConfigLoad {
     }
 
     const map = parsed as Record<string, unknown>;
+
+    const instructionsDirError = validateInstructionsDir(map["instructions-dir"]);
+    if (instructionsDirError !== null) {
+        return { ok: false, missing: false, error: instructionsDirError };
+    }
+    const instructionsDir = resolveInstructionsDir(map["instructions-dir"] as string);
+
     const agents = normaliseAgents(map.agents);
     if (!agents.ok) {
         return {
@@ -93,7 +114,7 @@ export function loadAgentsConfig(workspaceRoot: string): AgentsConfigLoad {
         };
     }
 
-    return { ok: true, config: { agents: agents.value, profiles } };
+    return { ok: true, config: { agents: agents.value, profiles, instructionsDir } };
 }
 
 /**
@@ -126,6 +147,17 @@ export function resolveProfile(
             },
         ];
     });
+}
+
+/**
+ * Resolves the `instructions-dir` value by substituting `${system-temp}` with
+ * the platform-specific system temporary directory and normalising the result.
+ *
+ * The caller must have already validated the value with `validateInstructionsDir`.
+ */
+export function resolveInstructionsDir(instructionsDir: string): string {
+    const suffix = instructionsDir.slice(SYSTEM_TEMP_VAR.length);
+    return path.normalize(path.join(os.tmpdir(), suffix));
 }
 
 export function isCommandInPath(command: string): boolean {
@@ -176,6 +208,71 @@ export function extractCommandExecutable(commandTemplate: string): string | null
     return match?.[0] ?? null;
 }
 
+// ── Private helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Validates the `instructions-dir` YAML field value.
+ *
+ * Returns null on success, or an actionable error message on failure.
+ * Handles all cases: missing, non-string, empty, unsupported variable,
+ * repeated variable, variable not at start, path traversal, and escape.
+ */
+function validateInstructionsDir(raw: unknown): string | null {
+    if (raw === undefined || raw === null) {
+        return `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' is required`;
+    }
+
+    if (typeof raw !== "string") {
+        return `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' must be a non-empty string`;
+    }
+
+    if (raw.trim().length === 0) {
+        return `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' must not be empty`;
+    }
+
+    const allVars = [...raw.matchAll(VAR_PATTERN)].map((m) => m[0]);
+    const unsupported = allVars.filter((v) => v !== SYSTEM_TEMP_VAR);
+    const systemTempCount = allVars.length - unsupported.length;
+
+    if (unsupported.length > 0) {
+        const badVar = unsupported[0] ?? "";
+        return (
+            `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' contains unsupported variable ` +
+            `expression '${badVar}'; only \${system-temp} is supported`
+        );
+    }
+
+    if (systemTempCount === 0) {
+        return `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' must begin with \${system-temp}`;
+    }
+
+    if (systemTempCount > 1) {
+        return `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' must contain \${system-temp} exactly once`;
+    }
+
+    if (!raw.startsWith(SYSTEM_TEMP_VAR)) {
+        return `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' must begin with \${system-temp}`;
+    }
+
+    const suffix = raw.slice(SYSTEM_TEMP_VAR.length);
+
+    // Reject path traversal.
+    for (const segment of suffix.split(/[/\\]/)) {
+        if (segment === "..") {
+            return `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' must not contain path traversal (..)`;
+        }
+    }
+
+    // Verify the resolved path stays within the system temporary directory.
+    const tmpDir = path.normalize(os.tmpdir());
+    const resolved = path.normalize(path.join(os.tmpdir(), suffix));
+    if (resolved !== tmpDir && !resolved.startsWith(tmpDir + path.sep)) {
+        return `${AGENTS_YAML_DISPLAY_PATH}: 'instructions-dir' resolves outside the system temporary directory`;
+    }
+
+    return null;
+}
+
 function normaliseAgents(
     raw: unknown,
 ): { ok: true; value: Record<string, AgentDefinition> } | { ok: false; error: string } {
@@ -206,10 +303,28 @@ function normaliseAgents(
                 error: `${AGENTS_YAML_DISPLAY_PATH}: agent '${k}' command must not be empty`,
             };
         }
-        if (!entry.command.includes(FILE_PLACEHOLDER)) {
+        if (entry.command.includes(LEGACY_FILE_PLACEHOLDER)) {
             return {
                 ok: false,
-                error: `${AGENTS_YAML_DISPLAY_PATH}: agent '${k}' command must include the <file> placeholder`,
+                error:
+                    `${AGENTS_YAML_DISPLAY_PATH}: agent '${k}' command uses the obsolete ` +
+                    `<file> placeholder; replace it with <instruction>`,
+            };
+        }
+        if (entry.command.includes(LEGACY_INSTRUCTION_ID_PLACEHOLDER)) {
+            return {
+                ok: false,
+                error:
+                    `${AGENTS_YAML_DISPLAY_PATH}: agent '${k}' command uses the obsolete ` +
+                    `<instruction-id> placeholder; replace it with <instruction>`,
+            };
+        }
+        if (!entry.command.includes(INSTRUCTION_PLACEHOLDER)) {
+            return {
+                ok: false,
+                error:
+                    `${AGENTS_YAML_DISPLAY_PATH}: agent '${k}' command must include ` +
+                    `the <instruction> placeholder`,
             };
         }
         result[k] = {

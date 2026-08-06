@@ -578,6 +578,10 @@ impl RagTools {
         name = "index",
         description = "Initialize the local RAG store for this workspace and update the workspace RAG index."
     )]
+    // `notify_logging_message` is deprecated by SEP-2577 in newer rmcp releases.
+    // Progress notifications are best-effort (result is discarded); this call is
+    // retained for observability until a non-deprecated replacement is available.
+    #[allow(deprecated)]
     async fn index(
         &self,
         context: rmcp::service::RequestContext<RoleServer>,

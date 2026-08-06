@@ -46,6 +46,7 @@ import {
     renderAgentBlock,
     loadAgentsConfig,
     resolveProfile,
+    resolveInstructionsDir,
     extractCommandExecutable,
     isCommandInPath,
     resolveAgentCommand,
@@ -3093,13 +3094,14 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
     }
 
     const VALID_AGENTS_YAML = [
+        'instructions-dir: "${system-temp}/vector/instructions"',
         "agents:",
         "  claude:",
         "    type: cli",
-        '    command: claude "$(cat <file>)"',
+        "    command: claude '<instruction>'",
         "  codex:",
         "    type: cli",
-        '    command: codex "$(cat <file>)"',
+        "    command: codex '<instruction>'",
         "profiles:",
         "  create-doc: [claude, codex]",
         "  code: [claude]",
@@ -3123,8 +3125,12 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
             const result = loadAgentsConfig(dir);
             assert.ok(result.ok, "must succeed for valid YAML");
             assert.ok(result.config.agents.claude, "must parse claude agent");
-            assert.strictEqual(result.config.agents.claude.command, 'claude "$(cat <file>)"');
+            assert.strictEqual(result.config.agents.claude.command, "claude '<instruction>'");
             assert.ok(Array.isArray(result.config.profiles["create-doc"]));
+            assert.ok(
+                result.config.instructionsDir.length > 0,
+                "must expose resolved instructions dir",
+            );
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -3148,6 +3154,7 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
 
     test("loadAgentsConfig returns error when an agent command is empty", () => {
         const yaml = [
+            'instructions-dir: "${system-temp}/vector/instructions"',
             "agents:",
             "  claude:",
             '    command: "   "',
@@ -3168,10 +3175,11 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
 
     test("loadAgentsConfig rejects snake_case schema fields", () => {
         const yaml = [
+            'instructions-dir: "${system-temp}/vector/instructions"',
             "agents:",
             "  claude:",
             "    prompt_template: prompts-00004-execute-task-phase",
-            '    command: claude "$(cat <file>)"',
+            "    command: claude '<instruction>'",
             "profiles:",
             "  code: [claude]",
         ].join("\n");
@@ -3192,9 +3200,10 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
 
     test("loadAgentsConfig rejects snake_case top-level schema fields", () => {
         const yaml = [
+            'instructions-dir: "${system-temp}/vector/instructions"',
             "agents:",
             "  claude:",
-            '    command: claude "$(cat <file>)"',
+            "    command: claude '<instruction>'",
             "agent_profiles:",
             "  code: [claude]",
         ].join("\n");
@@ -3212,8 +3221,9 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });
-    test("loadAgentsConfig returns error when an agent command omits <file>", () => {
+    test("loadAgentsConfig returns error when an agent command omits <instruction>", () => {
         const yaml = [
+            'instructions-dir: "${system-temp}/vector/instructions"',
             "agents:",
             "  claude:",
             "    command: claude",
@@ -3226,10 +3236,251 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
             fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
             const result = loadAgentsConfig(dir);
             assert.ok(!result.ok && !result.missing, "must report invalid command");
-            assert.match(result.error, /must include the <file> placeholder/);
+            assert.match(result.error, /must include the <instruction> placeholder/);
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }
+    });
+
+    test("loadAgentsConfig rejects the obsolete <file> placeholder", () => {
+        const yaml = [
+            'instructions-dir: "${system-temp}/vector/instructions"',
+            "agents:",
+            "  claude:",
+            '    command: claude "$(cat <file>)"',
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must reject obsolete placeholder");
+            assert.match(result.error, /obsolete.*<file>/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig rejects the obsolete <instruction-id> placeholder", () => {
+        const yaml = [
+            'instructions-dir: "${system-temp}/vector/instructions"',
+            "agents:",
+            "  claude:",
+            "    command: claude --id <instruction-id>",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must reject obsolete placeholder");
+            assert.match(result.error, /obsolete.*<instruction-id>/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    // ── instructions-dir validation ───────────────────────────────────────
+
+    test("loadAgentsConfig returns error when instructions-dir is missing", () => {
+        const yaml = [
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must report missing instructions-dir");
+            assert.match(result.error, /'instructions-dir' is required/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig returns error when instructions-dir is empty", () => {
+        const yaml = [
+            "instructions-dir: ''",
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must report empty instructions-dir");
+            assert.match(result.error, /'instructions-dir' must not be empty/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig returns error when instructions-dir is not a string", () => {
+        const yaml = [
+            "instructions-dir: 42",
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must report non-string instructions-dir");
+            assert.match(result.error, /'instructions-dir' must be a non-empty string/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig returns error when instructions-dir has no variable", () => {
+        const yaml = [
+            "instructions-dir: /tmp/vector/instructions",
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must report missing variable");
+            assert.match(result.error, /'instructions-dir' must begin with \$\{system-temp\}/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig returns error when instructions-dir has an unsupported variable", () => {
+        const yaml = [
+            'instructions-dir: "${project-root}/vector/instructions"',
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must report unsupported variable");
+            assert.match(result.error, /unsupported variable expression '\$\{project-root\}'/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig returns error when instructions-dir repeats ${system-temp}", () => {
+        const yaml = [
+            'instructions-dir: "${system-temp}/${system-temp}/instructions"',
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must report repeated variable");
+            assert.match(result.error, /\$\{system-temp\} exactly once/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig returns error when ${system-temp} is not at the start", () => {
+        const yaml = [
+            'instructions-dir: "prefix/${system-temp}/instructions"',
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must report variable not at start");
+            assert.match(result.error, /'instructions-dir' must begin with \$\{system-temp\}/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig returns error when instructions-dir contains path traversal", () => {
+        const yaml = [
+            'instructions-dir: "${system-temp}/../escape"',
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(!result.ok && !result.missing, "must report path traversal");
+            assert.match(result.error, /path traversal/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("loadAgentsConfig accepts ${system-temp} alone as instructions-dir", () => {
+        const yaml = [
+            'instructions-dir: "${system-temp}"',
+            "agents:",
+            "  claude:",
+            "    command: claude '<instruction>'",
+            "profiles:",
+            "  code: [claude]",
+        ].join("\n");
+        const dir = makeTempDir();
+        try {
+            fs.mkdirSync(path.join(dir, ".vector"));
+            fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), yaml, "utf-8");
+            const result = loadAgentsConfig(dir);
+            assert.ok(
+                result.ok,
+                `must accept bare \${system-temp}: ${!result.ok && !result.missing ? result.error : ""}`,
+            );
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test("resolveInstructionsDir expands ${system-temp} to the system temp directory", () => {
+        const resolved = resolveInstructionsDir("${system-temp}/vector/instructions");
+        assert.ok(resolved.length > 0, "must return a non-empty path");
+        assert.ok(!resolved.includes("${system-temp}"), "must not contain the variable expression");
+        assert.ok(resolved.includes("vector"), "must contain the suffix segments");
     });
 
     // ── resolveProfile ────────────────────────────────────────────────────
@@ -3286,10 +3537,11 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
 
     test("resolveProfile skips agents whose name is not in the agents map", () => {
         const yaml = [
+            'instructions-dir: "${system-temp}/vector/instructions"',
             "agents:",
             "  claude:",
             "    type: cli",
-            '    command: claude "$(cat <file>)"',
+            "    command: claude '<instruction>'",
             "profiles:",
             "  my-profile: [claude, ghost]",
         ].join("\n");
@@ -3308,12 +3560,14 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
     });
 
     test("extractCommandExecutable returns the first token for a templated command", () => {
-        assert.strictEqual(extractCommandExecutable('claude "$(cat <file>)"'), "claude");
+        assert.strictEqual(extractCommandExecutable("claude '<instruction>'"), "claude");
     });
 
     test("extractCommandExecutable supports quoted executable paths", () => {
         assert.strictEqual(
-            extractCommandExecutable('"C:\\Program Files\\Agent\\agent.exe" --prompt <file>'),
+            extractCommandExecutable(
+                "\"C:\\Program Files\\Agent\\agent.exe\" --prompt '<instruction>'",
+            ),
             "C:\\Program Files\\Agent\\agent.exe",
         );
     });
@@ -3324,7 +3578,10 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
             fs.mkdirSync(path.join(dir, ".vector"));
             fs.writeFileSync(path.join(dir, ".vector", "agents.yaml"), VALID_AGENTS_YAML, "utf-8");
             const load = loadAgentsConfig(dir);
-            assert.ok(load.ok);
+            assert.ok(
+                load.ok,
+                `agents.yaml must load successfully: ${!load.ok && !load.missing ? load.error : ""}`,
+            );
             const inspected: string[] = [];
             const agents = resolveProfile(load.config, "create-doc", (command) => {
                 inspected.push(command);
@@ -3360,38 +3617,44 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
         assert.strictEqual(quoteShellArgument(input), '"C:\\\\temp\\\\prompt\\"\\$\\`file.txt"');
     });
 
-    test("resolveAgentCommand replaces every <file> placeholder with the quoted temp file path", () => {
+    test("resolveAgentCommand replaces every <instruction> placeholder with the directive", () => {
         const resolved = resolveAgentCommand(
-            'claude "$(cat <file>)" && echo <file>',
-            "/tmp/vector prompt.txt",
+            "claude '<instruction>' && repeat '<instruction>'",
+            "the-directive",
         );
-        assert.strictEqual(
-            resolved,
-            'claude "$(cat "/tmp/vector prompt.txt")" && echo "/tmp/vector prompt.txt"',
-        );
+        assert.strictEqual(resolved, "claude 'the-directive' && repeat 'the-directive'");
     });
 
-    test("resolveAgentCommand throws when the configured command has no <file> placeholder", () => {
+    test("resolveAgentCommand substitutes the directive as-is without additional quoting", () => {
+        const directive = '"Using MCP, call get_instruction"';
+        const resolved = resolveAgentCommand("claude '<instruction>'", directive);
+        assert.strictEqual(resolved, `claude '${directive}'`);
+    });
+
+    test("resolveAgentCommand throws when the configured command has no <instruction> placeholder", () => {
         assert.throws(
-            () => resolveAgentCommand("claude", "/tmp/vector-prompt.txt"),
-            /must include the <file> placeholder/,
+            () => resolveAgentCommand("claude", "directive"),
+            /must include the <instruction> placeholder/,
         );
     });
 
-    test("spawnAgentTerminal sends the resolved command to the VS Code terminal", () => {
+    test("spawnAgentTerminal sends the pre-resolved command to the VS Code terminal", () => {
+        const resolvedCommand =
+            'claude "Using the Vector MCP server, call get_instruction with id \\"abc\\""';
         const tempFilePath = path.join(os.tmpdir(), "vector-agent-terminal-test.txt");
-        fs.writeFileSync(tempFilePath, "prompt", "utf-8");
+        fs.writeFileSync(tempFilePath, "instruction content", "utf-8");
 
         try {
             vscode.__resetTerminalState();
             const subscriptions: { dispose: () => void }[] = [];
 
             spawnAgentTerminal(
-                'claude "$(cat <file>)"',
+                resolvedCommand,
                 "claude",
                 "Execute",
                 tempFilePath,
                 subscriptions,
+                "/fake/workspace",
             );
 
             const terminals = vscode.__getCreatedTerminals();
@@ -3399,13 +3662,16 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
             const firstTerminal = terminals[0];
             assert.ok(firstTerminal, "terminal record must exist");
             assert.strictEqual(firstTerminal.name, "Vector: claude - Execute");
-            assert.deepStrictEqual(firstTerminal.sentText, [
-                `claude "$(cat ${quoteShellArgument(tempFilePath)})"`,
-            ]);
+            assert.deepStrictEqual(firstTerminal.sentText, [resolvedCommand]);
             assert.deepStrictEqual(
                 firstTerminal.showCalls,
                 [false],
                 "terminal must be shown with preserveFocus=false",
+            );
+            assert.strictEqual(
+                firstTerminal.cwd,
+                "/fake/workspace",
+                "terminal must use workspaceRoot as cwd",
             );
             assert.strictEqual(subscriptions.length, 1, "must register one close subscription");
         } finally {
@@ -3414,23 +3680,36 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
         }
     });
 
-    test("spawnAgentTerminal deletes the temp file when the terminal closes", () => {
+    test("spawnAgentTerminal deletes the instruction file when the terminal closes", () => {
         const tempFilePath = path.join(os.tmpdir(), "vector-agent-cleanup-test.txt");
-        fs.writeFileSync(tempFilePath, "prompt", "utf-8");
+        fs.writeFileSync(tempFilePath, "instruction content", "utf-8");
 
         try {
             vscode.__resetTerminalState();
             const subscriptions: { dispose: () => void }[] = [];
 
-            spawnAgentTerminal("claude <file>", "claude", "Execute", tempFilePath, subscriptions);
+            spawnAgentTerminal(
+                "claude already-resolved-command",
+                "claude",
+                "Execute",
+                tempFilePath,
+                subscriptions,
+                "/fake/workspace",
+            );
 
             const terminal = vscode.__getCreatedTerminals()[0]?.terminal;
             assert.ok(terminal, "terminal must be created");
-            assert.ok(fs.existsSync(tempFilePath), "temp file must exist before terminal close");
+            assert.ok(
+                fs.existsSync(tempFilePath),
+                "instruction file must exist before terminal close",
+            );
 
             vscode.__fireDidCloseTerminal(terminal);
 
-            assert.ok(!fs.existsSync(tempFilePath), "temp file must be deleted on terminal close");
+            assert.ok(
+                !fs.existsSync(tempFilePath),
+                "instruction file must be deleted on terminal close",
+            );
         } finally {
             fs.rmSync(tempFilePath, { force: true });
             vscode.__resetTerminalState();
@@ -3508,9 +3787,10 @@ suite("Task 00031 Phase C — Agent Trigger UI Errors", () => {
             fs.writeFileSync(
                 path.join(dir, ".vector", "agents.yaml"),
                 [
+                    'instructions-dir: "${system-temp}/vector/instructions"',
                     "agents:",
                     "  claude:",
-                    '    command: claude "$(cat <file>)"',
+                    "    command: claude '<instruction>'",
                     "profiles:",
                     "  other: [claude]",
                 ].join("\n"),
@@ -3544,9 +3824,10 @@ suite("Task 00031 Phase C — Agent Trigger UI Errors", () => {
             fs.writeFileSync(
                 path.join(dir, ".vector", "agents.yaml"),
                 [
+                    'instructions-dir: "${system-temp}/vector/instructions"',
                     "agents:",
                     "  ghost:",
-                    "    command: missing-agent --prompt <file>",
+                    "    command: missing-agent --prompt '<instruction>'",
                     "profiles:",
                     "  code: [ghost]",
                 ].join("\n"),
@@ -3581,13 +3862,14 @@ suite("Task 00031 Phase C — Agent Trigger UI Errors", () => {
             fs.writeFileSync(
                 path.join(dir, ".vector", "agents.yaml"),
                 [
+                    'instructions-dir: "${system-temp}/vector/instructions"',
                     "agents:",
                     "  node-one:",
-                    "    command: node <file>",
+                    "    command: node '<instruction>'",
                     "  node-two:",
-                    "    command: node <file>",
+                    "    command: node '<instruction>'",
                     "  ghost:",
-                    "    command: missing-agent --prompt <file>",
+                    "    command: missing-agent --prompt '<instruction>'",
                     "profiles:",
                     "  code: [node-one, node-two, ghost]",
                 ].join("\n"),
@@ -3635,11 +3917,12 @@ suite("Task 00031 Phase C — Agent Trigger UI Errors", () => {
             fs.writeFileSync(
                 path.join(dir, ".vector", "agents.yaml"),
                 [
+                    'instructions-dir: "${system-temp}/vector/instructions"',
                     "agents:",
                     "  node-one:",
-                    "    command: node <file>",
+                    "    command: node '<instruction>'",
                     "  node-two:",
-                    "    command: node <file>",
+                    "    command: node '<instruction>'",
                     "profiles:",
                     "  code: [node-one, node-two]",
                 ].join("\n"),

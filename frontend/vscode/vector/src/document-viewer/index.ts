@@ -95,14 +95,19 @@ export { resolveFileSuggestions } from "./chat-input/chatInputSuggestionProvider
 export {
     loadAgentsConfig,
     resolveProfile,
+    resolveInstructionsDir,
     extractCommandExecutable,
     isCommandInPath,
 } from "./document-actions/agentsConfig.js";
 export {
+    renderInstructionDirective,
+    writeInstructionFile,
+    cleanupStaleInstructionFiles,
     quoteShellArgument,
     resolveAgentCommand,
     spawnAgentTerminal,
 } from "./document-actions/agentExecutor.js";
+export type { DiagnosticOutput } from "./document-actions/agentExecutor.js";
 export type {
     AgentDefinition,
     AgentsYaml,

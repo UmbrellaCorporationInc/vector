@@ -101,7 +101,75 @@ Governed reading flows are extension-owned:
 - Underscore-containing placeholders such as `#{doc_type}` or `#{document_type}` are intentionally left unresolved and are treated as invalid contract usage.
 - `.vector/*.yaml` schema field names are also kebab-case only. Extension-side YAML readers reject invalid schema fields defensively, while repository-wide `runtime-doc validate` remains the authoritative failure path.
 
-## 8. Changelog
+## 8. Instruction Capability
+
+The extension communicates prompt content to agents through a UUID-scoped instruction file managed entirely by the extension. This replaces the former `<file>` path handoff.
+
+### 8.1 Configuration contract
+
+`.vector/agents.yaml` must declare a top-level `instructions-dir` property:
+
+```yaml
+instructions-dir: "${system-temp}/vector/instructions"
+agents:
+    claude:
+        type: cli
+        command: claude '<instruction>'
+```
+
+`${system-temp}` is the only supported variable. TypeScript resolves it with `os.tmpdir()`; the MCP counterpart resolves it with `std::env::temp_dir()`. The value must begin with `${system-temp}`, must not contain `..` or unsupported variable expressions, and must not resolve outside the system temporary directory.
+
+This is a **breaking change**. Configurations that use the old `<file>` or `<instruction-id>` placeholders, or that omit `instructions-dir`, fail validation with an actionable error toast and prevent terminal creation. There is no compatibility fallback.
+
+### 8.2 Distinct configuration responsibilities
+
+| File                      | Responsibility                                                                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.agents/mcp_config.json` | Declares how the MCP server (`mcp-vector`) is started — command, arguments, and transport type. Contains no agent-execution or instruction-directory configuration. |
+| `.vector/agents.yaml`     | Configures agents, profiles, and the `instructions-dir` where instruction files are written. This file is the source of truth for the instruction lifecycle.        |
+
+### 8.3 Instruction lifecycle
+
+For each agent invocation:
+
+1. The extension resolves the prompt and substitutes all declared input values.
+2. `.vector/agents.yaml` is loaded and validated.
+3. The configured instruction directory is resolved.
+4. A cryptographically random UUID is generated with `crypto.randomUUID()`.
+5. The instruction directory is created when necessary.
+6. A file named `vector-instruction-<canonical-uuid>.txt` is created exclusively with UTF-8 content and restrictive POSIX permissions (`0o600`) where supported (non-Windows).
+7. The frontend-owned MCP directive is rendered with the UUID and substituted for `<instruction>` as one shell-safe argument. No second interpolation pass occurs.
+8. The terminal is created with the active workspace root as explicit `cwd`.
+9. The instruction file path is associated with the terminal for cleanup.
+
+**Retry behaviour:** The MCP `get_instruction` tool does not delete the instruction file after a successful read. Repeated reads succeed for the full terminal lifetime, making agent retries safe.
+
+**Cleanup:** Instruction files are deleted when the associated terminal closes, when the extension deactivates, or immediately after a launch failure after the file has been created. On activation, the extension removes only regular files matching the exact `vector-instruction-<uuid>.txt` filename shape that are older than 24 hours; it does not follow links, recurse, or delete unrelated files.
+
+**Cleanup failures** are written to a local VS Code diagnostic output channel only. No telemetry is collected or emitted.
+
+**Size bound:** The MCP `get_instruction` tool enforces a fixed, non-configurable 1 MiB limit. Instructions larger than 1 MiB are rejected with an actionable error; they must be decomposed.
+
+### 8.4 Platform-specific filesystem guarantees
+
+| Platform    | Guarantee                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Windows** | `get_instruction` opens the target with `FILE_FLAG_OPEN_REPARSE_POINT` to avoid reparse-point redirection, inspects handle attributes via `GetFileInformationByHandle` to reject reparse points and directories, and validates the opened handle's canonical location with `GetFinalPathNameByHandleW`. Hard links are not detectable with these APIs alone; creating one across the boundary requires elevated privileges under default Windows policies. |
+| **Unix**    | `symlink_metadata` is used to detect and reject symbolic links before opening. A TOCTOU window exists between the metadata call and the open; `O_NOFOLLOW`-based elimination would require `libc`/`nix`. This is the strongest portable protection available in `std`.                                                                                                                                                                                     |
+
+### 8.5 Workspace scope
+
+The extension supports one governed project per VS Code window. The `workspaceRoot` selected during extension activation is the authoritative project root for agent actions, terminal creation, and instruction directory resolution. Mapping multiple governed projects inside one multi-root workspace is explicitly deferred and is not supported by this implementation.
+
+### 8.6 Cross-language test matrix
+
+TypeScript and Rust independently cover the same configuration validation cases using table-driven tests. Shared cross-language fixture infrastructure is intentionally deferred to a separate governed proposal and is not part of this implementation.
+
+## 9. Changelog
+
+### 2.0.0
+
+- **Instruction Capability (Breaking)** — Replaces the `<file>` path handoff with a UUID-scoped instruction file and the `<instruction>` placeholder. `.vector/agents.yaml` must declare `instructions-dir: "${system-temp}/vector/instructions"`. All agent commands must use `<instruction>` and must not use the obsolete `<file>` or `<instruction-id>` placeholders. The MCP server exposes a new `get_instruction` tool that reads the instruction file by UUID without exposing paths to the caller. See section 8 for the complete contract, platform guarantees, and migration guide.
 
 ### 1.4.5
 
@@ -135,7 +203,7 @@ Governed reading flows are extension-owned:
 - **`vector-open-doc` blocks** — trigger link that opens a target document in the preview panel and performs `#{}` variable substitution before rendering. The source document is never modified on disk.
 - **`vector-agent-button` and `vector-agent-action` blocks** — trigger CLI agents defined in `.vector/agents.yaml`. On click, the available agents in the configured profile are presented via VSCode QuickPick. Selecting an agent resolves the prompt file, merges form fields with block-level `input` (form overrides static values), writes a temp file, replaces every `<file>` placeholder in the configured agent command with that temp file path, and spawns a named VSCode terminal running the resolved command. Unresolved `#{}` variables produce a warning. Temp files are cleaned up on terminal close or extension deactivation.
 
-## 9. Non-Goals and Future Work
+## 10. Non-Goals and Future Work
 
 - Rich-text or WYSIWYG editing is intentionally out of scope.
 - Full live preview for arbitrary editor navigation is not required.
