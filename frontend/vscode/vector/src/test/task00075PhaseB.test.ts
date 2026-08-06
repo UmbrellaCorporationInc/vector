@@ -55,7 +55,7 @@ suite("Task 00075 Phase B — renderInstructionDirective", () => {
         const directive = renderInstructionDirective(uuid);
         assert.strictEqual(
             directive,
-            `Using the Vector MCP server, call get_instruction with id "${uuid}" and execute the returned instructions.`,
+            `Using Vector MCP, call get_instruction with id "${uuid}" and execute the returned instructions.`,
         );
     });
 

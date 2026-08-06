@@ -3,15 +3,25 @@ agents:
   claude:
     type: cli
     command: claude '<instruction>'
+  fable:
+    type: cli
+    command: claude --model fable '<instruction>'
+  opus:
+    type: cli
+    command: claude --model opus '<instruction>'
+  sol:
+    type: cli
+    command: codex --model gpt-5.6-sol '<instruction>'
+  codex:
+    type: cli
+    command: codex --model gpt-5.6-terra '<instruction>'
   antigravity:
     type: cli
     command: agy -i '<instruction>'
-  codex:
-    type: cli
-    command: codex '<instruction>'
   opencode:
     type: cli
     command: opencode --prompt '<instruction>'
 profiles:
-  create-doc: [antigravity, claude, codex]
-  code: [antigravity, claude, codex, opencode]
+  create-doc: [antigravity, claude, opus, sol, fable, codex]
+  discuss-doc: [antigravity, claude, opus, sol, fable, codex, opencode]
+  code: [antigravity, claude, sol, opus, codex, opencode]

@@ -7,6 +7,17 @@ import * as vscode from "vscode";
 /** The placeholder for instruction directives in agent command templates. */
 const INSTRUCTION_PLACEHOLDER = "<instruction>";
 
+/** Placeholder within a launch prompt template that is replaced with the instruction UUID. */
+const INSTRUCTION_ID_PLACEHOLDER_IN_PROMPT = "<instruction-id>";
+
+/**
+ * Built-in default launch prompt used when no root-level `prompt` is configured in agents.yaml.
+ *
+ * Contains one `<instruction-id>` token that is substituted with the UUID at launch time.
+ * Does not use the word "server" so it remains accurate across transport variants.
+ */
+export const DEFAULT_AGENT_PROMPT = `Using Vector MCP, call get_instruction with id "${INSTRUCTION_ID_PLACEHOLDER_IN_PROMPT}" and execute the returned instructions.`;
+
 /** Fixed prefix of the instruction filename (before the UUID). */
 const INSTRUCTION_FILE_PREFIX = "vector-instruction-";
 
@@ -37,17 +48,26 @@ export interface DiagnosticOutput {
 // ── Instruction lifecycle ─────────────────────────────────────────────────────
 
 /**
- * Renders the frontend-owned MCP directive for the given canonical UUID.
+ * Resolves the launch prompt for a given UUID.
  *
- * This is the complete text that the agent receives as its instruction argument.
- * The UUID is embedded inside double quotes within the directive body and is
- * never exposed as a separate configurable placeholder.
+ * Uses `configuredPrompt` when provided; otherwise falls back to `DEFAULT_AGENT_PROMPT`.
+ * Every `<instruction-id>` occurrence in the resolved template is replaced with `uuid`.
+ * Configured prompt text is preserved exactly apart from that substitution.
+ */
+export function resolveAgentPrompt(configuredPrompt: string | undefined, uuid: string): string {
+    const template = configuredPrompt ?? DEFAULT_AGENT_PROMPT;
+    return template.replaceAll(INSTRUCTION_ID_PLACEHOLDER_IN_PROMPT, uuid);
+}
+
+/**
+ * Renders the built-in MCP directive for the given canonical UUID using the default prompt.
+ *
+ * Prefer `resolveAgentPrompt(agentsConfig.prompt, uuid)` at call sites that have access to
+ * the loaded `AgentsYaml` config, so that a root-level `prompt` field from `agents.yaml` is
+ * honoured. This wrapper is kept for tests and utilities that always want the built-in default.
  */
 export function renderInstructionDirective(uuid: string): string {
-    return (
-        `Using the Vector MCP server, call get_instruction with id "${uuid}" ` +
-        `and execute the returned instructions.`
-    );
+    return resolveAgentPrompt(undefined, uuid);
 }
 
 /**

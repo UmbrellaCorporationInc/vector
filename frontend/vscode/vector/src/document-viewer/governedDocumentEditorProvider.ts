@@ -20,7 +20,7 @@ import {
 import { loadAgentsConfig, resolveProfile } from "./document-actions/agentsConfig.js";
 import {
     writeInstructionFile,
-    renderInstructionDirective,
+    resolveAgentPrompt,
     quoteShellArgument,
     resolveAgentCommand,
     spawnAgentTerminal,
@@ -351,7 +351,7 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
             agentsLoad.config.instructionsDir,
         );
         try {
-            const directive = renderInstructionDirective(uuid);
+            const directive = resolveAgentPrompt(agentsLoad.config.prompt, uuid);
             const quotedDirective = quoteShellArgument(directive);
             const resolvedCommand = resolveAgentCommand(chosenAgent.command, quotedDirective);
             spawnAgentTerminal(
