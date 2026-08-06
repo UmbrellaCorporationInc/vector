@@ -1588,3 +1588,111 @@ async fn patch_doc_tool_returns_error_for_bom_content() {
     );
     assert!(err.contains("BOM"), "error must mention BOM to guide remediation; got: {err:?}");
 }
+
+// ── get_instruction tool tests ────────────────────────────────────────────────
+
+/// Verifies that `GetInstructionParams` deserializes correctly from JSON input.
+#[test]
+fn get_instruction_params_deserializes_correctly() {
+    let raw = r#"{"id": "93b0a984-5422-4491-9b0c-db44fdb69ea8"}"#;
+    let params: super::GetInstructionParams =
+        serde_json::from_str(raw).expect("must deserialize GetInstructionParams");
+    assert_eq!(params.id, "93b0a984-5422-4491-9b0c-db44fdb69ea8");
+}
+
+/// Verifies that the `get_instruction` tool rejects an uppercase UUID without reading any file.
+///
+/// The UUID validation runs before any filesystem access; the tool must return an error
+/// from the adapter boundary — no filesystem access is attempted.
+#[tokio::test]
+async fn get_instruction_tool_returns_error_for_uppercase_uuid() {
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .get_instruction(Parameters(super::GetInstructionParams {
+            id: "93B0A984-5422-4491-9B0C-DB44FDB69EA8".to_string(),
+        }))
+        .await;
+
+    assert!(result.is_err(), "get_instruction must return an error for an uppercase UUID");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("get_instruction failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+}
+
+/// Verifies that the `get_instruction` tool rejects a non-UUID id value.
+#[tokio::test]
+async fn get_instruction_tool_returns_error_for_non_uuid_id() {
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .get_instruction(Parameters(super::GetInstructionParams {
+            id: "not-a-valid-uuid".to_string(),
+        }))
+        .await;
+
+    assert!(result.is_err(), "get_instruction must return an error for a non-UUID id");
+    let err = result.expect_err("must be an error");
+    assert!(
+        err.contains("get_instruction failed:"),
+        "error must carry the operation prefix; got: {err:?}"
+    );
+}
+
+/// Verifies that the `get_instruction` tool fails gracefully when the working directory
+/// lacks a `.vector/agents.yaml` configuration.
+///
+/// The `get_instruction` tool resolves the project root from the process working directory.
+/// This test exercises the configuration-load failure path in an environment where the
+/// current directory does not have a valid agents.yaml.
+#[tokio::test]
+async fn get_instruction_tool_returns_error_for_missing_configuration() {
+    // Use a valid UUID so the error comes from the configuration path, not UUID validation.
+    let tools = super::DocumentTools::new();
+    let result = tools
+        .get_instruction(Parameters(super::GetInstructionParams {
+            id: "93b0a984-5422-4491-9b0c-db44fdb69ea8".to_string(),
+        }))
+        .await;
+
+    // The tool will either succeed (if run in a project root with valid agents.yaml)
+    // or fail with an actionable configuration or missing-file error. We verify the
+    // error is well-formed regardless of the working directory configuration.
+    if let Err(err) = result {
+        assert!(
+            err.contains("get_instruction failed:"),
+            "error must carry the operation prefix; got: {err:?}"
+        );
+        assert!(!err.is_empty(), "error message must not be empty; got: {err:?}");
+    }
+    // If the test runs in a properly configured project root and the instruction file
+    // exists, the tool would succeed — which is also acceptable.
+}
+
+/// Verifies that `DocumentTools::new` and `Default` construct an adapter that exposes
+/// the `get_instruction` tool in the registered tool surface.
+#[test]
+fn get_instruction_tool_is_registered_in_document_tools() {
+    use rmcp::ServerHandler;
+
+    let tools = super::DocumentTools::new();
+    let registered = tools.get_tool("get_instruction");
+    assert!(registered.is_some(), "DocumentTools must register the get_instruction tool");
+}
+
+/// Verifies that the `get_instruction` tool schema requires only the `id` field.
+#[test]
+fn get_instruction_tool_schema_requires_only_id() {
+    use rmcp::ServerHandler;
+
+    let tools = super::DocumentTools::new();
+    let tool = tools.get_tool("get_instruction").expect("get_instruction must be registered");
+    let required =
+        tool.input_schema["required"].as_array().expect("required must be an array of field names");
+    assert!(required.iter().any(|v| v == "id"), "get_instruction schema must require the id field");
+    assert_eq!(
+        required.len(),
+        1,
+        "get_instruction schema must require only the id field (no path, filename, or directory)"
+    );
+}

@@ -7,7 +7,7 @@ title: Implement RFC 00043 Add Instruction Capability
 description: Replace filesystem-path prompt handoff with the UUID-scoped instruction capability accepted in RFC 00043.
 status: in-progress
 created: 2026-08-05
-updated: 2026-08-05
+updated: 2026-08-06
 tags:
   - vscode
   - mcp
@@ -96,14 +96,14 @@ input:
   language: Rust
 ```
 
-- [ ] Implement `GetInstructionOp` in `runtime-doc` with the standard operation input, output, dispatcher, and focused test structure.
-- [ ] Add `get_instruction` to the MCP document tool group as a thin `PluginDispatcher` adapter with no duplicated configuration or filesystem logic.
-- [ ] Accept only canonical lowercase hyphenated UUIDs and construct the controlled filename internally.
-- [ ] Enforce direct-child containment, regular-file and link protections, a fixed non-configurable 1 MiB limit before and during reads, and valid UTF-8.
-- [ ] Add target-specific `windows-sys` support to open without following reparse redirection, reject reparse targets, and validate the opened handle's final location; document any residual platform limitation.
-- [ ] Return exact instruction content without deleting it so repeated reads remain valid for the terminal lifetime.
-- [ ] Provide bounded actionable errors for invalid UUIDs, invalid configuration, missing or expired instructions, non-regular targets, oversized content, invalid UTF-8, and read failures.
-- [ ] Add tool-listing, routing, containment, validation, repeated-read, error, and platform-appropriate link tests using isolated temporary directories.
+- [x] Implement `GetInstructionOp` in `runtime-doc` with the standard operation input, output, dispatcher, and focused test structure.
+- [x] Add `get_instruction` to the MCP document tool group as a thin `PluginDispatcher` adapter with no duplicated configuration or filesystem logic.
+- [x] Accept only canonical lowercase hyphenated UUIDs and construct the controlled filename internally.
+- [x] Enforce direct-child containment, regular-file and link protections, a fixed non-configurable 1 MiB limit before and during reads, and valid UTF-8.
+- [x] Add target-specific `windows-sys` support to open without following reparse redirection, reject reparse targets, and validate the opened handle's final location; document any residual platform limitation.
+- [x] Return exact instruction content without deleting it so repeated reads remain valid for the terminal lifetime.
+- [x] Provide bounded actionable errors for invalid UUIDs, invalid configuration, missing or expired instructions, non-regular targets, oversized content, invalid UTF-8, and read failures.
+- [x] Add tool-listing, routing, containment, validation, repeated-read, error, and platform-appropriate link tests using isolated temporary directories.
 
 ### 3.4. Phase D — Integration and Documentation
 

@@ -29,6 +29,7 @@ dunce = "1"
 fastembed = { version = "5.16.0", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries-rustls-tls"] }
 patcher = "0.2"
 mcp-vector = { path = "mcp/vector" }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
 terminal_size = "0.4"
 blake3 = "1"
 lancedb = "0.30.0"

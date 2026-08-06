@@ -9,8 +9,8 @@ use runtime_channel::PluginDispatcher;
 use runtime_core::channel::Receiver;
 use runtime_doc::operations::{
     CreateDocInput, CreateDocOp, CreateDocTypeInput, CreateDocTypeOp, FindDocInput, FindDocOp,
-    PatchDocFormat, PatchDocInput, PatchDocOp, ReplaceDocInput, ReplaceDocOp, ValidateInput,
-    ValidateOp,
+    GetInstructionInput, GetInstructionOp, PatchDocFormat, PatchDocInput, PatchDocOp,
+    ReplaceDocInput, ReplaceDocOp, ValidateInput, ValidateOp,
 };
 use runtime_io::path::IoPath;
 use serde::{Deserialize, Serialize};
@@ -197,6 +197,20 @@ pub struct ReplaceDocParams {
     /// Must be valid UTF-8 without a BOM. The governed front matter identity fields
     /// (`id`, `type`, `code`, `slug`) must match the resolved document.
     pub content: String,
+}
+
+/// MCP-facing parameters for the `get_instruction` tool.
+///
+/// # DTO(MCP protocol input mapped at the adapter boundary; serde deserialization requires public fields)
+#[non_exhaustive]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GetInstructionParams {
+    /// The canonical lowercase hyphenated UUID identifying the instruction to read.
+    ///
+    /// Must match the form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` using only lowercase
+    /// hexadecimal digits.  The MCP server constructs the filename and directory path
+    /// internally; the caller must not supply a path, filename, or extension.
+    pub id: String,
 }
 
 /// MCP tool group for document operations.
@@ -504,6 +518,50 @@ impl DocumentTools {
             Ok(Some(output)) => Ok(format!("path: {}\n\n{}", output.path, output.content)),
             Ok(None) => Err("replace_doc failed: operation completed with no output".to_string()),
             Err(e) => Err(format!("replace_doc failed: {e}")),
+        }
+    }
+
+    /// Read a UUID-scoped instruction from the controlled instructions directory.
+    ///
+    /// Executes `GetInstructionOp` through the standard dispatcher path.
+    /// All filesystem access, configuration loading, UUID validation, containment enforcement,
+    /// size enforcement, encoding checks, and platform-specific link protection live in
+    /// `runtime-doc`; this method only maps the MCP UUID parameter to the runtime input
+    /// and returns the instruction content as MCP text.
+    ///
+    /// The instruction file is not deleted after a successful read; repeated reads succeed
+    /// for the full terminal lifetime.
+    ///
+    /// The server resolves the project root from the MCP process working directory and
+    /// loads `instructions-dir` from `.vector/agents.yaml`.  The caller controls only
+    /// the UUID; the filename, directory, prefix, suffix, and path components are
+    /// constructed internally and are not caller-configurable.
+    #[tool(
+        description = "Read a UUID-scoped instruction written by the Vector VS Code extension and return its exact UTF-8 content. The caller supplies only the canonical lowercase hyphenated UUID; the server constructs the file path internally from the configured instructions directory. Repeated reads succeed without deleting the file. Fails with an actionable error for invalid UUIDs, missing or invalid configuration, missing or expired instruction files, non-regular targets, oversized content (> 1 MiB), or invalid UTF-8."
+    )]
+    async fn get_instruction(
+        &self,
+        Parameters(GetInstructionParams { id }): Parameters<GetInstructionParams>,
+    ) -> Result<String, String> {
+        // Resolve the project root from the MCP process working directory so the server
+        // needs no caller-provided root_dir.
+        let root_dir = std::env::current_dir().map_err(|e| {
+            format!("get_instruction failed: cannot resolve working directory: {e}")
+        })?;
+
+        let input = GetInstructionInput::new(IoPath::new(root_dir), id);
+
+        let (_cancel, mut receiver) = PluginDispatcher::new(GetInstructionOp::new())
+            .input(input)
+            .build()
+            .map_err(|e| format!("dispatcher build failed: {e}"))?;
+
+        match receiver.recv().await {
+            Ok(Some(output)) => Ok(output.content),
+            Ok(None) => {
+                Err("get_instruction failed: operation completed with no output".to_string())
+            }
+            Err(e) => Err(format!("get_instruction failed: {e}")),
         }
     }
 }
