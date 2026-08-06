@@ -5,7 +5,7 @@ code: "00043"
 slug: add-instruction-capability
 title: Add Instruction Capability
 description: Replace temporary prompt-path handoff with a UUID-scoped instruction capability shared by the Vector VS Code extension and mcp-vector.
-status: accepted
+status: implemented
 created: 2026-08-05
 updated: 2026-08-05
 authors: []

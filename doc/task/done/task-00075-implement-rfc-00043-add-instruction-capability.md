@@ -5,7 +5,7 @@ code: "00075"
 slug: implement-rfc-00043-add-instruction-capability
 title: Implement RFC 00043 Add Instruction Capability
 description: Replace filesystem-path prompt handoff with the UUID-scoped instruction capability accepted in RFC 00043.
-status: in-progress
+status: done
 created: 2026-08-05
 updated: 2026-08-06
 tags:
