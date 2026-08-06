@@ -75,14 +75,14 @@ input:
   language: TypeScript
 ```
 
-- [ ] Resolve prompts and inputs before generating a canonical random UUID and exclusively creating the fixed UTF-8 instruction file.
-- [ ] Render the frontend-owned MCP directive and substitute it as one shell-safe `<instruction>` argument without a second interpolation pass.
-- [ ] Launch terminals with the active workspace root as explicit `cwd` for both agent actions and agent buttons.
-- [ ] Preserve the current single-governed-project contract: use the `workspaceRoot` selected during extension activation and do not add multi-project workspace mapping in this task.
-- [ ] Track instruction ownership by terminal and clean files on launch failure, terminal close, and extension deactivation.
-- [ ] On activation, remove only recognized regular instruction files older than 24 hours without following links, recursing, or deleting unrelated files.
-- [ ] Apply restrictive POSIX permissions where supported and report cleanup failures through a local VS Code diagnostic output channel without telemetry.
-- [ ] Add focused tests for UUID naming, exclusive creation, UTF-8 writing, directive rendering, cross-shell quoting, both launch surfaces, explicit `cwd`, cleanup paths, and stale-file selection.
+- [x] Resolve prompts and inputs before generating a canonical random UUID and exclusively creating the fixed UTF-8 instruction file.
+- [x] Render the frontend-owned MCP directive and substitute it as one shell-safe `<instruction>` argument without a second interpolation pass.
+- [x] Launch terminals with the active workspace root as explicit `cwd` for both agent actions and agent buttons.
+- [x] Preserve the current single-governed-project contract: use the `workspaceRoot` selected during extension activation and do not add multi-project workspace mapping in this task.
+- [x] Track instruction ownership by terminal and clean files on launch failure, terminal close, and extension deactivation.
+- [x] On activation, remove only recognized regular instruction files older than 24 hours without following links, recursing, or deleting unrelated files.
+- [x] Apply restrictive POSIX permissions where supported and report cleanup failures through a local VS Code diagnostic output channel without telemetry.
+- [x] Add focused tests for UUID naming, exclusive creation, UTF-8 writing, directive rendering, cross-shell quoting, both launch surfaces, explicit `cwd`, cleanup paths, and stale-file selection.
 
 ### 3.3. Phase C — MCP Instruction Retrieval
 

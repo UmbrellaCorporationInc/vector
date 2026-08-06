@@ -104,6 +104,7 @@ const terminalCloseListeners: TerminalCloseListener[] = [];
 const createdTerminals: Array<{
     terminal: Terminal;
     name: string;
+    cwd: string | undefined;
     sentText: string[];
     showCalls: boolean[];
 }> = [];
@@ -124,9 +125,10 @@ interface TextDocumentShowRecord {
 const openedTextDocumentUris: Uri[] = [];
 const shownTextDocuments: TextDocumentShowRecord[] = [];
 
-function makeTerminal(name: string): Terminal {
+function makeTerminal(name: string, cwd?: string): Terminal {
     const record = {
         name,
+        cwd,
         sentText: [] as string[],
         showCalls: [] as boolean[],
     };
@@ -194,7 +196,26 @@ export const window = {
         });
         return panel;
     },
-    createTerminal: ({ name }: { name: string }) => makeTerminal(name),
+    createTerminal: ({ name, cwd }: { name: string; cwd?: string }) => makeTerminal(name, cwd),
+    createOutputChannel: (name: string) => {
+        const lines: string[] = [];
+        return {
+            name,
+            appendLine: (value: string) => {
+                lines.push(value);
+            },
+            append: (value: string) => {
+                lines.push(value);
+            },
+            clear: () => {
+                lines.length = 0;
+            },
+            show: () => undefined,
+            hide: () => undefined,
+            dispose: () => undefined,
+            __lines: lines,
+        };
+    },
     onDidCloseTerminal: (listener: TerminalCloseListener) => {
         terminalCloseListeners.push(listener);
         return {
@@ -330,6 +351,7 @@ export const ViewColumn = {
 export function __getCreatedTerminals(): Array<{
     terminal: Terminal;
     name: string;
+    cwd: string | undefined;
     sentText: string[];
     showCalls: boolean[];
 }> {

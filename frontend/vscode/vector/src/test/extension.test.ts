@@ -3638,21 +3638,23 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
         );
     });
 
-    test("spawnAgentTerminal sends the resolved command to the VS Code terminal", () => {
-        const directive = 'Using the Vector MCP server, call get_instruction with id "abc"';
+    test("spawnAgentTerminal sends the pre-resolved command to the VS Code terminal", () => {
+        const resolvedCommand =
+            'claude "Using the Vector MCP server, call get_instruction with id \\"abc\\""';
         const tempFilePath = path.join(os.tmpdir(), "vector-agent-terminal-test.txt");
-        fs.writeFileSync(tempFilePath, directive, "utf-8");
+        fs.writeFileSync(tempFilePath, "instruction content", "utf-8");
 
         try {
             vscode.__resetTerminalState();
             const subscriptions: { dispose: () => void }[] = [];
 
             spawnAgentTerminal(
-                "claude '<instruction>'",
+                resolvedCommand,
                 "claude",
                 "Execute",
-                directive,
+                tempFilePath,
                 subscriptions,
+                "/fake/workspace",
             );
 
             const terminals = vscode.__getCreatedTerminals();
@@ -3660,11 +3662,16 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
             const firstTerminal = terminals[0];
             assert.ok(firstTerminal, "terminal record must exist");
             assert.strictEqual(firstTerminal.name, "Vector: claude - Execute");
-            assert.deepStrictEqual(firstTerminal.sentText, [`claude '${directive}'`]);
+            assert.deepStrictEqual(firstTerminal.sentText, [resolvedCommand]);
             assert.deepStrictEqual(
                 firstTerminal.showCalls,
                 [false],
                 "terminal must be shown with preserveFocus=false",
+            );
+            assert.strictEqual(
+                firstTerminal.cwd,
+                "/fake/workspace",
+                "terminal must use workspaceRoot as cwd",
             );
             assert.strictEqual(subscriptions.length, 1, "must register one close subscription");
         } finally {
@@ -3673,29 +3680,36 @@ suite("Task 00028 Phase D — document-actions: Agent Triggers", () => {
         }
     });
 
-    test("spawnAgentTerminal deletes the temp file when the terminal closes", () => {
+    test("spawnAgentTerminal deletes the instruction file when the terminal closes", () => {
         const tempFilePath = path.join(os.tmpdir(), "vector-agent-cleanup-test.txt");
-        fs.writeFileSync(tempFilePath, "prompt", "utf-8");
+        fs.writeFileSync(tempFilePath, "instruction content", "utf-8");
 
         try {
             vscode.__resetTerminalState();
             const subscriptions: { dispose: () => void }[] = [];
 
             spawnAgentTerminal(
-                "claude '<instruction>'",
+                "claude already-resolved-command",
                 "claude",
                 "Execute",
                 tempFilePath,
                 subscriptions,
+                "/fake/workspace",
             );
 
             const terminal = vscode.__getCreatedTerminals()[0]?.terminal;
             assert.ok(terminal, "terminal must be created");
-            assert.ok(fs.existsSync(tempFilePath), "temp file must exist before terminal close");
+            assert.ok(
+                fs.existsSync(tempFilePath),
+                "instruction file must exist before terminal close",
+            );
 
             vscode.__fireDidCloseTerminal(terminal);
 
-            assert.ok(!fs.existsSync(tempFilePath), "temp file must be deleted on terminal close");
+            assert.ok(
+                !fs.existsSync(tempFilePath),
+                "instruction file must be deleted on terminal close",
+            );
         } finally {
             fs.rmSync(tempFilePath, { force: true });
             vscode.__resetTerminalState();

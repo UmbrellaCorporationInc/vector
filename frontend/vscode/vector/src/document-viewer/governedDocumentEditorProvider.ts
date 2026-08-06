@@ -1,3 +1,4 @@
+import * as crypto from "crypto";
 import * as vscode from "vscode";
 import type { CustomReadonlyEditorProvider } from "vscode";
 import { loadDocumentTypes } from "../documentDiscovery.js";
@@ -18,7 +19,10 @@ import {
 } from "./document-actions/variableSubstitution.js";
 import { loadAgentsConfig, resolveProfile } from "./document-actions/agentsConfig.js";
 import {
-    writeTempPrompt,
+    writeInstructionFile,
+    renderInstructionDirective,
+    quoteShellArgument,
+    resolveAgentCommand,
     spawnAgentTerminal,
     deleteTempFile,
 } from "./document-actions/agentExecutor.js";
@@ -53,10 +57,21 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
     private _activeUri: vscode.Uri | undefined;
     private _activeDoc: GovernedDocument | undefined;
     private readonly subscriptions: vscode.Disposable[] = [];
+    /**
+     * Optional override for PATH availability checks.
+     * When `undefined`, defaults to `isCommandInPath` from agentsConfig.
+     * Exposed only for testing without modifying PATH-dependent behaviour.
+     */
+    private readonly _isAgentAvailable: ((command: string) => boolean) | undefined;
 
-    constructor(workspaceRoot: string, extensionUri: vscode.Uri) {
+    constructor(
+        workspaceRoot: string,
+        extensionUri: vscode.Uri,
+        isAgentAvailable?: (command: string) => boolean,
+    ) {
         this.workspaceRoot = workspaceRoot;
         this.extensionUri = extensionUri;
+        this._isAgentAvailable = isAgentAvailable;
     }
 
     openCustomDocument(uri: vscode.Uri): vscode.CustomDocument {
@@ -253,7 +268,9 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
             return;
         }
 
-        const allAgents = resolveProfile(agentsLoad.config, msg.profile);
+        const allAgents = this._isAgentAvailable
+            ? resolveProfile(agentsLoad.config, msg.profile, this._isAgentAvailable)
+            : resolveProfile(agentsLoad.config, msg.profile);
         if (allAgents.length === 0) {
             void vscode.window.showErrorMessage(
                 `Vector: profile '${msg.profile}' not found in .vector/agents.yaml`,
@@ -327,17 +344,26 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
         }
 
         const resolvedPrompt = substituteVariables(promptSource.content, mergedVars);
-        const tempFilePath = writeTempPrompt(resolvedPrompt);
+        const uuid = crypto.randomUUID();
+        const instructionFilePath = writeInstructionFile(
+            uuid,
+            resolvedPrompt,
+            agentsLoad.config.instructionsDir,
+        );
         try {
+            const directive = renderInstructionDirective(uuid);
+            const quotedDirective = quoteShellArgument(directive);
+            const resolvedCommand = resolveAgentCommand(chosenAgent.command, quotedDirective);
             spawnAgentTerminal(
-                chosenAgent.command,
+                resolvedCommand,
                 chosenAgent.name,
                 msg.label,
-                tempFilePath,
+                instructionFilePath,
                 this.subscriptions,
+                this.workspaceRoot,
             );
         } catch (error) {
-            deleteTempFile(tempFilePath);
+            deleteTempFile(instructionFilePath);
             const message = error instanceof Error ? error.message : String(error);
             void vscode.window.showErrorMessage(message);
         }
