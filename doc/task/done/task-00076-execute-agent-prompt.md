@@ -5,7 +5,7 @@ code: "00076"
 slug: execute-agent-prompt
 title: Execute Agent Prompt
 description: Make VS Code agent launches use a configurable root prompt with an instruction identifier placeholder and a safe built-in fallback.
-status: in-progress
+status: done
 created: 2026-08-06
 updated: 2026-08-06
 tags:
@@ -78,13 +78,13 @@ input:
   language: typescript, yaml
 ```
 
-- [ ] Add a test proving the built-in default is used when `prompt` is absent.
-- [ ] Add a test proving a configured root-level `prompt` overrides the built-in default.
-- [ ] Add a test proving all `<instruction-id>` occurrences are substituted with the generated identifier.
-- [ ] Add a test for a configured prompt without the placeholder.
-- [ ] Add a test proving an invalid non-string `prompt` produces a configuration error.
-- [ ] Add or update an `agents.yaml` example documenting the field and placeholder.
-- [ ] Run the affected unit, integration, lint, and type-check quality gates.
+- [x] Add a test proving the built-in default is used when `prompt` is absent.
+- [x] Add a test proving a configured root-level `prompt` overrides the built-in default.
+- [x] Add a test proving all `<instruction-id>` occurrences are substituted with the generated identifier.
+- [x] Add a test for a configured prompt without the placeholder.
+- [x] Add a test proving an invalid non-string `prompt` produces a configuration error.
+- [x] Add or update an `agents.yaml` example documenting the field and placeholder.
+- [x] Run the affected unit, integration, lint, and type-check quality gates.
 
 ### 3.3. Phase Z — Wrap-up
 
@@ -98,9 +98,9 @@ input:
   language: typescript, yaml
 ```
 
-- [ ] Update README files for modified packages when they document agent configuration or launch behavior.
-- [ ] Confirm existing agent profiles without a root-level `prompt` remain compatible.
-- [ ] Record the final quality-gate results in the implementation handoff.
+- [x] Update README files for modified packages when they document agent configuration or launch behavior.
+- [x] Confirm existing agent profiles without a root-level `prompt` remain compatible.
+- [x] Record the final quality-gate results in the implementation handoff.
 
 ## 4. Acceptance Criteria
 
@@ -114,3 +114,30 @@ input:
 ## 5. Staff Engineer Assessment
 
 The requested root-level field is a small, backward-compatible extension and does not justify a broader configuration redesign. The main risks are duplicating prompt resolution across launch paths, silently coercing invalid YAML values, and applying placeholder substitution before the final instruction identifier exists. Keep resolution centralized, validate the field strictly, and test the exact emitted launch message. Supporting prompts without the placeholder is intentional: it preserves user control, while the documentation should make clear that such prompts cannot reference the generated instruction.
+
+## 6. Implementation Handoff
+
+### 6.1 Changes
+
+| Package | File | Change |
+| ------- | ---- | ------ |
+| `frontend/vscode/vector` | `src/document-viewer/document-actions/agentsConfig.ts` | Added optional `prompt?: string` to `AgentsYaml` interface; validation rejects non-string values |
+| `frontend/vscode/vector` | `src/document-viewer/document-actions/agentExecutor.ts` | Added `DEFAULT_AGENT_PROMPT` constant and `resolveAgentPrompt(configuredPrompt, uuid)` function; `renderInstructionDirective` delegates to it |
+| `frontend/vscode/vector` | `src/test/task00076PhaseA.test.ts` | Phase A unit tests: wording contract, fallback, override, substitution, config validation |
+| `frontend/vscode/vector` | `src/test/task00076PhaseB.test.ts` | Phase B integration tests: full pipeline and terminal-surface verification |
+| `frontend/vscode/vector` | `README.md` | Added `prompt` field to section 8.1 example; added section 8.7 (Configurable launch prompt); corrected changelog version label to `1.5.0`; added prompt feature bullet |
+| `.vector/agents.yaml` | root | Added inline documentation comments for the `prompt` field and placeholder |
+| `runtime/project/assets/.vector/agents.yaml` | root | Added inline documentation comments for the `prompt` field and placeholder |
+
+### 6.2 Backward compatibility
+
+Both `agents.yaml` files in this repository omit the root-level `prompt` field. Loading them after this change resolves `config.prompt` as `undefined`, which causes `resolveAgentPrompt` to fall back to `DEFAULT_AGENT_PROMPT`. Agent launch behavior is identical to the pre-task state for any configuration without `prompt`.
+
+### 6.3 Quality-gate results (2026-08-06)
+
+| Gate | Result |
+| ---- | ------ |
+| `pnpm typecheck` | ✅ 0 errors |
+| `pnpm lint` | ✅ 0 warnings |
+| `pnpm format:check` | ✅ all files conformant |
+| `pnpm test` | ✅ 712 passing (4 s) |

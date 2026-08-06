@@ -111,6 +111,8 @@ The extension communicates prompt content to agents through a UUID-scoped instru
 
 ```yaml
 instructions-dir: "${system-temp}/vector/instructions"
+# Optional: override the default launch prompt (see section 8.7).
+# prompt: 'Using Vector MCP, call get_instruction with id "<instruction-id>" and execute the returned instructions.'
 agents:
     claude:
         type: cli
@@ -165,11 +167,36 @@ The extension supports one governed project per VS Code window. The `workspaceRo
 
 TypeScript and Rust independently cover the same configuration validation cases using table-driven tests. Shared cross-language fixture infrastructure is intentionally deferred to a separate governed proposal and is not part of this implementation.
 
+### 8.7 Configurable launch prompt
+
+The optional root-level `prompt` field in `.vector/agents.yaml` controls the message sent to the agent terminal at launch.
+
+**Built-in default** (used when `prompt` is absent):
+
+```
+Using Vector MCP, call get_instruction with id "<instruction-id>" and execute the returned instructions.
+```
+
+The default references `Vector MCP` and never uses the word `server`.
+
+**Configured prompt** — when `prompt` is present, its value overrides the built-in default:
+
+```yaml
+prompt: 'Using Vector MCP, call get_instruction with id "<instruction-id>" and execute the returned instructions.'
+```
+
+**Placeholder substitution** — every `<instruction-id>` token in the resolved prompt is replaced with the UUID generated for that launch. This applies to both the built-in default and any configured prompt. A configured prompt that omits the placeholder is sent verbatim; it cannot reference the generated instruction UUID.
+
+**Validation** — `prompt` must be a string. A non-string value (number, boolean, mapping, …) fails validation with an actionable error toast before any terminal is created.
+
+**Backward compatibility** — existing `agents.yaml` files that omit `prompt` continue to launch agents using the built-in default without any modification.
+
 ## 9. Changelog
 
-### 2.0.0
+### 1.5.0
 
 - **Instruction Capability (Breaking)** — Replaces the `<file>` path handoff with a UUID-scoped instruction file and the `<instruction>` placeholder. `.vector/agents.yaml` must declare `instructions-dir: "${system-temp}/vector/instructions"`. All agent commands must use `<instruction>` and must not use the obsolete `<file>` or `<instruction-id>` placeholders. The MCP server exposes a new `get_instruction` tool that reads the instruction file by UUID without exposing paths to the caller. See section 8 for the complete contract, platform guarantees, and migration guide.
+- **Configurable Launch Prompt** — `.vector/agents.yaml` now accepts an optional root-level `prompt` string that overrides the built-in default launch message. The `<instruction-id>` placeholder in the configured or default prompt is replaced with the UUID of each generated instruction at launch time. Existing configurations that omit `prompt` continue to use the built-in default unchanged. See section 8.7.
 
 ### 1.4.5
 
