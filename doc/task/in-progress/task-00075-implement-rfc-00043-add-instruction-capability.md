@@ -134,11 +134,11 @@ input:
   language: TypeScript, Rust, Markdown
 ```
 
-- [ ] Run TypeScript compilation, lint, and focused tests.
-- [ ] Run Rust formatting, lint, and focused tests.
-- [ ] Run MCP tool-listing and routing tests plus project bootstrap asset tests.
-- [ ] Run repository-prescribed quality gates and separate unrelated pre-existing failures from implementation failures.
-- [ ] Update README files for modified packages and ensure every governed-document reference uses a stem wikilink.
+- [x] Run TypeScript compilation, lint, and focused tests.
+- [x] Run Rust formatting, lint, and focused tests.
+- [x] Run MCP tool-listing and routing tests plus project bootstrap asset tests.
+- [x] Run repository-prescribed quality gates and separate unrelated pre-existing failures from implementation failures.
+- [x] Update README files for modified packages and ensure every governed-document reference uses a stem wikilink.
 
 ## 4. Staff Engineer Assessment
 
