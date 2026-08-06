@@ -1,16 +1,17 @@
+instructions-dir: "${system-temp}/vector/instructions"
 agents:
   claude:
     type: cli
-    command: claude 'execute the content in the file <file>'
+    command: claude '<instruction>'
   antigravity:
     type: cli
-    command: agy -i 'execute the content in the file <file>'
+    command: agy -i '<instruction>'
   codex:
     type: cli
-    command: codex 'execute the content in the file <file>'
+    command: codex '<instruction>'
   opencode:
     type: cli
-    command: opencode --prompt 'execute the content in the file <file>'
+    command: opencode --prompt '<instruction>'
 profiles:
   create-doc: [antigravity, claude, codex]
   code: [antigravity, claude, codex, opencode]

@@ -5,7 +5,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 
 const activeTempFiles = new Set<string>();
-const FILE_PLACEHOLDER = "<file>";
+const INSTRUCTION_PLACEHOLDER = "<instruction>";
 
 /**
  * Writes the resolved prompt content to a uniquely-named temp file.
@@ -58,20 +58,20 @@ export function cleanupAllTempFiles(): void {
 }
 
 /**
- * Resolves an agent command template by replacing each `<file>` placeholder
- * with a safely quoted temp prompt file path.
+ * Resolves an agent command template by replacing each `<instruction>` placeholder
+ * with the provided directive string.
  *
+ * The directive is substituted as-is — shell quoting is the caller's responsibility.
  * Throws when the configured command does not contain the required placeholder.
  */
-export function resolveAgentCommand(commandTemplate: string, tempFilePath: string): string {
-    if (!commandTemplate.includes(FILE_PLACEHOLDER)) {
+export function resolveAgentCommand(commandTemplate: string, directive: string): string {
+    if (!commandTemplate.includes(INSTRUCTION_PLACEHOLDER)) {
         throw new Error(
-            "Vector: agent command must include the <file> placeholder in .vector/agents.yaml",
+            "Vector: agent command must include the <instruction> placeholder in .vector/agents.yaml",
         );
     }
 
-    const quotedPath = quoteShellArgument(tempFilePath);
-    return commandTemplate.replaceAll(FILE_PLACEHOLDER, quotedPath);
+    return commandTemplate.replaceAll(INSTRUCTION_PLACEHOLDER, directive);
 }
 
 /**

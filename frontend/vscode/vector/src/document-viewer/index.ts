@@ -95,6 +95,7 @@ export { resolveFileSuggestions } from "./chat-input/chatInputSuggestionProvider
 export {
     loadAgentsConfig,
     resolveProfile,
+    resolveInstructionsDir,
     extractCommandExecutable,
     isCommandInPath,
 } from "./document-actions/agentsConfig.js";
