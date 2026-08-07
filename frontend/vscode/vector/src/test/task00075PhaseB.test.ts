@@ -55,7 +55,7 @@ suite("Task 00075 Phase B — renderInstructionDirective", () => {
         const directive = renderInstructionDirective(uuid);
         assert.strictEqual(
             directive,
-            `Using Vector MCP, call get_instruction with id "${uuid}" and execute the returned instructions.`,
+            `process the instruction ${uuid} by using the vector mcp`,
         );
     });
 
@@ -171,8 +171,7 @@ suite("Task 00075 Phase B — directive quoting", () => {
 
     test("inner double quotes in the directive are escaped with backslash", () => {
         const uuid = "11111111-1111-1111-1111-111111111111";
-        const directive = renderInstructionDirective(uuid);
-        // The directive body contains the UUID in double quotes: get_instruction with id "..."
+        const directive = `process instruction "${uuid}"`;
         const quoted = quoteShellArgument(directive);
         assert.ok(
             quoted.includes('\\"'),
@@ -268,8 +267,7 @@ suite("Task 00075 Phase B — spawnAgentTerminal explicit cwd", () => {
     test("terminal receives the pre-resolved command without further substitution", () => {
         const uuid = "66666666-6666-6666-6666-666666666666";
         const directive = renderInstructionDirective(uuid);
-        const quoted = quoteShellArgument(directive);
-        const resolvedCmd = resolveAgentCommand("claude <instruction>", quoted);
+        const resolvedCmd = resolveAgentCommand("claude '<instruction>'", directive);
         const filePath = writeInstructionFile(uuid, "content", instructionsDir);
 
         try {
@@ -668,10 +666,10 @@ suite("Task 00075 Phase B — both launch surfaces via _handleRunAgent", () => {
             const terminal = terminals[0];
             assert.ok(terminal, "terminal record must exist");
 
-            // The command sent to the terminal must contain the MCP get_instruction directive.
+            // The command sent to the terminal must contain the MCP directive.
             assert.ok(
-                terminal.sentText[0]?.includes("get_instruction"),
-                "command must include the get_instruction MCP call",
+                terminal.sentText[0]?.includes("vector mcp"),
+                "command must include the vector mcp call",
             );
             // The terminal must use the workspace root as cwd.
             assert.strictEqual(terminal.cwd, dir, "terminal cwd must be the workspaceRoot");
@@ -717,7 +715,7 @@ suite("Task 00075 Phase B — both launch surfaces via _handleRunAgent", () => {
             const terminals = vscode.__getCreatedTerminals();
             assert.strictEqual(terminals.length, 1, "button surface must create one terminal");
             assert.ok(
-                terminals[0]?.sentText[0]?.includes("get_instruction"),
+                terminals[0]?.sentText[0]?.includes("vector mcp"),
                 "button-triggered command must include the MCP directive",
             );
         } finally {

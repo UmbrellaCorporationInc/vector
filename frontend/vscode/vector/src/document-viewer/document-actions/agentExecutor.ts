@@ -16,7 +16,7 @@ const INSTRUCTION_ID_PLACEHOLDER_IN_PROMPT = "<instruction-id>";
  * Contains one `<instruction-id>` token that is substituted with the UUID at launch time.
  * Does not use the word "server" so it remains accurate across transport variants.
  */
-export const DEFAULT_AGENT_PROMPT = `Using Vector MCP, call get_instruction with id "${INSTRUCTION_ID_PLACEHOLDER_IN_PROMPT}" and execute the returned instructions.`;
+export const DEFAULT_AGENT_PROMPT = `process the instruction ${INSTRUCTION_ID_PLACEHOLDER_IN_PROMPT} by using the vector mcp`;
 
 /** Fixed prefix of the instruction filename (before the UUID). */
 const INSTRUCTION_FILE_PREFIX = "vector-instruction-";
