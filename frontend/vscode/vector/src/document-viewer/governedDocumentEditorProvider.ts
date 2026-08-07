@@ -21,7 +21,6 @@ import { loadAgentsConfig, resolveProfile } from "./document-actions/agentsConfi
 import {
     writeInstructionFile,
     resolveAgentPrompt,
-    quoteShellArgument,
     resolveAgentCommand,
     spawnAgentTerminal,
     deleteTempFile,
@@ -352,8 +351,7 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
         );
         try {
             const directive = resolveAgentPrompt(agentsLoad.config.prompt, uuid);
-            const quotedDirective = quoteShellArgument(directive);
-            const resolvedCommand = resolveAgentCommand(chosenAgent.command, quotedDirective);
+            const resolvedCommand = resolveAgentCommand(chosenAgent.command, directive);
             spawnAgentTerminal(
                 resolvedCommand,
                 chosenAgent.name,

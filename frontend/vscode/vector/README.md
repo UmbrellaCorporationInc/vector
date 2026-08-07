@@ -174,15 +174,15 @@ The optional root-level `prompt` field in `.vector/agents.yaml` controls the mes
 **Built-in default** (used when `prompt` is absent):
 
 ```
-Using Vector MCP, call get_instruction with id "<instruction-id>" and execute the returned instructions.
+process the instruction <instruction-id> by using the vector mcp
 ```
 
-The default references `Vector MCP` and never uses the word `server`.
+The default references `vector mcp` and never uses the word `server`.
 
 **Configured prompt** — when `prompt` is present, its value overrides the built-in default:
 
 ```yaml
-prompt: 'Using Vector MCP, call get_instruction with id "<instruction-id>" and execute the returned instructions.'
+prompt: "process the instruction <instruction-id> by using the vector mcp"
 ```
 
 **Placeholder substitution** — every `<instruction-id>` token in the resolved prompt is replaced with the UUID generated for that launch. This applies to both the built-in default and any configured prompt. A configured prompt that omits the placeholder is sent verbatim; it cannot reference the generated instruction UUID.

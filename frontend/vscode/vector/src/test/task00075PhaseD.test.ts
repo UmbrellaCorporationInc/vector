@@ -22,7 +22,6 @@ import {
 import {
     writeInstructionFile,
     renderInstructionDirective,
-    quoteShellArgument,
     resolveAgentCommand,
     cleanupAllTempFiles,
     deleteTempFile,
@@ -246,31 +245,20 @@ suite("Task 00075 Phase D — complete frontend-to-MCP flow", () => {
         try {
             // 3. Render the MCP directive (frontend-owned step).
             const directive = renderInstructionDirective(uuid);
-            assert.ok(
-                directive.includes("get_instruction"),
-                "directive must reference the get_instruction tool",
-            );
-            assert.ok(
-                directive.includes(`"${uuid}"`),
-                "directive must embed the UUID in double quotes",
-            );
+            assert.ok(directive.includes("vector mcp"), "directive must reference vector mcp");
+            assert.ok(directive.includes(uuid), "directive must embed the UUID");
 
-            // 4. Quote the directive as a shell-safe argument.
-            const quoted = quoteShellArgument(directive);
-            assert.ok(quoted.startsWith('"'), "quoted directive must open with double quote");
-            assert.ok(quoted.endsWith('"'), "quoted directive must close with double quote");
-
-            // 5. Resolve the agent command (substitute <instruction> exactly once).
+            // 4. Resolve the agent command (substitute <instruction> directly).
             const commandTemplate = configResult.config.agents["claude"]?.command ?? "";
             assert.ok(commandTemplate.length > 0, "claude agent must have a command");
-            const resolvedCommand = resolveAgentCommand(commandTemplate, quoted);
+            const resolvedCommand = resolveAgentCommand(commandTemplate, directive);
 
             assert.ok(
                 !resolvedCommand.includes("<instruction>"),
                 "resolved command must not retain the <instruction> placeholder",
             );
             assert.ok(
-                resolvedCommand.includes("get_instruction"),
+                resolvedCommand.includes("vector mcp"),
                 "resolved command must contain the MCP directive",
             );
             assert.ok(resolvedCommand.includes(uuid), "resolved command must contain the UUID");

@@ -52,8 +52,11 @@ function writeAgentsYaml(workspaceDir: string, extraLines: string[] = []): void 
 // ── DEFAULT_AGENT_PROMPT wording ──────────────────────────────────────────────
 
 suite("Task 00076 Phase A — DEFAULT_AGENT_PROMPT wording contract", () => {
-    test("contains 'Vector MCP'", () => {
-        assert.ok(DEFAULT_AGENT_PROMPT.includes("Vector MCP"), "must reference Vector MCP");
+    test("contains 'vector mcp'", () => {
+        assert.ok(
+            DEFAULT_AGENT_PROMPT.toLowerCase().includes("vector mcp"),
+            "must reference vector mcp",
+        );
     });
 
     test("does not contain the word 'server'", () => {
@@ -67,11 +70,8 @@ suite("Task 00076 Phase A — DEFAULT_AGENT_PROMPT wording contract", () => {
         );
     });
 
-    test("references get_instruction", () => {
-        assert.ok(
-            DEFAULT_AGENT_PROMPT.includes("get_instruction"),
-            "must reference get_instruction",
-        );
+    test("references instruction", () => {
+        assert.ok(DEFAULT_AGENT_PROMPT.includes("instruction"), "must reference instruction");
     });
 });
 
@@ -95,10 +95,13 @@ suite("Task 00076 Phase A — resolveAgentPrompt: default fallback", () => {
         );
     });
 
-    test("resolved default prompt contains 'Vector MCP' and not 'server'", () => {
+    test("resolved default prompt contains 'vector mcp' and not 'server'", () => {
         const uuid = "00000000-0000-0000-0000-000000000000";
         const result = resolveAgentPrompt(undefined, uuid);
-        assert.ok(result.includes("Vector MCP"), "resolved prompt must reference Vector MCP");
+        assert.ok(
+            result.toLowerCase().includes("vector mcp"),
+            "resolved prompt must reference vector mcp",
+        );
         assert.ok(!result.includes("server"), "resolved prompt must not contain 'server'");
     });
 

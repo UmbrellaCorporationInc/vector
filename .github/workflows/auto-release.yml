@@ -23,13 +23,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Find the PR that was merged by this push
-          PR=$(gh pr list \
-            --state merged \
-            --label release \
-            --base main \
-            --json number,headRefName,mergeCommit \
-            --jq ".[] | select(.mergeCommit.oid == \"${{ github.sha }}\")")
+          # Use the Commits API — works for squash, merge commit, and rebase merges.
+          # gh pr list with mergeCommit.oid only works for "Create a merge commit" merges;
+          # squash merges leave mergeCommit null in the GraphQL API.
+          PR=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+            --jq '.[] | select(
+              (.base.ref == "main") and
+              (.labels[].name == "release")
+            ) | {number, headRefName: .head.ref}' | head -1)
 
           if [ -z "$PR" ]; then
             echo "No merged release PR found for this commit — skipping."
