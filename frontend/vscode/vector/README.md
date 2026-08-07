@@ -182,7 +182,7 @@ The default references `vector mcp` and never uses the word `server`.
 **Configured prompt** — when `prompt` is present, its value overrides the built-in default:
 
 ```yaml
-prompt: 'process the instruction <instruction-id> by using the vector mcp'
+prompt: "process the instruction <instruction-id> by using the vector mcp"
 ```
 
 **Placeholder substitution** — every `<instruction-id>` token in the resolved prompt is replaced with the UUID generated for that launch. This applies to both the built-in default and any configured prompt. A configured prompt that omits the placeholder is sent verbatim; it cannot reference the generated instruction UUID.

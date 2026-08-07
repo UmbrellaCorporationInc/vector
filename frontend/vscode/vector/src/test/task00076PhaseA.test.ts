@@ -71,10 +71,7 @@ suite("Task 00076 Phase A — DEFAULT_AGENT_PROMPT wording contract", () => {
     });
 
     test("references instruction", () => {
-        assert.ok(
-            DEFAULT_AGENT_PROMPT.includes("instruction"),
-            "must reference instruction",
-        );
+        assert.ok(DEFAULT_AGENT_PROMPT.includes("instruction"), "must reference instruction");
     });
 });
 

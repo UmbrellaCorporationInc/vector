@@ -53,10 +53,7 @@ suite("Task 00075 Phase B — renderInstructionDirective", () => {
     test("returns the canonical MCP call directive with the UUID embedded in double quotes", () => {
         const uuid = "93b0a984-5422-4491-9b0c-db44fdb69ea8";
         const directive = renderInstructionDirective(uuid);
-        assert.strictEqual(
-            directive,
-            `process the instruction ${uuid} by using the vector mcp`,
-        );
+        assert.strictEqual(directive, `process the instruction ${uuid} by using the vector mcp`);
     });
 
     test("UUID appears exactly once in the directive", () => {

@@ -245,14 +245,8 @@ suite("Task 00075 Phase D — complete frontend-to-MCP flow", () => {
         try {
             // 3. Render the MCP directive (frontend-owned step).
             const directive = renderInstructionDirective(uuid);
-            assert.ok(
-                directive.includes("vector mcp"),
-                "directive must reference vector mcp",
-            );
-            assert.ok(
-                directive.includes(uuid),
-                "directive must embed the UUID",
-            );
+            assert.ok(directive.includes("vector mcp"), "directive must reference vector mcp");
+            assert.ok(directive.includes(uuid), "directive must embed the UUID");
 
             // 4. Resolve the agent command (substitute <instruction> directly).
             const commandTemplate = configResult.config.agents["claude"]?.command ?? "";

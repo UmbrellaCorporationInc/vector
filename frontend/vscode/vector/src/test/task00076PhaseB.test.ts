@@ -115,7 +115,10 @@ suite("Task 00076 Phase B — default prompt when prompt is absent", () => {
 
             const uuid = "cccccccc-3333-4444-5555-666666666666";
             const directive = resolveAgentPrompt(load.config.prompt, uuid);
-            assert.ok(directive.toLowerCase().includes("vector mcp"), "must reference 'vector mcp'");
+            assert.ok(
+                directive.toLowerCase().includes("vector mcp"),
+                "must reference 'vector mcp'",
+            );
             assert.ok(!directive.includes("server"), "must not contain the word 'server'");
         } finally {
             cleanup();
