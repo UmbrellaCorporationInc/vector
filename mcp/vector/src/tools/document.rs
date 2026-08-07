@@ -205,7 +205,7 @@ pub struct ReplaceDocParams {
 #[non_exhaustive]
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct GetInstructionParams {
-    /// The canonical lowercase hyphenated UUID identifying the instruction to read.
+    /// The instruction-id: a canonical lowercase hyphenated UUID identifying the agent prompt to read.
     ///
     /// Must match the form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` using only lowercase
     /// hexadecimal digits.  The MCP server constructs the filename and directory path
@@ -537,7 +537,7 @@ impl DocumentTools {
     /// the UUID; the filename, directory, prefix, suffix, and path components are
     /// constructed internally and are not caller-configurable.
     #[tool(
-        description = "Read a UUID-scoped instruction written by the Vector VS Code extension and return its exact UTF-8 content. The caller supplies only the canonical lowercase hyphenated UUID; the server constructs the file path internally from the configured instructions directory. Repeated reads succeed without deleting the file. Fails with an actionable error for invalid UUIDs, missing or invalid configuration, missing or expired instruction files, non-regular targets, oversized content (> 1 MiB), or invalid UTF-8."
+        description = "Read a governed agent prompt by its instruction-id and return its exact UTF-8 content. The caller supplies only the canonical lowercase hyphenated UUID (instruction-id); the server constructs the file path internally from the configured instructions directory. Repeated reads succeed without deleting the file. Fails with an actionable error for invalid instruction-ids, missing or invalid configuration, missing or expired instruction files, non-regular targets, oversized content (> 1 MiB), or invalid UTF-8."
     )]
     async fn get_instruction(
         &self,
