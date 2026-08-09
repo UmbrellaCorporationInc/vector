@@ -81,6 +81,7 @@ impl ServerHandler for VectorServer {
             ProtocolVersion::V_2025_03_26,
             ProtocolVersion::V_2025_06_18,
             ProtocolVersion::V_2025_11_25,
+            ProtocolVersion::V_2026_07_28,
         ])
     }
 
