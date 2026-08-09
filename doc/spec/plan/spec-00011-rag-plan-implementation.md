@@ -14,6 +14,7 @@ tags:
   - implementation
   - local
 related:
+  - adr-00002-remove-rag-functionality-in-vector-mcp
   - rfc-00038-phase-6-lancedb-integration
   - rfc-00039-phase-7-incremental-indexing
   - rfc-00040-phase-8-hybrid-search
@@ -26,6 +27,9 @@ aliases:
 ---
 
 # SPEC 00011: RAG Plan Implementation
+
+> [!NOTE]
+> RAG functionality was removed after version 0.5.0 per [[adr-00002-remove-rag-functionality-in-vector-mcp]]. This document is preserved as a historical record.
 
 ## 1. Purpose
 

@@ -13,10 +13,14 @@ tags:
   - rust
   - markdown
   - embedded
-related: []
+related:
+  - adr-00002-remove-rag-functionality-in-vector-mcp
 ---
 
 # Local RAG
+
+> [!NOTE]
+> RAG functionality was removed after version 0.5.0 per [[adr-00002-remove-rag-functionality-in-vector-mcp]]. This document is preserved as a historical record.
 
 ## Context
 

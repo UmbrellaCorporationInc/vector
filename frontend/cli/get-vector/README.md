@@ -2,14 +2,13 @@
 
 ## 1. Objective
 
-`get-vector` is the operator CLI for managing the local Vector tool installation. It provides a single command surface to install or update the base `mcp-vector` and `vector-database` binaries from the vector repository without requiring manual `cargo install` invocations. Optional RAG support is installed separately through `get-vector install rag`.
+`get-vector` is the operator CLI for managing the local Vector tool installation. It provides a single command surface to install or update the base `mcp-vector` and `vector-database` binaries from the vector repository without requiring manual `cargo install` invocations.
 
 ## 2. Boundaries
 
 ### In scope
 
 - Installing and updating the local `mcp-vector` and `vector-database` binaries
-- Installing optional local RAG support through the `vector-rag` companion CLI
 - Using `runtime-io` execution primitives (`CommandBuilder`, `CommandExecutor`, `ProcessCommandExecutor`) as the shell boundary
 
 ### Out of scope
@@ -34,25 +33,9 @@
 
 Runs `cargo install --git <repo> --force mcp-vector` and `cargo install --git <repo> --force vector-database` to install or update the base local Vector tools from the repository HEAD.
 
-This command does not install RAG support. Run `get-vector install rag` when the optional `vector-rag` companion CLI is required for `vector-database rag ...` commands.
-
 V1 always performs a full install. No version comparison is done — this avoids a chicken-and-egg problem where an outdated CLI binary would incorrectly skip reinstallation after a workspace version bump.
 
 Cargo's stdout and stderr are streamed live to the terminal as the install runs, so the command does not appear blocked during the (often lengthy) compilation step.
-
-**Exit behavior:**
-
-| Condition                       | Exit code |
-|---------------------------------|-----------|
-| Install succeeded               | `0`       |
-| `cargo install` exited non-zero | `1`       |
-| Failed to spawn `cargo`         | `1`       |
-
-### `install rag`
-
-Runs `cargo install --git <repo> --force vector-rag` to install or update the optional local RAG runtime support from the repository HEAD.
-
-`vector-rag` owns the heavy RAG runtime dependencies, including LanceDB, DataFusion, FastEmbed, ONNX Runtime, and tokenizer dependencies. Keeping this install behind an explicit command prevents the base `update-mcp-vector` flow from compiling those dependencies unless RAG support is requested.
 
 **Exit behavior:**
 
@@ -92,13 +75,10 @@ get-vector --version
 # or
 get-vector -V
 
-# Install or update mcp-vector
+# Install or update mcp-vector and vector-database
 get-vector update-mcp-vector
-
-# Install or update optional RAG support
-get-vector install rag
 ```
 
 ## 5. Distribution
 
-`get-vector` is distributed via `cargo install --git` alongside `mcp-vector`, `vector-database`, and `vector-rag`. These crates are not published to crates.io because they depend on internal `runtime-*` path crates that cannot be resolved by the crates.io registry. See `spec-00008-mcp-vector-release-process` for the full release workflow.
+`get-vector` is distributed via `cargo install --git` alongside `mcp-vector` and `vector-database`. These crates are not published to crates.io because they depend on internal `runtime-*` path crates that cannot be resolved by the crates.io registry. See `spec-00008-mcp-vector-release-process` for the full release workflow.

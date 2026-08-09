@@ -13,7 +13,8 @@ tags:
   - rag
   - markdown
   - extraction
-related: []
+related:
+  - adr-00002-remove-rag-functionality-in-vector-mcp
 supersedes: []
 superseded_by: null
 aliases:
@@ -21,6 +22,9 @@ aliases:
 ---
 
 # RFC 00033: Markdown Extraction
+
+> [!NOTE]
+> RAG functionality was removed after version 0.5.0 per [[adr-00002-remove-rag-functionality-in-vector-mcp]]. This document is preserved as a historical record.
 
 ```vector-agent-action
 label: Create a task

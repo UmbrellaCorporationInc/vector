@@ -45,30 +45,6 @@ vector/
 
 ## Installation
 
-### Protocol Buffers compiler (`protoc`)
-
-Some workspace builds now require the Protocol Buffers compiler `protoc`
-through the LanceDB dependency graph.
-
-Install `protoc` with the package manager for your platform:
-
-```sh
-# Linux
-apt install -y protobuf-compiler
-protoc --version
-
-# macOS
-brew install protobuf
-protoc --version
-
-# Windows
-winget install protobuf
-protoc --version
-```
-
-Ensure `protoc --version` reports a sufficiently recent compiler after
-installation.
-
 ### MCP server (`mcp-vector`)
 
 Install the latest release directly from the repository:
@@ -140,3 +116,18 @@ The `mcp-vector` binary is produced at `target/release/mcp-vector`.
 - **Performance** — Rust systems layer with efficient local execution
 - **Extensibility** — small core, plugin-based growth
 - **Configurability** — no single workflow imposed; projects define their own ways of working
+
+## Release Notes & Compatibility (Version 0.5.0 Boundary)
+
+Version 0.5.0 is the final release supporting Retrieval-Augmented Generation (RAG) functionality per [[adr-00002-remove-rag-functionality-in-vector-mcp]].
+
+### Removed Interfaces & Surfaces
+- **MCP Tools**: `search` and `index`
+- **CLI Commands**: `vector-rag rag init`, `vector-rag rag search`, `vector-rag rag update-database`, `vector-database rag ...`, `get-vector install rag`
+- **Crates**: `runtime-rag`, `frontend/cli/vector-rag`
+- **Workspace Dependencies**: `arrow-array`, `arrow-schema`, `fastembed`, `futures`, `lancedb`
+
+### Migration & Cleanup Guidance
+- **Code Search Migration**: Migrate from MCP `search`/`index` and RAG CLI commands to direct repository search tools (`rg`, `grep`, `find_doc`, etc.).
+- **Manual Cleanup**: Persisted RAG index files located at `.vector-database/rag/` are left intact to prevent accidental deletion of user data. Operators wishing to reclaim disk space can safely delete `.vector-database/rag/` manually. Do not delete `.vector-database/packages/`, which stores package synchronization data.
+
