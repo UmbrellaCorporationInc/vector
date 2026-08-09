@@ -38,7 +38,7 @@ fn vector_server_get_info_declares_tool_capabilities() {
     assert!(tools.is_some(), "VectorServer must declare tool capabilities in its ServerInfo");
 }
 
-/// Verifies that VectorServer advertises legacy and 2026 MCP protocol revisions for agy compatibility.
+/// Verifies that `VectorServer` advertises legacy and 2026 MCP protocol revisions for `agy` compatibility.
 #[test]
 fn vector_server_advertises_supported_mcp_protocol_versions() {
     let supported_versions = VectorServer::new().supported_protocol_versions();
