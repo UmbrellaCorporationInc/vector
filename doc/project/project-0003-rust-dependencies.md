@@ -6,7 +6,7 @@ slug: rust-dependencies
 title: Rust Dependencies
 description: Defines the approved Rust dependencies for VECTOR project crates.
 created: 2026-05-02
-updated: 2026-06-10
+updated: 2026-08-09
 tags:
   - project
   - rust
@@ -17,6 +17,7 @@ related:
   - task-00004-extract-tokio-backed-runtime-channel-crate-and-remove-runtime-core-channel-implementation
   - task-00011-bootstrap-mcp-vector-crate-and-approve-rmcp-dependency
   - task-00059-improve-runtime-io-directory-traversal
+  - task-00077-remove-rag-capability
 ---
 
 # Dependencies
@@ -48,14 +49,14 @@ Description: Official Rust MCP SDK approved as the server integration dependency
 ## 5. serde
 
 Tags: #rust #serialization
-Scope: `runtime-doc`, `runtime-language`, `runtime-packages`, `runtime-markdown`, `mcp-vector`
-Description: Serialization framework approved for structured document metadata, package and language metadata decoding, Markdown extraction records, and MCP-facing DTO handling.
+Scope: `runtime-doc`, `runtime-language`, `runtime-packages`, `mcp-vector`
+Description: Serialization framework approved for structured document metadata, package and language metadata decoding, and MCP-facing DTO handling.
 
-## 6. serde_yaml
+## 6. noyalib
 
 Tags: #rust #serialization #yaml
-Scope: `runtime-doc`, `runtime-language`, `runtime-packages`, `runtime-markdown`
-Description: YAML codec approved for parsing governed Markdown frontmatter, Markdown extraction frontmatter metadata, and related project, language, and package metadata.
+Scope: `runtime-doc`, `runtime-language`, `runtime-packages`
+Description: YAML codec approved via `noyalib` (with `compat-serde-yaml` feature) for parsing governed Markdown frontmatter and related project, language, and package metadata.
 
 ## 7. tempfile
 
@@ -111,12 +112,6 @@ Tags: #rust #hashing #filesystem
 Scope: `runtime-io`
 Description: BLAKE3 content hashing crate approved for `runtime-io` file-byte hashing primitives. The approved use is limited to hashing file bytes through the generic IO boundary; callers must not include paths, modified times, package identity, Markdown metadata, or other domain data in the hash input.
 
-## 16. lancedb
-
-Tags: #rust #vector-database #storage
-Scope: `runtime-rag`
-Description: Embedded vector database approved for the `runtime-rag` Phase 6 persistence boundary. The approved use is limited to owning the local RAG retrieval store lifecycle, schema creation, index creation, and later retrieval-store writes under `.vector-database/rag/lancedb/`. LanceDB-specific behavior must remain behind `runtime-rag` and must not leak into CLI-only code.
-
 ## Workspace-local dependencies
 
 These workspace crates are used as internal dependencies and are governed by the workspace architecture rather than third-party dependency approval:
@@ -146,7 +141,7 @@ Workspace members `get-vector` and `vector-database` are application crates, not
 - Any additional Tokio-adjacent dependency beyond `tokio` itself must be justified separately in a future task or RFC if it is not strictly required by the current async runtime and I/O boundaries.
 - `rmcp` is **not** approved for `runtime/*` crates or plugin crates. Only `mcp-vector` may take a direct dependency on `rmcp`. Runtime and plugin crates must remain MCP-SDK-agnostic so they stay reusable from CLI or future non-MCP frontends.
 - `rmcp` types must not leak into runtime contracts. The MCP facade boundary stops at `mcp-vector`; all protocol types stay inside that crate.
-- `runtime-doc` remains the main consumer of document-processing dependencies (`serde`, `serde_yaml`, `walkdir`, `regex`, `chrono`, `patcher`, `dunce`). New crates should reuse existing runtime boundaries instead of spreading parsing or patching dependencies across the workspace without explicit justification.
-- `runtime-language` and `runtime-packages` are approved to use `serde`, `serde_yaml`, and adjacent filesystem helpers only for their own metadata-loading boundaries. They must not duplicate governed document parsing responsibilities that belong in `runtime-doc` without explicit justification.
+- `runtime-doc` remains the main consumer of document-processing dependencies (`serde`, `noyalib`, `walkdir`, `regex`, `chrono`, `patcher`, `dunce`). New crates should reuse existing runtime boundaries instead of spreading parsing or patching dependencies across the workspace without explicit justification.
+- `runtime-language` and `runtime-packages` are approved to use `serde`, `noyalib`, and adjacent filesystem helpers only for their own metadata-loading boundaries. They must not duplicate governed document parsing responsibilities that belong in `runtime-doc` without explicit justification.
 - `runtime-project` depends on `runtime-doc` only for project setup composition through `ProjectExtensionSetupOp`. This is the only approved dependency from `runtime-project` to `runtime-doc`; any broader cross-crate composition must be justified separately.
 - CLI crates (`get-vector`, `vector-database`) may depend on `runtime-io`, Tokio, and approved runtime crates because they own the executable boundary. They should remain thin entrypoints and must not become the primary home of reusable domain logic.

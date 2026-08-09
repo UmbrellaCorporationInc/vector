@@ -120,13 +120,13 @@ input:
   language: Rust
 ```
 
-- [ ] Remove the `runtime/rag` crate and its chunking, embedding, storage, lifecycle, indexing, retrieval, context assembly, defaults, pipeline, operations, tests, and README.
-- [ ] Remove `runtime/rag` and `frontend/cli/vector-rag` from the workspace members and remove the `runtime-rag` workspace dependency.
-- [ ] Remove `arrow-array`, `arrow-schema`, `fastembed`, `futures`, and `lancedb` from workspace dependencies after confirming no retained crate consumes them.
-- [ ] Determine whether `runtime/markdown` exists solely for RAG. Remove the crate and `runtime-markdown` workspace dependency if exclusive; otherwise retain it and document its remaining owner.
-- [ ] Regenerate `Cargo.lock` and verify that transitive model-runtime, ONNX, Arrow, LanceDB, and embedding dependencies no longer remain unless a retained crate independently requires them.
-- [ ] Confirm no retained source module imports RAG types or depends transitively on removed operations, defaults, schemas, or storage abstractions.
-- [ ] Run formatting, compilation, linting, tests, and dependency checks for the complete Rust workspace.
+- [x] Remove the `runtime/rag` crate and its chunking, embedding, storage, lifecycle, indexing, retrieval, context assembly, defaults, pipeline, operations, tests, and README.
+- [x] Remove `runtime/rag` and `frontend/cli/vector-rag` from the workspace members and remove the `runtime-rag` workspace dependency.
+- [x] Remove `arrow-array`, `arrow-schema`, `fastembed`, `futures`, and `lancedb` from workspace dependencies after confirming no retained crate consumes them.
+- [x] Determine whether `runtime/markdown` exists solely for RAG. Remove the crate and `runtime-markdown` workspace dependency if exclusive; otherwise retain it and document its remaining owner.
+- [x] Regenerate `Cargo.lock` and verify that transitive model-runtime, ONNX, Arrow, LanceDB, and embedding dependencies no longer remain unless a retained crate independently requires them.
+- [x] Confirm no retained source module imports RAG types or depends transitively on removed operations, defaults, schemas, or storage abstractions.
+- [x] Run formatting, compilation, linting, tests, and dependency checks for the complete Rust workspace.
 
 ### 3.5. Phase E — Reconcile Documentation and Release Guidance
 
