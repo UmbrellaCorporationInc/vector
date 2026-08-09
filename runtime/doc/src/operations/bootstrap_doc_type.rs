@@ -101,18 +101,18 @@ async fn update_document_types_yaml(
         })?
     };
 
-    let mut config: serde_yaml::Value = serde_yaml::from_str(&content).map_err(|error| {
-        runtime_core::RuntimeError::operation(format!(
-            "failed to parse .vector/document-types.yaml: {error}"
-        ))
-    })?;
+    let mut config: noyalib::compat::serde_yaml::Value =
+        noyalib::compat::serde_yaml::from_str(&content).map_err(|error| {
+            runtime_core::RuntimeError::operation(format!(
+                "failed to parse .vector/document-types.yaml: {error}"
+            ))
+        })?;
 
     let root = config.as_mapping_mut().ok_or_else(|| {
         runtime_core::RuntimeError::operation("document-types.yaml root is not a mapping")
     })?;
-    let doc_types_key = serde_yaml::Value::String("document-types".to_string());
     let doc_types =
-        root.get_mut(&doc_types_key).and_then(|v| v.as_mapping_mut()).ok_or_else(|| {
+        root.get_mut("document-types").and_then(|v| v.as_mapping_mut()).ok_or_else(|| {
             RuntimeError::operation("document-types.yaml is missing 'document-types' mapping")
         })?;
 
@@ -125,15 +125,16 @@ async fn update_document_types_yaml(
         params.statuses,
         params.template,
     );
-    let type_value: serde_yaml::Value = serde_yaml::from_str(&type_config).map_err(|_| {
-        runtime_core::RuntimeError::operation(
-            "failed to serialize new document type config as YAML",
-        )
-    })?;
+    let type_value: noyalib::compat::serde_yaml::Value =
+        noyalib::compat::serde_yaml::from_str(&type_config).map_err(|_| {
+            runtime_core::RuntimeError::operation(
+                "failed to serialize new document type config as YAML",
+            )
+        })?;
 
-    doc_types.insert(serde_yaml::Value::String(params.doc_type_name.to_string()), type_value);
+    doc_types.insert(params.doc_type_name.to_string(), type_value);
 
-    let new_content = serde_yaml::to_string(&config).map_err(|_| {
+    let new_content = noyalib::compat::serde_yaml::to_string(&config).map_err(|_| {
         runtime_core::RuntimeError::operation("failed to serialize updated document-types.yaml")
     })?;
 

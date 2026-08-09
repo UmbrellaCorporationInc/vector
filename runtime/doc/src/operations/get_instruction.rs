@@ -157,7 +157,8 @@ fn load_instructions_dir(root_dir: &IoPath) -> RuntimeResult<PathBuf> {
         ))
     })?;
 
-    let doc: serde_yaml::Value = serde_yaml::from_str(&content).map_err(|e| {
+    let doc: noyalib::compat::serde_yaml::Value = noyalib::compat::serde_yaml::from_str(&content)
+        .map_err(|e| {
         runtime_core::RuntimeError::operation(format!(
             "invalid project configuration: failed to parse .vector/agents.yaml: {e}"
         ))
@@ -170,11 +171,12 @@ fn load_instructions_dir(root_dir: &IoPath) -> RuntimeResult<PathBuf> {
 
     // validate_instructions_dir_from_yaml passed → the value is a non-empty string that
     // starts with ${system-temp} and has no traversal or escape violations.
-    let value = raw_value.and_then(serde_yaml::Value::as_str).ok_or_else(|| {
-        runtime_core::RuntimeError::operation(
-            "invalid project configuration: instructions-dir is not a valid string",
-        )
-    })?;
+    let value =
+        raw_value.and_then(noyalib::compat::serde_yaml::Value::as_str).ok_or_else(|| {
+            runtime_core::RuntimeError::operation(
+                "invalid project configuration: instructions-dir is not a valid string",
+            )
+        })?;
 
     Ok(resolve_instructions_dir_path(value))
 }

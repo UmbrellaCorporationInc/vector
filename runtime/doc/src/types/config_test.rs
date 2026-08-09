@@ -58,7 +58,7 @@ document-types:
 #[test]
 fn test_deserialize_valid_config() {
     let config: crate::types::DocumentTypesConfig =
-        serde_yaml::from_str(VALID_CONFIG_YAML).expect("valid yaml should parse");
+        noyalib::compat::serde_yaml::from_str(VALID_CONFIG_YAML).expect("valid yaml should parse");
     assert_eq!(config.document_types.len(), 2);
     assert_eq!(config.doc_type.prompt, "prompts-00001-create-doc-type");
     assert_eq!(config.doc_type.create_document_type_form, "form-00002-create-document-type");
@@ -73,7 +73,8 @@ fn test_deserialize_valid_config() {
 #[test]
 fn test_deserialize_minimal_config() {
     let config: crate::types::DocumentTypesConfig =
-        serde_yaml::from_str(MINIMAL_CONFIG_YAML).expect("valid yaml should parse");
+        noyalib::compat::serde_yaml::from_str(MINIMAL_CONFIG_YAML)
+            .expect("valid yaml should parse");
     assert_eq!(config.doc_type.template, "t");
     let task = config.document_types.get("task").expect("task type should exist");
     assert!(task.is_status_based());
@@ -84,7 +85,7 @@ fn test_deserialize_minimal_config() {
 #[test]
 fn test_category_based_document_type() {
     let config: crate::types::DocumentTypesConfig =
-        serde_yaml::from_str(VALID_CONFIG_YAML).expect("valid yaml should parse");
+        noyalib::compat::serde_yaml::from_str(VALID_CONFIG_YAML).expect("valid yaml should parse");
     let spec = config.document_types.get("spec").expect("spec type should exist");
     assert!(!spec.is_status_based());
     assert!(spec.is_category_based());
@@ -100,7 +101,7 @@ document-types:
     code-width: 5
 ";
     let config: crate::types::DocumentTypesConfig =
-        serde_yaml::from_str(yaml).expect("valid yaml should parse");
+        noyalib::compat::serde_yaml::from_str(yaml).expect("valid yaml should parse");
     let research = config.document_types.get("research").expect("research type should exist");
     assert!(!research.is_status_based());
     assert!(!research.is_category_based());
@@ -110,7 +111,8 @@ document-types:
 #[test]
 fn test_deserialize_optional_tags() {
     let config: crate::types::DocumentTypesConfig =
-        serde_yaml::from_str(CONFIG_WITH_TAGS_YAML).expect("valid yaml should parse");
+        noyalib::compat::serde_yaml::from_str(CONFIG_WITH_TAGS_YAML)
+            .expect("valid yaml should parse");
     let adr = config.document_types.get("adr").expect("adr type should exist");
     assert_eq!(adr.tags, Some(vec!["architecture".to_string(), "governance".to_string()]));
     assert_eq!(adr.prompt, "prompts-00004-create-adr");
@@ -126,7 +128,8 @@ document-types:
     prompt: prompts-00001-create-rfc
     unknown_field: value
 ";
-    let result: Result<crate::types::DocumentTypesConfig, _> = serde_yaml::from_str(yaml);
+    let result: Result<crate::types::DocumentTypesConfig, _> =
+        noyalib::compat::serde_yaml::from_str(yaml);
     assert!(result.is_err());
 }
 
@@ -141,7 +144,7 @@ document-types:
       - draft
 ";
     let config: crate::types::DocumentTypesConfig =
-        serde_yaml::from_str(yaml).expect("missing prompt should default");
+        noyalib::compat::serde_yaml::from_str(yaml).expect("missing prompt should default");
     assert_eq!(config.document_types["rfc"].prompt, "");
 }
 
@@ -158,7 +161,7 @@ document-types:
     statuses:
       - draft
 ";
-    let config: crate::types::DocumentTypesConfig =
-        serde_yaml::from_str(yaml).expect("missing create-document-type-form should default");
+    let config: crate::types::DocumentTypesConfig = noyalib::compat::serde_yaml::from_str(yaml)
+        .expect("missing create-document-type-form should default");
     assert_eq!(config.doc_type.create_document_type_form, "");
 }

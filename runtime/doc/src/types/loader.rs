@@ -33,9 +33,10 @@ pub async fn load_document_types_config(root_dir: &IoPath) -> RuntimeResult<Docu
         return Err(RuntimeError::operation(error));
     }
 
-    let config: DocumentTypesConfig = serde_yaml::from_str(&content).map_err(|error| {
-        RuntimeError::operation(format!("failed to parse .vector/document-types.yaml: {error}"))
-    })?;
+    let config: DocumentTypesConfig =
+        noyalib::compat::serde_yaml::from_str(&content).map_err(|error| {
+            RuntimeError::operation(format!("failed to parse .vector/document-types.yaml: {error}"))
+        })?;
 
     Ok(config)
 }
@@ -60,9 +61,10 @@ pub async fn load_from_path<P: AsRef<Path>>(path: P) -> RuntimeResult<DocumentTy
         return Err(RuntimeError::operation(error));
     }
 
-    let config: DocumentTypesConfig = serde_yaml::from_str(&content).map_err(|error| {
-        RuntimeError::operation(format!("failed to parse document-types config: {error}"))
-    })?;
+    let config: DocumentTypesConfig =
+        noyalib::compat::serde_yaml::from_str(&content).map_err(|error| {
+            RuntimeError::operation(format!("failed to parse document-types config: {error}"))
+        })?;
 
     Ok(config)
 }
