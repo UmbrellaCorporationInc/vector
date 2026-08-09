@@ -5,9 +5,9 @@ code: "00077"
 slug: remove-rag-capability
 title: Remove RAG Capability
 description: Remove the complete RAG runtime, CLI, MCP, dependency, installation, test, documentation, and local-artifact surface after version 0.5.0.
-status: in-progress
+status: done
 created: 2026-08-08
-updated: 2026-08-08
+updated: 2026-08-09
 tags:
   - rag
   - mcp
@@ -159,25 +159,25 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Run a repository-wide RAG reference audit and classify every remaining match as historical governance, compatibility/release guidance, or an unrelated use of the word `index`.
-- [ ] Verify from a clean build that neither `runtime-rag` nor `vector-rag` is produced and that no RAG-exclusive dependency remains in `Cargo.lock`.
-- [ ] Verify the MCP server starts and exposes only retained tools without local RAG artifacts or model downloads.
-- [ ] Verify `vector-database package add` and `package sync` still work with synchronized packages under `.vector-database/packages/`.
-- [ ] Update README files for every modified package.
-- [ ] Record the final list of deleted public interfaces, crates, dependencies, tests, documents, and retained historical references in the completion notes.
-- [ ] Run all project quality gates successfully.
+- [x] Run a repository-wide RAG reference audit and classify every remaining match as historical governance, compatibility/release guidance, or an unrelated use of the word `index`.
+- [x] Verify from a clean build that neither `runtime-rag` nor `vector-rag` is produced and that no RAG-exclusive dependency remains in `Cargo.lock`.
+- [x] Verify the MCP server starts and exposes only retained tools without local RAG artifacts or model downloads.
+- [x] Verify `vector-database package add` and `package sync` still work with synchronized packages under `.vector-database/packages/`.
+- [x] Update README files for every modified package.
+- [x] Record the final list of deleted public interfaces, crates, dependencies, tests, documents, and retained historical references in the completion notes.
+- [x] Run all project quality gates successfully.
 
 ## 4. Acceptance Criteria
 
-- [ ] The workspace contains no `runtime-rag` or `vector-rag` crate and builds without their source directories.
-- [ ] MCP tool discovery and invocation no longer expose `search` or `index`.
-- [ ] `vector-database` has no `rag` command group or companion-process dependency.
-- [ ] `get-vector` has no RAG installation command or RAG-specific installation messaging.
-- [ ] RAG-exclusive direct and transitive dependencies are absent from manifests and `Cargo.lock`.
-- [ ] Existing `.vector-database/rag/` data is not deleted by installation, update, startup, or migration code.
-- [ ] Package synchronization and all retained MCP and CLI capabilities pass regression tests.
-- [ ] User-facing documentation identifies 0.5.0 as the final RAG-capable version and provides migration and manual cleanup guidance.
-- [ ] Governed-document validation, formatting, compilation, linting, and the full test suite pass.
+- [x] The workspace contains no `runtime-rag` or `vector-rag` crate and builds without their source directories.
+- [x] MCP tool discovery and invocation no longer expose `search` or `index`.
+- [x] `vector-database` has no `rag` command group or companion-process dependency.
+- [x] `get-vector` has no RAG installation command or RAG-specific installation messaging.
+- [x] RAG-exclusive direct and transitive dependencies are absent from manifests and `Cargo.lock`.
+- [x] Existing `.vector-database/rag/` data is not deleted by installation, update, startup, or migration code.
+- [x] Package synchronization and all retained MCP and CLI capabilities pass regression tests.
+- [x] User-facing documentation identifies 0.5.0 as the final RAG-capable version and provides migration and manual cleanup guidance.
+- [x] Governed-document validation, formatting, compilation, linting, and the full test suite pass.
 
 ## 5. Staff Engineering Assessment
 
