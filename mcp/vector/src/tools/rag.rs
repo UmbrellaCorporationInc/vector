@@ -8,7 +8,7 @@ use rmcp::{
         router::tool::ToolRouter,
         wrapper::{Json, Parameters},
     },
-    model::{LoggingLevel, LoggingMessageNotificationParam},
+    model::{ProgressNotificationParam, ProgressToken},
     schemars, tool, tool_handler, tool_router,
 };
 use runtime_io::{CommandBuilder, CommandExecutor, CommandExit, CommandHandle, CommandSpec};
@@ -248,26 +248,51 @@ pub struct RetrievalContextDiagnostics {
     pub retrieval_limit: usize,
 }
 
-/// Builds a log notification for a single lifecycle step of the `rag.index` bridge.
-fn index_lifecycle_log(step: &str) -> LoggingMessageNotificationParam {
-    LoggingMessageNotificationParam::new(
-        LoggingLevel::Info,
-        serde_json::json!({ "tool": "rag.index", "message": step }),
-    )
+/// Progress information emitted by the `rag.index` MCP adapter.
+#[derive(Debug, Clone, PartialEq)]
+struct IndexProgressUpdate {
+    completed: u32,
+    total: Option<u32>,
+    message: String,
 }
 
-/// Builds a log notification from one structured progress event emitted by the `rag.index` bridge.
-fn index_progress_event_log(event: &RagIndexProgressEvent) -> LoggingMessageNotificationParam {
-    LoggingMessageNotificationParam::new(
-        LoggingLevel::Info,
-        serde_json::json!({
-            "tool": "rag.index",
-            "label": event.label,
-            "package": event.package,
-            "document_stem": event.document_stem,
-            "message": event.message,
-        }),
-    )
+impl IndexProgressUpdate {
+    fn new(completed: u32, total: Option<u32>, message: impl Into<String>) -> Self {
+        Self { completed, total, message: message.into() }
+    }
+
+    fn into_notification(self, progress_token: ProgressToken) -> ProgressNotificationParam {
+        let notification =
+            ProgressNotificationParam::new(progress_token, f64::from(self.completed))
+                .with_message(self.message);
+        match self.total {
+            Some(total) => notification.with_total(f64::from(total)),
+            None => notification,
+        }
+    }
+}
+
+/// Builds a progress update for a lifecycle boundary in the `rag.index` bridge.
+fn index_lifecycle_progress(completed: u32, step: &str) -> IndexProgressUpdate {
+    IndexProgressUpdate::new(completed, None, step)
+}
+
+/// Builds a progress update from one structured event emitted by `update-database --json`.
+fn index_progress_event_update(
+    event: &RagIndexProgressEvent,
+    completed: u32,
+    total: u32,
+) -> IndexProgressUpdate {
+    let mut message = event.label.clone();
+    if let Some(document_stem) = &event.document_stem {
+        message.push_str(": ");
+        message.push_str(document_stem);
+    }
+    if let Some(detail) = &event.message {
+        message.push_str(" — ");
+        message.push_str(detail);
+    }
+    IndexProgressUpdate::new(completed, Some(total), message)
 }
 
 /// MCP tool group for RAG operations.
@@ -370,9 +395,9 @@ where
     })
 }
 
-/// Runs the `rag init` then `rag update-database` lifecycle, calling `notify` at each step.
+/// Runs the `rag init` then `rag update-database` lifecycle, reporting progress at each step.
 ///
-/// `notify` receives a [`LoggingMessageNotificationParam`] before each command, and once per
+/// `report_progress` receives one update before each command, and once per
 /// progress event from the parsed `update-database --json` output. Notification failures are
 /// silently ignored so a disconnected client cannot abort an in-progress index run.
 ///
@@ -381,17 +406,20 @@ where
 /// accepts synchronous callbacks. Notifications are therefore emitted at lifecycle boundaries
 /// (before init, after init/before update-database) and per structured progress event from the
 /// final parsed JSON, not as raw subprocess lines arrive.
+///
+/// Cancellation is intentionally unsupported. `CommandHandle` has no safe termination operation,
+/// so request cancellation is not propagated to either indexing subprocess.
 async fn execute_index_bridge_with_progress<E, N, Fut>(
     executor: &E,
     workspace_root: &std::path::Path,
-    notify: N,
+    report_progress: N,
 ) -> Result<RagIndexOutput, String>
 where
     E: CommandExecutor + Sync,
-    N: Fn(LoggingMessageNotificationParam) -> Fut,
+    N: Fn(IndexProgressUpdate) -> Fut,
     Fut: Future<Output = ()>,
 {
-    notify(index_lifecycle_log("starting rag init")).await;
+    report_progress(index_lifecycle_progress(0, "starting rag init")).await;
 
     let init_spec = build_index_command(workspace_root, "init")?;
     let init_output = execute_index_command(executor, init_spec).await?;
@@ -403,7 +431,7 @@ where
         ));
     }
 
-    notify(index_lifecycle_log("init complete, starting update-database")).await;
+    report_progress(index_lifecycle_progress(1, "init complete, starting update-database")).await;
 
     let update_spec = build_index_command(workspace_root, "update-database")?;
     let update_output = execute_index_command(executor, update_spec).await?;
@@ -420,8 +448,14 @@ where
         update_database: parse_update_database_outcome(&update_output.spec, &update_output.output)?,
     };
 
-    for event in &index_output.update_database.progress {
-        notify(index_progress_event_log(event)).await;
+    let progress_event_count = u32::try_from(index_output.update_database.progress.len())
+        .map_err(|_| "rag.index emitted more progress events than MCP can represent".to_owned())?;
+    let total_progress_events = progress_event_count
+        .checked_add(2)
+        .ok_or_else(|| "rag.index progress event count overflowed".to_owned())?;
+    for (completed, event) in (2..total_progress_events).zip(&index_output.update_database.progress)
+    {
+        report_progress(index_progress_event_update(event, completed, total_progress_events)).await;
     }
 
     Ok(index_output)
@@ -578,10 +612,6 @@ impl RagTools {
         name = "index",
         description = "Initialize the local RAG store for this workspace and update the workspace RAG index."
     )]
-    // `notify_logging_message` is deprecated by SEP-2577 in newer rmcp releases.
-    // Progress notifications are best-effort (result is discarded); this call is
-    // retained for observability until a non-deprecated replacement is available.
-    #[allow(deprecated)]
     async fn index(
         &self,
         context: rmcp::service::RequestContext<RoleServer>,
@@ -589,12 +619,19 @@ impl RagTools {
     ) -> Result<Json<RagIndexOutput>, String> {
         let workspace_root = resolve_workspace_root_from_runtime_context("rag.index", &context)?;
         let executor = runtime_io::ProcessCommandExecutor::default();
+        let progress_token = context.meta.get_progress_token();
         let peer = context.peer.clone();
+        // Cancellation is intentionally a no-op until `CommandHandle` can terminate a running
+        // subprocess safely. The server does not advertise cancellation support for `rag.index`.
         let index_result =
-            execute_index_bridge_with_progress(&executor, &workspace_root, move |param| {
+            execute_index_bridge_with_progress(&executor, &workspace_root, move |update| {
                 let peer = peer.clone();
+                let progress_token = progress_token.clone();
                 async move {
-                    let _ = peer.notify_logging_message(param).await;
+                    if let Some(progress_token) = progress_token {
+                        let _ =
+                            peer.notify_progress(update.into_notification(progress_token)).await;
+                    }
                 }
             })
             .await?;

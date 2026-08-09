@@ -6,7 +6,7 @@ members = ["runtime/core", "runtime/channel", "runtime/io", "runtime/project", "
 thiserror = "2.0.17"
 tokio = { version = "1", features = ["sync", "rt", "fs", "io-util", "rt-multi-thread", "process", "macros"] }
 paste = "1.0"
-rmcp = { version = "1.6.0", features = ["server", "transport-io"] }
+rmcp = { version = "3.1.2", features = ["server", "transport-io"] }
 arrow-array = "58.3.0"
 arrow-schema = "58.3.0"
 runtime-channel = { path = "runtime/channel" }
@@ -37,7 +37,7 @@ futures = "0"
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.97.1"
 version = "0.4.2"
 license = "MIT"
 
