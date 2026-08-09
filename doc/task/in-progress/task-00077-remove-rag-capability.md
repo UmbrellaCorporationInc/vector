@@ -140,12 +140,12 @@ input:
   language: Markdown
 ```
 
-- [ ] Update the root README, crate READMEs, dependency registry, release documentation, examples, and help text that describe RAG as an available capability.
-- [ ] Add release notes listing removed MCP tools, CLI commands, crate names, dependencies, and the 0.5.0 compatibility boundary.
-- [ ] Add migration guidance for direct repository search and manual cleanup guidance for existing `.vector-database/rag/` data.
-- [ ] Preserve accepted and implemented governed documents as historical records unless the documentation policy explicitly requires another lifecycle transition; add references to [[adr-00002-remove-rag-functionality-in-vector-mcp]] where readers could otherwise mistake an old RAG design for active functionality.
-- [ ] Validate that no active documentation instructs users to install, configure, initialize, index, or query the removed RAG subsystem.
-- [ ] Run governed-document validation and fix all correctable issues.
+- [x] Update the root README, crate READMEs, dependency registry, release documentation, examples, and help text that describe RAG as an available capability.
+- [x] Add release notes listing removed MCP tools, CLI commands, crate names, dependencies, and the 0.5.0 compatibility boundary.
+- [x] Add migration guidance for direct repository search and manual cleanup guidance for existing `.vector-database/rag/` data.
+- [x] Preserve accepted and implemented governed documents as historical records unless the documentation policy explicitly requires another lifecycle transition; add references to [[adr-00002-remove-rag-functionality-in-vector-mcp]] where readers could otherwise mistake an old RAG design for active functionality.
+- [x] Validate that no active documentation instructs users to install, configure, initialize, index, or query the removed RAG subsystem.
+- [x] Run governed-document validation and fix all correctable issues.
 
 ### 3.6. Phase Z — Wrap-up
 

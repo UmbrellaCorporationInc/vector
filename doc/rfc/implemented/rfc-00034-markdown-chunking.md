@@ -14,6 +14,7 @@ tags:
   - markdown
   - chunking
 related:
+  - adr-00002-remove-rag-functionality-in-vector-mcp
   - task-00063-implement-rfc-00034-markdown-chunking
 supersedes: []
 superseded_by: null
@@ -22,6 +23,9 @@ aliases:
 ---
 
 # RFC 00034: Markdown Chunking
+
+> [!NOTE]
+> RAG functionality was removed after version 0.5.0 per [[adr-00002-remove-rag-functionality-in-vector-mcp]]. This document is preserved as a historical record.
 
 ```vector-agent-action
 label: Create a task

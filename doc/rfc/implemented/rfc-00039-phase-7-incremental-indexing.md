@@ -15,6 +15,7 @@ tags:
   - incremental
   - pipeline
 related:
+  - adr-00002-remove-rag-functionality-in-vector-mcp
   - spec-00011-rag-plan-implementation
   - rfc-00038-phase-6-lancedb-integration
   - task-00069-implement-rfc-00039-phase-7-incremental-indexing
@@ -25,6 +26,9 @@ aliases:
 ---
 
 # RFC 00039: Phase 7 Incremental Indexing
+
+> [!NOTE]
+> RAG functionality was removed after version 0.5.0 per [[adr-00002-remove-rag-functionality-in-vector-mcp]]. This document is preserved as a historical record.
 
 ```vector-agent-action
 label: Create a task

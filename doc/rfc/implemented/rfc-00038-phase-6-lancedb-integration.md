@@ -15,6 +15,7 @@ tags:
   - retrieval
   - indexing
 related:
+  - adr-00002-remove-rag-functionality-in-vector-mcp
   - spec-00011-rag-plan-implementation
   - task-00068-implement-rfc-00038-phase-6-lancedb-integration
 supersedes: []
@@ -24,6 +25,9 @@ aliases:
 ---
 
 # RFC 00038: Phase 6 LanceDB Integration
+
+> [!NOTE]
+> RAG functionality was removed after version 0.5.0 per [[adr-00002-remove-rag-functionality-in-vector-mcp]]. This document is preserved as a historical record.
 
 ```vector-agent-action
 label: Create a task

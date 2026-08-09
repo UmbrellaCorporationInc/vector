@@ -15,6 +15,7 @@ tags:
   - runtime
   - discovery
 related:
+  - adr-00002-remove-rag-functionality-in-vector-mcp
   - spec-00011-rag-plan-implementation
   - project-0003-rust-dependencies
   - task-00059-improve-runtime-io-directory-traversal
@@ -25,6 +26,9 @@ aliases:
 ---
 
 # RFC 00032: Markdown Discovery Runtime Boundary
+
+> [!NOTE]
+> RAG functionality was removed after version 0.5.0 per [[adr-00002-remove-rag-functionality-in-vector-mcp]]. This document is preserved as a historical record.
 
 ```vector-agent-action
 label: Create a task

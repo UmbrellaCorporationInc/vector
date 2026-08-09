@@ -15,6 +15,7 @@ tags:
   - search
   - retrieval
 related:
+  - adr-00002-remove-rag-functionality-in-vector-mcp
   - spec-00011-rag-plan-implementation
   - rfc-00041-phase-9-canonical-result-for-retrieval-operation
   - task-00074-implement-rfc-00042-phase-10-mcp-search-tool
@@ -25,6 +26,9 @@ aliases:
 ---
 
 # RFC 00042: Phase 10 MCP Search Tool
+
+> [!NOTE]
+> RAG functionality was removed after version 0.5.0 per [[adr-00002-remove-rag-functionality-in-vector-mcp]]. This document is preserved as a historical record.
 
 ```vector-agent-action
 label: Create a task
