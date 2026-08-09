@@ -15,9 +15,6 @@ const MCP_PACKAGE_NAME: &str = "mcp-vector";
 /// The CLI package name passed to `cargo install`.
 const CLI_PACKAGE_NAME: &str = "vector-database";
 
-/// The RAG companion CLI package name passed to `cargo install`.
-const RAG_PACKAGE_NAME: &str = "vector-rag";
-
 /// Outcome produced by [`run`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -70,28 +67,6 @@ where
     Err: FnMut(&[u8]) + Send,
 {
     run_packages(executor, &[MCP_PACKAGE_NAME, CLI_PACKAGE_NAME], on_stdout, on_stderr).await
-}
-
-/// Runs `cargo install --git <REPO_URL> --force vector-rag`, streaming stdout and
-/// stderr to the provided callbacks as the install runs.
-///
-/// # Errors
-///
-/// Returns [`UpdateError::Spawn`] when the `cargo` process cannot be started,
-/// [`UpdateError::Wait`] when waiting for it fails, or
-/// [`UpdateError::InstallFailed`] when it exits with a non-zero status.
-#[allow(clippy::print_stderr)]
-pub async fn run_rag<E, Out, Err>(
-    executor: &E,
-    on_stdout: Out,
-    on_stderr: Err,
-) -> Result<UpdateOutcome, UpdateError>
-where
-    E: CommandExecutor + Sync,
-    Out: FnMut(&[u8]) + Send,
-    Err: FnMut(&[u8]) + Send,
-{
-    run_packages(executor, &[RAG_PACKAGE_NAME], on_stdout, on_stderr).await
 }
 
 #[allow(clippy::print_stderr)]

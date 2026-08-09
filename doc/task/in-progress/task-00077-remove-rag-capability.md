@@ -101,12 +101,12 @@ input:
   language: Rust, Markdown
 ```
 
-- [ ] Remove the `frontend/cli/vector-rag` crate, including command parsing, `rag init`, `rag search`, `rag update-database`, JSON output contracts, tests, and README.
-- [ ] Remove the `rag` command group, usage text, dispatch, subprocess passthrough, installation guidance, and passthrough tests from `vector-database`.
-- [ ] Remove `get-vector install rag`, `run_rag`, `RAG_PACKAGE_NAME`, RAG installation messages, and their parsing and command-construction tests.
-- [ ] Preserve the base `get-vector update-mcp-vector` behavior for `mcp-vector` and `vector-database`.
-- [ ] Update packaging and release automation so no build or install step references the removed `vector-rag` package.
-- [ ] Add CLI regression tests proving retained `vector-database package add` and `package sync` behavior remains intact and the removed RAG command group is rejected as unknown.
+- [x] Remove the `frontend/cli/vector-rag` crate, including command parsing, `rag init`, `rag search`, `rag update-database`, JSON output contracts, tests, and README.
+- [x] Remove the `rag` command group, usage text, dispatch, subprocess passthrough, installation guidance, and passthrough tests from `vector-database`.
+- [x] Remove `get-vector install rag`, `run_rag`, `RAG_PACKAGE_NAME`, RAG installation messages, and their parsing and command-construction tests.
+- [x] Preserve the base `get-vector update-mcp-vector` behavior for `mcp-vector` and `vector-database`.
+- [x] Update packaging and release automation so no build or install step references the removed `vector-rag` package.
+- [x] Add CLI regression tests proving retained `vector-database package add` and `package sync` behavior remains intact and the removed RAG command group is rejected as unknown.
 
 ### 3.4. Phase D — Remove Runtime Code and Exclusive Dependencies
 

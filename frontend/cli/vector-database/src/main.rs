@@ -4,7 +4,7 @@
 
 use runtime_io::ProcessCommandExecutor;
 use std::path::PathBuf;
-use vector_database::commands::{package_add, package_sync, rag_passthrough};
+use vector_database::commands::{package_add, package_sync};
 
 #[derive(Debug, Default)]
 struct PackageAddArgs {
@@ -31,22 +31,26 @@ async fn main() {
         }
     };
 
-    let result = match args[1].as_str() {
-        "package" => handle_package_command(&root_dir, &args).await.map(|()| 0),
-        "rag" => handle_rag_command(&root_dir, &args).await,
-        cmd => Err(format!("unknown command group '{cmd}'")),
-    };
+    let result = dispatch_command(&root_dir, &args).await;
 
     match result {
         Ok(0) => {}
         Ok(code) => std::process::exit(code),
         Err(error) => {
             eprintln!("error: {error}");
-            if args[1].as_str() != "rag" {
-                print_usage();
-            }
+            print_usage();
             std::process::exit(1);
         }
+    }
+}
+
+async fn dispatch_command(root_dir: &std::path::Path, args: &[String]) -> Result<i32, String> {
+    if args.len() < 3 {
+        return Err("insufficient arguments".to_string());
+    }
+    match args[1].as_str() {
+        "package" => handle_package_command(root_dir, args).await.map(|()| 0),
+        cmd => Err(format!("unknown command group '{cmd}'")),
     }
 }
 
@@ -56,9 +60,6 @@ fn print_usage() {
     println!("Command groups:");
     println!("  package sync                    Synchronize packages defined in the manifest");
     println!("  package add <name> <type> <url> [tag]  Add a new package to the manifest");
-    println!("  rag init                        Create or validate the local RAG LanceDB store");
-    println!("  rag search <query>              Search the local RAG store with hybrid retrieval");
-    println!("  rag update-database             Index workspace documents into the RAG store");
 }
 
 fn print_add_usage() {
@@ -81,13 +82,6 @@ async fn handle_package_command(root_dir: &std::path::Path, args: &[String]) -> 
         }
         cmd => Err(format!("unknown package subcommand '{cmd}'")),
     }
-}
-
-async fn handle_rag_command(root_dir: &std::path::Path, args: &[String]) -> Result<i32, String> {
-    let executor = ProcessCommandExecutor::default();
-    rag_passthrough::run(&executor, root_dir, &args[2..])
-        .await
-        .map(rag_passthrough::DelegatedExit::code)
 }
 
 fn parse_package_add_args(args: &[String]) -> PackageAddArgs {
@@ -124,6 +118,10 @@ fn parse_package_add_args(args: &[String]) -> PackageAddArgs {
 
     parsed
 }
+
+#[cfg(test)]
+#[path = "main_test.rs"]
+mod tests;
 
 fn missing_package_argument(name: &str) -> String {
     print_add_usage();

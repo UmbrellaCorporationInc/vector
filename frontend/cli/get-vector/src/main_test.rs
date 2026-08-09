@@ -27,14 +27,6 @@ fn test_parse_args_update() {
 }
 
 #[test]
-fn test_parse_args_install_rag() {
-    assert_eq!(
-        parse_args(&["get-vector".to_string(), "install".to_string(), "rag".to_string()]),
-        CliAction::InstallRag
-    );
-}
-
-#[test]
 fn test_parse_args_unknown() {
     assert_eq!(
         parse_args(&["get-vector".to_string(), "unknown-cmd".to_string()]),
