@@ -2109,7 +2109,7 @@ dependencies = [
 
 [[package]]
 name = "get-vector"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "runtime-core",
  "runtime-io",
@@ -3568,7 +3568,7 @@ dependencies = [
 
 [[package]]
 name = "mcp-vector"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "dunce",
  "rmcp",
@@ -4694,7 +4694,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-channel"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "runtime-core",
  "thiserror",
@@ -4703,7 +4703,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-core"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "paste",
  "thiserror",
@@ -4712,7 +4712,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-doc"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "dunce",
@@ -4731,7 +4731,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-io"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "blake3",
  "runtime-core",
@@ -4741,7 +4741,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-language"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "noyalib",
  "runtime-core",
@@ -4755,7 +4755,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-markdown"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "noyalib",
  "runtime-io",
@@ -4765,7 +4765,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-packages"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "noyalib",
  "runtime-core",
@@ -4778,7 +4778,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-project"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "runtime-core",
  "runtime-doc",
@@ -4790,7 +4790,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-rag"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -5973,7 +5973,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vector-database"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "runtime-core",
  "runtime-io",
@@ -5984,7 +5984,7 @@ dependencies = [
 
 [[package]]
 name = "vector-rag"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "runtime-channel",
  "runtime-core",
