@@ -215,7 +215,7 @@ fn test_runtime_markdown_extraction_uses_only_registered_serialization_dependenc
         include_str!("../../../doc/project/project-0003-rust-dependencies.md");
 
     assert!(crate_manifest.contains("serde = { workspace = true }"));
-    assert!(crate_manifest.contains("serde_yaml = { workspace = true }"));
+    assert!(crate_manifest.contains("noyalib = { workspace = true }"));
     assert!(dependency_register.contains("`runtime-markdown`"));
     assert!(dependency_register.contains("Markdown extraction frontmatter metadata"));
 }

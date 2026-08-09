@@ -56,7 +56,9 @@ pub fn validate_vector_yaml_schema_content(
     relative_path: &str,
     content: &str,
 ) -> Result<(), Vec<VectorYamlFieldError>> {
-    let Ok(yaml) = serde_yaml::from_str::<serde_yaml::Value>(content) else {
+    let Ok(yaml) =
+        noyalib::compat::serde_yaml::from_str::<noyalib::compat::serde_yaml::Value>(content)
+    else {
         return Ok(());
     };
 
@@ -102,20 +104,16 @@ pub fn relative_display_path(root_dir: &Path, path: &Path) -> String {
 
 fn visit_value(
     relative_path: &str,
-    value: &serde_yaml::Value,
+    value: &noyalib::compat::serde_yaml::Value,
     current_path: &mut Vec<String>,
     errors: &mut Vec<VectorYamlFieldError>,
 ) {
-    let serde_yaml::Value::Mapping(mapping) = value else {
+    let noyalib::compat::serde_yaml::Value::Mapping(mapping) = value else {
         return;
     };
 
     let dynamic_children = has_dynamic_children(relative_path, current_path);
-    for (key, child) in mapping {
-        let serde_yaml::Value::String(field_name) = key else {
-            continue;
-        };
-
+    for (field_name, child) in mapping {
         if dynamic_children {
             current_path.push("*".to_string());
             visit_value(relative_path, child, current_path, errors);

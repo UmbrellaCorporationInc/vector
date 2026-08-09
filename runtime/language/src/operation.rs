@@ -220,22 +220,19 @@ async fn load_language_rules(root_dir: &IoPath) -> Result<LanguageRules, Languag
         .await
         .map_err(|error| LanguageRulesError::ConfigRead(error.to_string()))?;
     validate_language_rules_field_names(&text)?;
-    serde_yaml::from_str::<LanguageRules>(&text)
+    noyalib::compat::serde_yaml::from_str::<LanguageRules>(&text)
         .map_err(|error| LanguageRulesError::ConfigParse(error.to_string()))
 }
 
 fn validate_language_rules_field_names(text: &str) -> Result<(), LanguageRulesError> {
-    let yaml = serde_yaml::from_str::<serde_yaml::Value>(text)
+    let yaml = noyalib::compat::serde_yaml::from_str::<noyalib::compat::serde_yaml::Value>(text)
         .map_err(|error| LanguageRulesError::ConfigParse(error.to_string()))?;
-    let serde_yaml::Value::Mapping(root) = yaml else {
+    let noyalib::compat::serde_yaml::Value::Mapping(root) = yaml else {
         return Ok(());
     };
 
-    for (language_key, entry_value) in root {
-        let Some(language) = language_key.as_str() else {
-            continue;
-        };
-        validate_language_rule_value(language, &entry_value)?;
+    for (language, entry_value) in root {
+        validate_language_rule_value(&language, &entry_value)?;
     }
 
     Ok(())
@@ -243,16 +240,13 @@ fn validate_language_rules_field_names(text: &str) -> Result<(), LanguageRulesEr
 
 fn validate_language_rule_value(
     current_path: &str,
-    value: &serde_yaml::Value,
+    value: &noyalib::compat::serde_yaml::Value,
 ) -> Result<(), LanguageRulesError> {
-    let serde_yaml::Value::Mapping(entry) = value else {
+    let noyalib::compat::serde_yaml::Value::Mapping(entry) = value else {
         return Ok(());
     };
 
-    for (field_key, child_value) in entry {
-        let Some(field_name) = field_key.as_str() else {
-            continue;
-        };
+    for (field_name, child_value) in entry {
         let field_path = format!("{current_path}.{field_name}");
         if !is_kebab_case_identifier(field_name) {
             return Err(LanguageRulesError::ConfigParse(format!(

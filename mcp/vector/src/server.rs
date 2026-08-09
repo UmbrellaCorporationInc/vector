@@ -4,11 +4,13 @@
 //! Tool groups are composed here by delegating to each capability group's
 //! `ServerHandler` implementation through rmcp's router merge pattern.
 
+use std::borrow::Cow;
+
 use rmcp::{
     RoleServer, ServerHandler,
     model::{
-        CallToolRequestParams, CallToolResult, ListToolsResult, PaginatedRequestParams,
-        ServerCapabilities, ServerInfo, Tool,
+        CallToolRequestParams, CallToolResponse, ListToolsResult, PaginatedRequestParams,
+        ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
     },
     serve_server,
     service::RequestContext,
@@ -73,6 +75,15 @@ impl ServerHandler for VectorServer {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
     }
 
+    fn supported_protocol_versions(&self) -> Cow<'static, [ProtocolVersion]> {
+        Cow::Owned(vec![
+            ProtocolVersion::V_2024_11_05,
+            ProtocolVersion::V_2025_03_26,
+            ProtocolVersion::V_2025_06_18,
+            ProtocolVersion::V_2025_11_25,
+        ])
+    }
+
     async fn list_tools(
         &self,
         request: Option<PaginatedRequestParams>,
@@ -94,7 +105,7 @@ impl ServerHandler for VectorServer {
         &self,
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
-    ) -> Result<CallToolResult, rmcp::ErrorData> {
+    ) -> Result<CallToolResponse, rmcp::ErrorData> {
         if self.document.get_tool(&request.name).is_some() {
             return self.document.call_tool(request, context).await;
         }

@@ -81,21 +81,16 @@ impl PackageManifest {
     ///
     /// Returns a [`ManifestError`] if the YAML is malformed or violates validation rules.
     pub fn parse(text: &str) -> Result<Self, ManifestError> {
-        let yaml_val: serde_yaml::Value =
-            serde_yaml::from_str(text).map_err(|e| ManifestError::YamlParse(e.to_string()))?;
+        let yaml_val: noyalib::compat::serde_yaml::Value =
+            noyalib::compat::serde_yaml::from_str(text)
+                .map_err(|e| ManifestError::YamlParse(e.to_string()))?;
 
         let mapping = yaml_val.as_mapping().ok_or(ManifestError::NotAMap)?;
 
         let mut packages = BTreeMap::new();
 
-        for (key_val, val_val) in mapping {
-            let key = key_val
-                .as_str()
-                .ok_or_else(|| {
-                    ManifestError::YamlParse("Package name must be a string".to_string())
-                })?
-                .to_string();
-
+        for (key, val_val) in mapping {
+            let key = key.clone();
             if !val_val.is_mapping() {
                 return Err(ManifestError::EntryNotAMap(key));
             }
@@ -169,7 +164,8 @@ impl PackageManifest {
     ///
     /// Returns a [`ManifestError`] if serialization fails.
     pub fn to_yaml(&self) -> Result<String, ManifestError> {
-        serde_yaml::to_string(self).map_err(|e| ManifestError::YamlParse(e.to_string()))
+        noyalib::compat::serde_yaml::to_string(self)
+            .map_err(|e| ManifestError::YamlParse(e.to_string()))
     }
 }
 

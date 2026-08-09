@@ -9,7 +9,7 @@ license.workspace = true
 runtime-core = { workspace = true }
 runtime-io = { workspace = true }
 serde = { workspace = true }
-serde_yaml = { workspace = true }
+noyalib = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

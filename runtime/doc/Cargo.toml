@@ -15,7 +15,7 @@ patcher = { workspace = true }
 runtime-core = { workspace = true }
 runtime-io = { workspace = true }
 serde = { workspace = true }
-serde_yaml = { workspace = true }
+noyalib = { workspace = true }
 walkdir = { workspace = true }
 regex = { workspace = true }
 chrono = { workspace = true }

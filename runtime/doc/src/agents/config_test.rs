@@ -3,7 +3,7 @@
 //! These tests cover the same observable cases as the TypeScript tests in
 //! `extension.test.ts` independently, without shared cross-language fixtures.
 
-use serde_yaml::{Mapping, Value};
+use noyalib::compat::serde_yaml::{Mapping, Value};
 
 use super::{InstructionsDirError, validate_instructions_dir, validate_instructions_dir_from_yaml};
 
@@ -16,7 +16,7 @@ fn reject_absent_instructions_dir() {
 
 #[test]
 fn reject_non_string_instructions_dir_number() {
-    let val = Value::Number(serde_yaml::Number::from(42));
+    let val = Value::Number(noyalib::compat::serde_yaml::Number::from(42));
     assert_eq!(
         validate_instructions_dir_from_yaml(Some(&val)),
         Err(InstructionsDirError::NotAString)
@@ -26,7 +26,7 @@ fn reject_non_string_instructions_dir_number() {
 #[test]
 fn reject_non_string_instructions_dir_mapping() {
     let mut map = Mapping::new();
-    map.insert(Value::String("key".to_string()), Value::String("value".to_string()));
+    map.insert("key", Value::String("value".to_string()));
     let val = Value::Mapping(map);
     assert_eq!(
         validate_instructions_dir_from_yaml(Some(&val)),

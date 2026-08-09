@@ -45,7 +45,7 @@ fn load_document_types_config_from_path(path: &Path) -> Option<DocumentTypesConf
     let content = std::fs::read_to_string(path).ok()?;
     let display_path = path.to_string_lossy().replace('\\', "/");
     validate_vector_yaml_schema_content(&display_path, &content).ok()?;
-    serde_yaml::from_str(&content).ok()
+    noyalib::compat::serde_yaml::from_str(&content).ok()
 }
 
 pub fn build_document_stem_index(

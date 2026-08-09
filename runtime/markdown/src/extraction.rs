@@ -372,40 +372,40 @@ fn parse_yaml_metadata(
     format: MarkdownFrontmatterFormat,
     source_span: MarkdownSourceSpan,
 ) -> Result<MarkdownMetadataValue, MarkdownExtractionError> {
-    let value = serde_yaml::from_str::<serde_yaml::Value>(raw).map_err(|error| {
-        frontmatter_error(
-            format,
-            match format {
-                MarkdownFrontmatterFormat::Json => "JSON frontmatter could not be parsed.",
-                MarkdownFrontmatterFormat::Yaml => "YAML frontmatter could not be parsed.",
-                MarkdownFrontmatterFormat::Toml => "TOML frontmatter could not be parsed.",
-            },
-            source_span,
-            Some(error.to_string()),
-        )
-    })?;
+    let value = noyalib::compat::serde_yaml::from_str::<noyalib::compat::serde_yaml::Value>(raw)
+        .map_err(|error| {
+            frontmatter_error(
+                format,
+                match format {
+                    MarkdownFrontmatterFormat::Json => "JSON frontmatter could not be parsed.",
+                    MarkdownFrontmatterFormat::Yaml => "YAML frontmatter could not be parsed.",
+                    MarkdownFrontmatterFormat::Toml => "TOML frontmatter could not be parsed.",
+                },
+                source_span,
+                Some(error.to_string()),
+            )
+        })?;
     Ok(yaml_to_metadata(value))
 }
 
-fn yaml_to_metadata(value: serde_yaml::Value) -> MarkdownMetadataValue {
+fn yaml_to_metadata(value: noyalib::compat::serde_yaml::Value) -> MarkdownMetadataValue {
     match value {
-        serde_yaml::Value::Null => MarkdownMetadataValue::Null,
-        serde_yaml::Value::Bool(value) => MarkdownMetadataValue::Bool(value),
-        serde_yaml::Value::Number(value) => MarkdownMetadataValue::Number(value.to_string()),
-        serde_yaml::Value::String(value) => MarkdownMetadataValue::String(value),
-        serde_yaml::Value::Sequence(values) => {
+        noyalib::compat::serde_yaml::Value::Null => MarkdownMetadataValue::Null,
+        noyalib::compat::serde_yaml::Value::Bool(value) => MarkdownMetadataValue::Bool(value),
+        noyalib::compat::serde_yaml::Value::Number(value) => {
+            MarkdownMetadataValue::Number(value.to_string())
+        }
+        noyalib::compat::serde_yaml::Value::String(value) => MarkdownMetadataValue::String(value),
+        noyalib::compat::serde_yaml::Value::Sequence(values) => {
             MarkdownMetadataValue::Sequence(values.into_iter().map(yaml_to_metadata).collect())
         }
-        serde_yaml::Value::Mapping(mapping) => MarkdownMetadataValue::Mapping(
-            mapping
-                .into_iter()
-                .filter_map(|(key, value)| match key {
-                    serde_yaml::Value::String(key) => Some((key, yaml_to_metadata(value))),
-                    _ => None,
-                })
-                .collect(),
+        noyalib::compat::serde_yaml::Value::Mapping(mapping) => MarkdownMetadataValue::Mapping(
+            mapping.into_iter().map(|(key, value)| (key, yaml_to_metadata(value))).collect(),
         ),
-        serde_yaml::Value::Tagged(tagged) => yaml_to_metadata(tagged.value),
+        noyalib::compat::serde_yaml::Value::Tagged(tagged) => {
+            let (_, value) = tagged.into_parts();
+            yaml_to_metadata(value)
+        }
     }
 }
 

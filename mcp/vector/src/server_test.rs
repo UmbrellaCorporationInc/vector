@@ -2,7 +2,7 @@
 
 use rmcp::{
     ClientHandler, ServerHandler, ServiceExt,
-    model::{CallToolRequestParams, ClientInfo},
+    model::{CallToolRequestParams, ClientInfo, ProtocolVersion},
 };
 use serde_json::{Map, json};
 
@@ -36,6 +36,22 @@ fn vector_server_get_info_declares_tool_capabilities() {
     let info = server.get_info();
     let tools = info.capabilities.tools;
     assert!(tools.is_some(), "VectorServer must declare tool capabilities in its ServerInfo");
+}
+
+/// Verifies that the compatibility migration does not advertise the 2026 protocol revision.
+#[test]
+fn vector_server_advertises_legacy_mcp_protocol_versions_only() {
+    let supported_versions = VectorServer::new().supported_protocol_versions();
+    assert_eq!(
+        supported_versions.as_ref(),
+        [
+            ProtocolVersion::V_2024_11_05,
+            ProtocolVersion::V_2025_03_26,
+            ProtocolVersion::V_2025_06_18,
+            ProtocolVersion::V_2025_11_25,
+        ],
+        "the compatibility migration must not advertise MCP 2026-07-28"
+    );
 }
 
 /// Verifies that `get_tool` resolves the `create_project` tool by name.
@@ -657,7 +673,7 @@ async fn vector_server_dispatches_version_tool_calls_over_transport() {
     let text = result
         .content
         .first()
-        .and_then(|content| content.raw.as_text())
+        .and_then(|content| content.as_text())
         .map(|text| text.text.as_str())
         .expect("tool result must contain text content");
 
@@ -703,7 +719,7 @@ async fn vector_server_dispatches_rag_search_with_runtime_root_over_transport() 
     // parameter deserialization error, which would indicate the input contract
     // is broken.
     let content = result.content.first().expect("tool result must contain content");
-    let text = content.raw.as_text().expect("tool content must be text").text.as_str();
+    let text = content.as_text().expect("tool content must be text").text.as_str();
 
     // A blank-query rejection would mention "non-empty query"; a valid query
     // must pass input validation and reach the bridge step.
@@ -782,7 +798,7 @@ async fn vector_server_dispatches_language_tool_calls_over_transport() {
     let text = result
         .content
         .first()
-        .and_then(|content| content.raw.as_text())
+        .and_then(|content| content.as_text())
         .map(|text| text.text.as_str())
         .expect("tool result must contain text content");
 
@@ -827,7 +843,7 @@ async fn vector_server_dispatches_document_tool_calls_over_transport() {
     let text = result
         .content
         .first()
-        .and_then(|content| content.raw.as_text())
+        .and_then(|content| content.as_text())
         .map(|text| text.text.as_str())
         .expect("tool result must contain text content");
 
@@ -871,7 +887,7 @@ async fn vector_server_dispatches_project_tool_calls_over_transport() {
     let text = result
         .content
         .first()
-        .and_then(|content| content.raw.as_text())
+        .and_then(|content| content.as_text())
         .map(|text| text.text.as_str())
         .expect("tool result must contain text content");
 

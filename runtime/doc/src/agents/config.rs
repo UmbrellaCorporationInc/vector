@@ -129,11 +129,11 @@ pub fn validate_instructions_dir(value: &str) -> Result<(), InstructionsDirError
 /// # Errors
 /// Returns the first `InstructionsDirError` that describes the failure.
 pub fn validate_instructions_dir_from_yaml(
-    raw: Option<&serde_yaml::Value>,
+    raw: Option<&noyalib::compat::serde_yaml::Value>,
 ) -> Result<(), InstructionsDirError> {
     match raw {
         None => Err(InstructionsDirError::Missing),
-        Some(serde_yaml::Value::String(s)) => validate_instructions_dir(s),
+        Some(noyalib::compat::serde_yaml::Value::String(s)) => validate_instructions_dir(s),
         Some(_) => Err(InstructionsDirError::NotAString),
     }
 }
