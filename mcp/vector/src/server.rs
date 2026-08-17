@@ -9,8 +9,8 @@ use std::borrow::Cow;
 use rmcp::{
     RoleServer, ServerHandler,
     model::{
-        CallToolRequestParams, CallToolResponse, ListToolsResult, PaginatedRequestParams,
-        ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
+        CacheScope, CallToolRequestParams, CallToolResponse, ListToolsResult,
+        PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
     },
     serve_server,
     service::RequestContext,
@@ -94,7 +94,9 @@ impl ServerHandler for VectorServer {
         doc_result.tools.extend(language_result.tools);
         doc_result.tools.extend(project_result.tools);
         doc_result.tools.extend(version_result.tools);
-        Ok(ListToolsResult::with_all_items(doc_result.tools))
+        Ok(ListToolsResult::with_all_items(doc_result.tools)
+            .with_ttl_ms(60_000)
+            .with_cache_scope(CacheScope::Public))
     }
 
     async fn call_tool(
