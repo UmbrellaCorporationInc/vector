@@ -20,8 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'workflow_call' ||
-      startsWith(github.event.release.tag_name, 'ext-')
+      inputs.tag != '' ||
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'ext-'))
 
     defaults:
       run:
