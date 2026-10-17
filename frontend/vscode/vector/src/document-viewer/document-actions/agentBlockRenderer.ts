@@ -26,6 +26,7 @@ export function renderAgentBlock(content: string, variant: AgentBlockVariant): s
               ? "vector-agent-inline-action"
               : "vector-agent-action";
     const inputJson = escapeHtml(JSON.stringify(result.input));
+    const contextJson = escapeHtml(JSON.stringify(result.context));
 
     let html =
         `<button class="${cssClass}" type="button"` +
@@ -33,6 +34,10 @@ export function renderAgentBlock(content: string, variant: AgentBlockVariant): s
         ` data-agent-prompt="${escapeHtml(result.prompt)}"` +
         ` data-agent-label="${escapeHtml(result.label)}"` +
         ` data-agent-input="${inputJson}"`;
+
+    if (variant !== "button") {
+        html += ` data-agent-action-id="vector-action" data-agent-context="${contextJson}"`;
+    }
 
     if (variant === "inline-action") {
         html += ` data-agent-prompt-field="${escapeHtml(result.promptField)}"`;
