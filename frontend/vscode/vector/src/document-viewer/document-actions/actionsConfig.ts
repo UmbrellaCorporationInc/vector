@@ -15,7 +15,7 @@ export const ACTIONS_YAML_PATH = [".vector", "actions.yaml"];
 export const ACTIONS_YAML_DISPLAY_PATH = ".vector/actions.yaml";
 
 export interface ActionDefinition {
-    profile: string;
+    profile?: string;
     prompt: string;
     input?: Record<string, string> | undefined;
 }
@@ -56,6 +56,7 @@ export type ResolveActionResult =
           type: "resolved";
           actionId: string;
           definition: ActionDefinition;
+          effectiveProfile: string;
           agents: ResolvedAgent[];
           instructionsDir: string;
           launchPromptTemplate?: string | undefined;
@@ -183,18 +184,11 @@ export function loadActionsConfig(
             }
         }
 
-        // Required profile
-        if (entryMap.profile === undefined || entryMap.profile === null) {
-            isEntryValid = false;
-            const diag: ActionDiagnostic = {
-                actionId,
-                invalidField: "profile",
-                configFile: ACTIONS_YAML_DISPLAY_PATH,
-                message: `${ACTIONS_YAML_DISPLAY_PATH}: action '${actionId}' is missing required field 'profile'`,
-            };
-            diagnostics.push(diag);
-            output?.appendLine(`Vector: ${diag.message}`);
-        } else if (typeof entryMap.profile !== "string" || entryMap.profile.trim().length === 0) {
+        // An omitted profile inherits the runtime action profile.
+        if (
+            Object.hasOwn(entryMap, "profile") &&
+            (typeof entryMap.profile !== "string" || entryMap.profile.trim().length === 0)
+        ) {
             isEntryValid = false;
             const diag: ActionDiagnostic = {
                 actionId,
@@ -280,7 +274,9 @@ export function loadActionsConfig(
 
         if (isEntryValid) {
             actions[actionId] = {
-                profile: (entryMap.profile as string).trim(),
+                ...(typeof entryMap.profile === "string"
+                    ? { profile: entryMap.profile.trim() }
+                    : {}),
                 prompt: (entryMap.prompt as string).trim(),
                 ...(validatedInput !== undefined ? { input: validatedInput } : {}),
             };
@@ -389,6 +385,7 @@ export function interpolateActionPrompt(
 export function resolveConfiguredAction(options: {
     workspaceRoot: string;
     actionId: string;
+    runtimeProfile?: string;
     actionOrFormValues?: Record<string, string>;
     extensionGeneratedValues?: Record<string, string>;
     actionsConfig?: ActionsConfigLoad;
@@ -437,13 +434,22 @@ export function resolveConfiguredAction(options: {
         return { type: "fallback", actionId };
     }
 
+    const effectiveProfile = actionDef.profile ?? options.runtimeProfile?.trim();
+    if (!effectiveProfile) {
+        return {
+            type: "error",
+            actionId,
+            error: `Vector: action '${actionId}' needs a profile in ${ACTIONS_YAML_DISPLAY_PATH} or from the runtime action`,
+        };
+    }
+
     const agentsLoad = options.agentsConfig ?? loadAgentsConfig(workspaceRoot);
     if (!agentsLoad.ok) {
         if (agentsLoad.missing) {
             return {
                 type: "error",
                 actionId,
-                error: `Vector: .vector/agents.yaml is missing; cannot resolve profile '${actionDef.profile}'`,
+                error: `Vector: .vector/agents.yaml is missing; cannot resolve profile '${effectiveProfile}'`,
             };
         }
         return {
@@ -453,12 +459,12 @@ export function resolveConfiguredAction(options: {
         };
     }
 
-    const agents = resolveProfile(agentsLoad.config, actionDef.profile, isAvailable);
+    const agents = resolveProfile(agentsLoad.config, effectiveProfile, isAvailable);
     if (agents.length === 0) {
         return {
             type: "error",
             actionId,
-            error: `Vector: profile '${actionDef.profile}' configured for action '${actionId}' has no agents in .vector/agents.yaml`,
+            error: `Vector: profile '${effectiveProfile}' for action '${actionId}' has no agents in .vector/agents.yaml`,
         };
     }
 
@@ -490,6 +496,7 @@ export function resolveConfiguredAction(options: {
         type: "resolved",
         actionId,
         definition: actionDef,
+        effectiveProfile,
         agents,
         instructionsDir: agentsLoad.config.instructionsDir,
         launchPromptTemplate: agentsLoad.config.prompt,

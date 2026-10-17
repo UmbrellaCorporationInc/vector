@@ -189,7 +189,8 @@ suite("Task 00078 Phase A — Independent Entry Validation", () => {
                 `    prompt: prompts-00001-test`,
                 `    input:`,
                 `      doc-type: rfc`,
-                `  missing-profile:`,
+                `  invalid-profile:`,
+                `    profile: null`,
                 `    prompt: prompts-00002-test`,
                 `  missing-prompt:`,
                 `    profile: code`,
@@ -216,14 +217,14 @@ suite("Task 00078 Phase A — Independent Entry Validation", () => {
             assert.strictEqual(okRes.config.actions["valid-action"].input?.["doc-type"], "rfc");
 
             // Invalid actions are marked
-            assert.ok(okRes.config.invalidActionIds.has("missing-profile"));
+            assert.ok(okRes.config.invalidActionIds.has("invalid-profile"));
             assert.ok(okRes.config.invalidActionIds.has("missing-prompt"));
             assert.ok(okRes.config.invalidActionIds.has("unknown-setting"));
             assert.ok(okRes.config.invalidActionIds.has("invalid-input"));
 
             // Diagnostics report actionId, invalidField, and configFile
             const profileDiag = okRes.config.diagnostics.find(
-                (d) => d.actionId === "missing-profile" && d.invalidField === "profile",
+                (d) => d.actionId === "invalid-profile" && d.invalidField === "profile",
             );
             assert.ok(profileDiag, "profile diagnostic must be present");
             assert.strictEqual(profileDiag.configFile, ACTIONS_YAML_DISPLAY_PATH);
