@@ -59,11 +59,11 @@ input:
   language: Markdown, YAML
 ```
 
-- [ ] Document the `.vector/actions.yaml` schema and profile precedence with examples for `create-doc` and `vector-action` in the extension's user-facing documentation.
-- [ ] Document that configured `create-doc` receives extension-generated `doc-type`, set to the selected document type. Distinguish this key from `document-type`, used by the legacy create-form template.
-- [ ] Document that configured `vector-action` receives extension-generated `file-path` (the source document's path relative to `doc/`, or a synchronized package's `doc/`) and `file-name` (the source document's basename).
-- [ ] Explain input precedence: YAML `input` defaults, then Markdown action or form values, then extension-generated values. Document the inner order for `vector-action`: static input, action context, then form values. State that merging is shallow and that `profile` and `prompt` are not prompt inputs.
-- [ ] Verify the documented keys and precedence against the implementation and update examples if the runtime contract changes during Phase A.
+- [x] Document the `.vector/actions.yaml` schema and profile precedence with examples for `create-doc` and `vector-action` in the extension's user-facing documentation.
+- [x] Document that configured `create-doc` receives extension-generated `doc-type`, set to the selected document type. Distinguish this key from `document-type`, used by the legacy create-form template.
+- [x] Document that configured `vector-action` receives extension-generated `file-path` (the source document's path relative to `doc/`, or a synchronized package's `doc/`) and `file-name` (the source document's basename).
+- [x] Explain input precedence: YAML `input` defaults, then Markdown action or form values, then extension-generated values. Document the inner order for `vector-action`: static input, action context, then form values. State that merging is shallow and that `profile` and `prompt` are not prompt inputs.
+- [x] Verify the documented keys and precedence against the implementation and update examples if the runtime contract changes during Phase A.
 
 ### 3.3. Phase Z — Wrap-up
 
