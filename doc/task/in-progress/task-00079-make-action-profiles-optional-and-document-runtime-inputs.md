@@ -77,5 +77,5 @@ input:
   language: TypeScript, Markdown
 ```
 
-- [ ] Run relevant extension tests and documentation validation.
-- [ ] Update the extension package README if another document is chosen as the primary reference.
+- [x] Run relevant extension tests and documentation validation.
+- [x] Update the extension package README if another document is chosen as the primary reference. The extension package README is the primary reference, so no additional README update is needed.
