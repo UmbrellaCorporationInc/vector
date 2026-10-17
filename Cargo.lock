@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "get-vector"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "runtime-core",
  "runtime-io",
@@ -408,7 +408,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "mcp-vector"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "dunce",
  "rmcp",
@@ -615,7 +615,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-channel"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "runtime-core",
  "thiserror",
@@ -624,7 +624,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-core"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "paste",
  "thiserror",
@@ -633,7 +633,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-doc"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "chrono",
  "dunce",
@@ -652,7 +652,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-io"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "blake3",
  "runtime-core",
@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-language"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "noyalib",
  "runtime-core",
@@ -676,7 +676,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-packages"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "noyalib",
  "runtime-core",
@@ -689,7 +689,7 @@ dependencies = [
 
 [[package]]
 name = "runtime-project"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "runtime-core",
  "runtime-doc",
@@ -1035,7 +1035,7 @@ dependencies = [
 
 [[package]]
 name = "vector-database"
-version = "0.5.0"
+version = "0.6.1"
 dependencies = [
  "runtime-core",
  "runtime-io",

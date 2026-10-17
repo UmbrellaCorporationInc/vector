@@ -116,3 +116,19 @@ export type {
     ResolvedAgent,
     AgentsConfigLoad,
 } from "./document-actions/agentsConfig.js";
+export {
+    ACTIONS_YAML_PATH,
+    ACTIONS_YAML_DISPLAY_PATH,
+    loadActionsConfig,
+    mergeActionVariables,
+    normalizeDocPath,
+    interpolateActionPrompt,
+    resolveConfiguredAction,
+} from "./document-actions/actionsConfig.js";
+export type {
+    ActionDefinition,
+    ActionDiagnostic,
+    ActionsYaml,
+    ActionsConfigLoad,
+    ResolveActionResult,
+} from "./document-actions/actionsConfig.js";
