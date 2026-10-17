@@ -226,6 +226,10 @@ The sidebar then supplies `doc-type` to `prompts-00005-create-document`. A docum
 
 ## 9. Changelog
 
+### 1.5.2
+
+- **Project Action Overrides** — Optional `.vector/actions.yaml` configures the agent profile, governed prompt, and default inputs for sidebar document creation and block or inline document actions. Missing overrides retain the built-in behavior; invalid configured actions report diagnostics and fail when invoked. See section 8.8 for the schema and example.
+
 ### 1.5.0
 
 - **Instruction Capability (Breaking)** — Replaces the `<file>` path handoff with a UUID-scoped instruction file and the `<instruction>` placeholder. `.vector/agents.yaml` must declare `instructions-dir: "${system-temp}/vector/instructions"`. All agent commands must use `<instruction>` and must not use the obsolete `<file>` or `<instruction-id>` placeholders. The MCP server exposes a new `get_instruction` tool that reads the instruction file by UUID without exposing paths to the caller. See section 8 for the complete contract, platform guarantees, and migration guide.

@@ -111,9 +111,25 @@ input:
   language: TypeScript
 ```
 
-- [ ] Update README files for modified packages.
-- [ ] Confirm every acceptance criterion in [[rfc-00044-vector-actions-setting]] is met and link evidence in the implementation summary.
+- [x] Update README files for modified packages.
+- [x] Confirm every acceptance criterion in [[rfc-00044-vector-actions-setting]] is met and link evidence in the implementation summary.
 
-## 4. Staff Engineering Assessment
+## 4. Implementation Summary and Acceptance Evidence
+
+The only modified package is `frontend/vscode/vector`. Its [README](../../../frontend/vscode/vector/README.md) documents the configuration schema, recognized IDs, runtime variables, precedence, diagnostics, an end-to-end example, and the 1.5.2 changelog entry.
+
+| RFC 00044 acceptance criteria | Evidence |
+|---|---|
+| Optional file, root map, non-empty IDs, required profile and prompt, optional input | [Configuration loader](../../../frontend/vscode/vector/src/document-viewer/document-actions/actionsConfig.ts); [Phase A configuration tests](../../../frontend/vscode/vector/src/test/task00078PhaseA.test.ts) |
+| Sidebar `create-doc` override and `doc-type` | [Sidebar integration](../../../frontend/vscode/vector/src/extension.ts); [Phase B sidebar tests](../../../frontend/vscode/vector/src/test/task00078PhaseB.test.ts) |
+| Shared `vector-action` override for block and inline actions, complete parsed YAML, generated path metadata, and inline form values | [Document action integration](../../../frontend/vscode/vector/src/document-viewer/governedDocumentEditorProvider.ts), [path metadata](../../../frontend/vscode/vector/src/document-viewer/document-actions/actionRuntimeContext.ts); [Phase B action tests](../../../frontend/vscode/vector/src/test/task00078PhaseB.test.ts) |
+| Variable precedence, generated path and name priority, single-pass hash-brace interpolation, and unresolved-variable errors | [Variable resolution](../../../frontend/vscode/vector/src/document-viewer/document-actions/actionsConfig.ts); [Phase A merge and interpolation tests](../../../frontend/vscode/vector/src/test/task00078PhaseA.test.ts) |
+| Built-in behavior for missing file or ID; independent diagnostics and valid-entry availability; invoked invalid entry fails | [Configuration and resolution](../../../frontend/vscode/vector/src/document-viewer/document-actions/actionsConfig.ts); [Phase A resolution tests](../../../frontend/vscode/vector/src/test/task00078PhaseA.test.ts), [Phase B fallback tests](../../../frontend/vscode/vector/src/test/task00078PhaseB.test.ts) |
+| Required negative, path, inline, and fallback test coverage | [Phase A tests](../../../frontend/vscode/vector/src/test/task00078PhaseA.test.ts) and [Phase B tests](../../../frontend/vscode/vector/src/test/task00078PhaseB.test.ts) cover absent and malformed files, unknown IDs, invalid profiles and prompts, partially invalid entries, duplicate keys, interpolation, path normalization, inline values, and fallback. |
+| User documentation with schema, IDs, runtime variables, and example | [Extension README, section 8.8](../../../frontend/vscode/vector/README.md) |
+
+Quality gate: Vector MCP `language_quality_gate(["TypeScript"])` required `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, and `pnpm test` in that order. All passed in `frontend/vscode/vector`; the test suite reported 745 passing tests.
+
+## 5. Staff Engineering Assessment
 
 The highest implementation risk is bypassing existing execution behavior while adding the override path. Keep configuration parsing, per-entry validation, variable merging, interpolation, and agent launch separate so each failure can be tested without an agent terminal. Preserve the accepted precedence and invalid-entry behavior exactly; a silent fallback after an invalid configured entry would hide configuration errors. The RFC does not define how non-scalar YAML values become interpolation text or prescribe a canonical separator for `file-path`; settle those contracts explicitly before encoding them in tests or documentation.
