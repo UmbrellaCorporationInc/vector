@@ -19,12 +19,22 @@ export function renderInlineHeaderAction(documentStem: string, headingText?: str
         inputObj["document-header"] = headingText;
     }
     const input = escapeHtml(JSON.stringify(inputObj));
+    const context = escapeHtml(
+        JSON.stringify({
+            label: INLINE_ACTION_LABEL,
+            profile: INLINE_ACTION_PROFILE,
+            prompt: INLINE_ACTION_PROMPT,
+            "prompt-field": "prompt-message",
+            input: inputObj,
+        }),
+    );
     return (
         `<button class="vector-agent-inline-action vector-agent-header-action" type="button"` +
         ` data-agent-profile="${escapeHtml(INLINE_ACTION_PROFILE)}"` +
         ` data-agent-prompt="${escapeHtml(INLINE_ACTION_PROMPT)}"` +
         ` data-agent-label="${escapeHtml(INLINE_ACTION_LABEL)}"` +
         ` data-agent-input="${input}"` +
+        ` data-agent-action-id="vector-action" data-agent-context="${context}"` +
         ` data-agent-prompt-field="prompt-message"` +
         ` aria-label="${escapeHtml(INLINE_ACTION_LABEL)}"` +
         `>${INLINE_ACTION_GLYPH}</button>`

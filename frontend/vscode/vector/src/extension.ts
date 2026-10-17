@@ -21,6 +21,8 @@ import {
     writeTempDocument,
 } from "./document-viewer/document-actions/agentExecutor.js";
 import { loadAgentsConfig } from "./document-viewer/document-actions/agentsConfig.js";
+import { resolveConfiguredAction } from "./document-viewer/document-actions/actionsConfig.js";
+import { executeConfiguredAction } from "./document-viewer/document-actions/configuredActionExecutor.js";
 import { substituteVariables } from "./document-viewer/document-actions/variableSubstitution.js";
 import { DashboardViewerController } from "./dashboard-viewer/index.js";
 
@@ -246,6 +248,25 @@ export function activate(context: vscode.ExtensionContext): void {
                 );
                 return;
             }
+            const configured = resolveConfiguredAction({
+                workspaceRoot,
+                actionId: "create-doc",
+                extensionGeneratedValues: { "doc-type": node.docType },
+                ...(_diagOutput ? { output: _diagOutput } : {}),
+            });
+            if (configured.type === "error") {
+                void vscode.window.showErrorMessage(configured.error);
+                return;
+            }
+            if (configured.type === "resolved") {
+                await executeConfiguredAction(
+                    configured,
+                    `Create ${node.docType} document`,
+                    workspaceRoot,
+                    context.subscriptions,
+                );
+                return;
+            }
             const config = loadDocumentTypes(workspaceRoot);
             const typeConfig = config?.["document-types"][node.docType];
             const createFormId = typeConfig?.["create-document-form"];
@@ -268,7 +289,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 const substituted = substituteVariables(sourceContent, {
                     "document-type": node.docType,
                 });
-                const tempPath = writeTempDocument(substituted);
+                const tempPath = writeTempDocument(substituted, result.filePath);
                 await vscode.commands.executeCommand(
                     "vscode.openWith",
                     vscode.Uri.file(tempPath),

@@ -104,8 +104,10 @@
         }
       }
       var staticInput = Object.assign({}, action.staticInput);
+      var formValues = Object.assign({}, action.formValues);
       if (extra) {
         staticInput[promptField] = extra;
+        formValues[promptField] = extra;
       }
       closeInlineOverlay();
       vscode.postMessage({
@@ -114,8 +116,10 @@
         prompt: action.prompt,
         label: action.label,
         staticInput: staticInput,
-        formValues: action.formValues,
+        formValues: formValues,
         chatInputMentions: chatInputMentions,
+        actionId: action.actionId,
+        actionContext: action.actionContext,
       });
     }
 
@@ -269,6 +273,15 @@
       const prompt = agentTrigger.dataset.agentPrompt;
       const label = agentTrigger.dataset.agentLabel ?? "";
       const inputJson = agentTrigger.dataset.agentInput;
+      const actionId = agentTrigger.dataset.agentActionId;
+      let actionContext = {};
+      try {
+        actionContext = agentTrigger.dataset.agentContext
+          ? JSON.parse(agentTrigger.dataset.agentContext)
+          : {};
+      } catch {
+        actionContext = {};
+      }
       let staticInput = {};
       try {
         staticInput = inputJson ? JSON.parse(inputJson) : {};
@@ -282,7 +295,7 @@
           : {};
         const promptField = agentTrigger.dataset.agentPromptField || "prompt-message";
         if (profile && prompt) {
-          openInlineOverlay({ profile: profile, prompt: prompt, label: label, staticInput: staticInput, formValues: formValues, promptField: promptField });
+          openInlineOverlay({ profile: profile, prompt: prompt, label: label, staticInput: staticInput, formValues: formValues, promptField: promptField, actionId: actionId, actionContext: actionContext });
         }
         return;
       }
@@ -302,6 +315,8 @@
           staticInput: staticInput,
           formValues: formValues,
           chatInputMentions: chatInputMentions,
+          actionId: actionId,
+          actionContext: actionContext,
         });
       }
       return;

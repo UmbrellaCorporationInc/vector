@@ -6,6 +6,7 @@ export interface AgentBlock {
     prompt: string;
     promptField: string;
     input: Record<string, string>;
+    context: Record<string, unknown>;
 }
 
 export interface AgentBlockParseError {
@@ -84,5 +85,6 @@ export function parseAgentBlock(content: string): AgentBlockParseResult {
         prompt: map.prompt.trim(),
         promptField,
         input,
+        context: map,
     };
 }

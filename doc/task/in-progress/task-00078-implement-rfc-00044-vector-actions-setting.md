@@ -74,12 +74,12 @@ input:
   language: TypeScript
 ```
 
-- [ ] Route sidebar document creation through `create-doc` when configured and expose the selected governed type as `doc-type`.
-- [ ] Route `vector-agent-action` and `vector-agent-inline-action` through `vector-action` when configured, using the complete parsed action YAML as runtime context.
-- [ ] Collect inline form values before resolving the configured action and include those values in runtime context.
-- [ ] Generate `file-path` relative to the `doc` directory and `file-name` as the document basename. Ensure generated values override configured defaults and action-supplied values.
-- [ ] Present the agents associated with the resolved profile and launch the selected agent with the rendered instruction.
-- [ ] Retain each entry point's current behavior when no matching override is configured.
+- [x] Route sidebar document creation through `create-doc` when configured and expose the selected governed type as `doc-type`.
+- [x] Route `vector-agent-action` and `vector-agent-inline-action` through `vector-action` when configured, using the complete parsed action YAML as runtime context.
+- [x] Collect inline form values before resolving the configured action and include those values in runtime context.
+- [x] Generate `file-path` relative to the `doc` directory and `file-name` as the document basename. Ensure generated values override configured defaults and action-supplied values.
+- [x] Present the agents associated with the resolved profile and launch the selected agent with the rendered instruction.
+- [x] Retain each entry point's current behavior when no matching override is configured.
 
 ### 3.3. Phase C — Verification and documentation
 

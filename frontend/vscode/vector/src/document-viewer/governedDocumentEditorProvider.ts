@@ -1,5 +1,8 @@
 import * as crypto from "crypto";
 import * as vscode from "vscode";
+import { documentActionMetadata } from "./document-actions/actionRuntimeContext.js";
+import { resolveConfiguredAction } from "./document-actions/actionsConfig.js";
+import { executeConfiguredAction } from "./document-actions/configuredActionExecutor.js";
 import type { CustomReadonlyEditorProvider } from "vscode";
 import { loadDocumentTypes } from "../documentDiscovery.js";
 import type { GovernedDocument } from "../documentDiscovery.js";
@@ -24,6 +27,7 @@ import {
     resolveAgentCommand,
     spawnAgentTerminal,
     deleteTempFile,
+    resolveTempDocumentSource,
 } from "./document-actions/agentExecutor.js";
 import {
     isFileSuggestionsRequest,
@@ -255,6 +259,42 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
     }
 
     private async _handleRunAgent(msg: RunAgentMessage): Promise<void> {
+        if (msg.actionId === "vector-action") {
+            const metadata = this._activeDoc
+                ? documentActionMetadata(
+                      this.workspaceRoot,
+                      resolveTempDocumentSource(this._activeDoc.filePath) ??
+                          this._activeDoc.filePath,
+                  )
+                : null;
+            const runtimeValues = actionContextVariables(msg.actionContext);
+            const configured = resolveConfiguredAction({
+                workspaceRoot: this.workspaceRoot,
+                actionId: "vector-action",
+                actionOrFormValues: { ...msg.staticInput, ...runtimeValues, ...msg.formValues },
+                ...(metadata ? { extensionGeneratedValues: metadata } : {}),
+                ...(this._isAgentAvailable ? { isAvailable: this._isAgentAvailable } : {}),
+            });
+            if (configured.type === "error") {
+                void vscode.window.showErrorMessage(configured.error);
+                return;
+            }
+            if (configured.type === "resolved") {
+                if (!metadata) {
+                    void vscode.window.showErrorMessage(
+                        "Vector: document action requires a source file inside the doc directory",
+                    );
+                    return;
+                }
+                await executeConfiguredAction(
+                    configured,
+                    msg.label,
+                    this.workspaceRoot,
+                    this.subscriptions,
+                );
+                return;
+            }
+        }
         const agentsLoad = loadAgentsConfig(this.workspaceRoot);
         if (!agentsLoad.ok) {
             if (!agentsLoad.missing) {
@@ -435,6 +475,8 @@ interface RunAgentMessage {
     staticInput: Record<string, string>;
     formValues: Record<string, string>;
     chatInputMentions?: Record<string, ChatInputMention[]>;
+    actionId?: string;
+    actionContext?: Record<string, unknown>;
 }
 
 interface OpenDocMessage {
@@ -487,6 +529,24 @@ function isChangeStatusMessage(message: unknown): message is ChangeStatusMessage
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
+}
+
+function actionContextVariables(
+    context: Record<string, unknown> | undefined,
+): Record<string, string> {
+    const values: Record<string, string> = {};
+    if (!context) {
+        return values;
+    }
+    for (const [key, value] of Object.entries(context)) {
+        values[key] = typeof value === "string" ? value : JSON.stringify(value);
+    }
+    if (isRecord(context.input)) {
+        for (const [key, value] of Object.entries(context.input)) {
+            values[key] = typeof value === "string" ? value : JSON.stringify(value);
+        }
+    }
+    return values;
 }
 
 function buildStubDocument(uri: vscode.Uri): GovernedDocument {

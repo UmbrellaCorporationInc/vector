@@ -36,6 +36,7 @@ const INSTRUCTION_FILENAME_PATTERN =
 
 /** Instruction and temp-document files created this session, tracked for deactivation cleanup. */
 const activeTempFiles = new Set<string>();
+const tempDocumentSources = new Map<string, string>();
 
 /**
  * Minimal sink for one-line diagnostic messages written without telemetry.
@@ -104,12 +105,20 @@ export function writeInstructionFile(
  * directory. Used for the create-document form flow (not for instruction files).
  * The file path is tracked for cleanup on extension deactivation.
  */
-export function writeTempDocument(content: string): string {
+export function writeTempDocument(content: string, sourcePath?: string): string {
     const fileName = `vector_temp_${crypto.randomUUID()}.md`;
     const filePath = path.join(os.tmpdir(), fileName);
     fs.writeFileSync(filePath, content, "utf-8");
     activeTempFiles.add(filePath);
+    if (sourcePath) {
+        tempDocumentSources.set(filePath, sourcePath);
+    }
     return filePath;
+}
+
+/** Returns the governed source of a temporary create form, when one was recorded. */
+export function resolveTempDocumentSource(filePath: string): string | undefined {
+    return tempDocumentSources.get(filePath);
 }
 
 /**
@@ -123,6 +132,7 @@ export function deleteTempFile(filePath: string): void {
         // Ignore — file may have already been deleted.
     }
     activeTempFiles.delete(filePath);
+    tempDocumentSources.delete(filePath);
 }
 
 /**
@@ -143,6 +153,7 @@ export function cleanupAllTempFiles(output?: DiagnosticOutput): void {
         }
     }
     activeTempFiles.clear();
+    tempDocumentSources.clear();
 }
 
 /**

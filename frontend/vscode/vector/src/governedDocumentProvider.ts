@@ -9,6 +9,7 @@ import {
     type GovernedDocumentGroup,
 } from "./documentDiscovery.js";
 import { scanDashboards, type Dashboard } from "./dashboardDiscovery.js";
+import { loadActionsConfig } from "./document-viewer/document-actions/actionsConfig.js";
 
 export {
     findGovernedWorkspaceRoot,
@@ -230,11 +231,16 @@ export class PerTypeDocumentProvider implements vscode.TreeDataProvider<Governed
             const config = loadDocumentTypes(this.workspaceRoot);
             const typeConfig = config?.["document-types"][element.docType];
             const hasCreateForm = typeConfig?.["create-document-form"] !== undefined;
+            const actions = loadActionsConfig(this.workspaceRoot);
+            const hasCreateOverride =
+                actions.ok &&
+                (actions.config.actions["create-doc"] !== undefined ||
+                    actions.config.invalidActionIds.has("create-doc"));
 
             const filter = this.getFilter(element.docType);
             const label = element.docType.toUpperCase();
             const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Collapsed);
-            item.contextValue = hasCreateForm ? "docTypeFolder" : "docType";
+            item.contextValue = hasCreateForm || hasCreateOverride ? "docTypeFolder" : "docType";
             if (filter.kind !== "all") {
                 item.description = `filter: ${filter.value}`;
             }
