@@ -21,7 +21,7 @@ export async function executeConfiguredAction(
     const available = action.agents.filter((agent) => agent.available);
     if (available.length === 0) {
         void vscode.window.showErrorMessage(
-            `Vector: no agents in profile '${action.definition.profile}' are installed`,
+            `Vector: no agents in profile '${action.effectiveProfile}' are installed`,
         );
         return;
     }

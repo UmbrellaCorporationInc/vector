@@ -271,6 +271,7 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
             const configured = resolveConfiguredAction({
                 workspaceRoot: this.workspaceRoot,
                 actionId: "vector-action",
+                ...(msg.profile !== undefined ? { runtimeProfile: msg.profile } : {}),
                 actionOrFormValues: { ...msg.staticInput, ...runtimeValues, ...msg.formValues },
                 ...(metadata ? { extensionGeneratedValues: metadata } : {}),
                 ...(this._isAgentAvailable ? { isAvailable: this._isAgentAvailable } : {}),
@@ -294,6 +295,12 @@ export class GovernedDocumentEditorProvider implements CustomReadonlyEditorProvi
                 );
                 return;
             }
+        }
+        if (!msg.profile) {
+            void vscode.window.showErrorMessage(
+                "Vector: document action needs a runtime profile when no configured action supplies one",
+            );
+            return;
         }
         const agentsLoad = loadAgentsConfig(this.workspaceRoot);
         if (!agentsLoad.ok) {
@@ -469,7 +476,7 @@ interface OpenEditorMessage {
 
 interface RunAgentMessage {
     type: "vector.runAgent";
-    profile: string;
+    profile?: string;
     prompt: string;
     label: string;
     staticInput: Record<string, string>;
@@ -494,7 +501,8 @@ function isRunAgentMessage(message: unknown): message is RunAgentMessage {
     return (
         isRecord(message) &&
         message.type === "vector.runAgent" &&
-        typeof message.profile === "string" &&
+        (typeof message.profile === "string" ||
+            (message.actionId === "vector-action" && message.profile === undefined)) &&
         typeof message.prompt === "string" &&
         typeof message.label === "string" &&
         isRecord(message.staticInput) &&
