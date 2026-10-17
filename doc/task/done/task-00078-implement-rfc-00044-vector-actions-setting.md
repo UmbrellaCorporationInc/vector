@@ -5,7 +5,7 @@ code: "00078"
 slug: implement-rfc-00044-vector-actions-setting
 title: Implement RFC 00044 Vector Actions Settings
 description: Add governed action overrides for the VS Code extension's document creation and document action entry points.
-status: in-progress
+status: done
 created: 2026-10-17
 updated: 2026-10-17
 tags:
