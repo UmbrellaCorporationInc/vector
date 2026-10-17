@@ -281,4 +281,145 @@ suite("Task 00078 Phase B — action entry points", () => {
             "Create task",
         );
     });
+
+    test("sidebar uses its create form when create-doc is not configured", async () => {
+        writeFile(
+            path.join(root, ".vector", "document-types.yaml"),
+            "document-types:\n  task:\n    layout: directory\n    create-document-form: form-00001-create\n  prompts:\n    layout: directory\n",
+        );
+        writeFile(
+            path.join(root, "doc", "form", "form-00001-create.md"),
+            "Type #{document-type}\n",
+        );
+        writeFile(
+            path.join(root, ".vector", "actions.yaml"),
+            "actions:\n  unrelated:\n    profile: configured\n    prompt: prompts-00002-create\n",
+        );
+        vscode.workspace.workspaceFolders = [
+            { uri: vscode.Uri.file(root), name: "test", index: 0 },
+        ];
+        activate({
+            subscriptions: [],
+            extensionUri: vscode.Uri.file(extensionRoot),
+        } as unknown as import("vscode").ExtensionContext);
+
+        const command = vscode.__getCommandHandler("vector.createDocument");
+        assert.ok(command);
+        await command({ kind: "root", docType: "task" });
+
+        assert.strictEqual(vscode.__getCreatedTerminals().length, 0);
+        assert.ok(
+            vscode.__getExecutedCommands().some((entry) => entry.command === "vscode.openWith"),
+            vscode.__getErrorMessages().join(" | "),
+        );
+    });
+
+    test("inline action falls back to its own prompt when vector-action is absent", async () => {
+        writeFile(
+            path.join(root, ".vector", "actions.yaml"),
+            "actions:\n  create-doc:\n    profile: configured\n    prompt: prompts-00002-create\n",
+        );
+        writeFile(
+            path.join(root, "doc", "prompts", "prompts-00003-inline.md"),
+            "Inline #{prompt-message}",
+        );
+        const provider = new GovernedDocumentEditorProvider(
+            root,
+            vscode.Uri.file(extensionRoot) as unknown as import("vscode").Uri,
+            () => true,
+        );
+        const panel = vscode.window.createWebviewPanel("vector.documentPreview", "Test");
+        provider.resolveCustomEditor(
+            provider.openCustomDocument(
+                vscode.Uri.file(
+                    path.join(root, "doc", "task", "task-00001-source.md"),
+                ) as unknown as import("vscode").Uri,
+            ),
+            panel as unknown as import("vscode").WebviewPanel,
+        );
+        vscode.__fireWebviewMessage(panel, {
+            type: "vector.runAgent",
+            actionId: "vector-action",
+            actionContext: { label: "Inline" },
+            profile: "configured",
+            prompt: "prompts-00003-inline",
+            label: "Inline",
+            staticInput: {},
+            formValues: { "prompt-message": "user response" },
+        });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        assert.strictEqual(vscode.__getCreatedTerminals().length, 1);
+        const files = fs.readdirSync(path.join(root, "instructions"));
+        assert.strictEqual(
+            fs.readFileSync(path.join(root, "instructions", files[0] ?? ""), "utf-8"),
+            "Inline user response",
+        );
+    });
+
+    test("configured profile presents its agents and launches the selected one", async () => {
+        writeFile(
+            path.join(root, ".vector", "agents.yaml"),
+            [
+                `instructions-dir: "\${system-temp}/${path.basename(root)}/instructions"`,
+                "agents:",
+                "  first:",
+                "    type: cli",
+                "    command: node '<instruction>'",
+                "  second:",
+                "    type: cli",
+                "    command: node '<instruction>'",
+                "profiles:",
+                "  configured: [first, second]",
+            ].join("\n"),
+        );
+        writeFile(
+            path.join(root, ".vector", "actions.yaml"),
+            "actions:\n  vector-action:\n    profile: configured\n    prompt: prompts-00002-create\n",
+        );
+        const provider = new GovernedDocumentEditorProvider(
+            root,
+            vscode.Uri.file(extensionRoot) as unknown as import("vscode").Uri,
+            () => true,
+        );
+        const panel = vscode.window.createWebviewPanel("vector.documentPreview", "Test");
+        provider.resolveCustomEditor(
+            provider.openCustomDocument(
+                vscode.Uri.file(
+                    path.join(root, "doc", "task", "task-00001-source.md"),
+                ) as unknown as import("vscode").Uri,
+            ),
+            panel as unknown as import("vscode").WebviewPanel,
+        );
+        const pickerWindow = vscode.window as unknown as {
+            showQuickPick: (
+                items: Array<{ label: string }>,
+            ) => Promise<{ label: string } | undefined>;
+        };
+        const originalShowQuickPick = pickerWindow.showQuickPick;
+        let presented: string[] = [];
+        pickerWindow.showQuickPick = (items: Array<{ label: string }>) => {
+            presented = items.map((item) => item.label);
+            return Promise.resolve(items[1]);
+        };
+        try {
+            vscode.__fireWebviewMessage(panel, {
+                type: "vector.runAgent",
+                actionId: "vector-action",
+                actionContext: { "doc-type": "task" },
+                profile: "ignored",
+                prompt: "ignored",
+                label: "Select",
+                staticInput: {},
+                formValues: {},
+            });
+            await new Promise((resolve) => setTimeout(resolve, 20));
+        } finally {
+            pickerWindow.showQuickPick = originalShowQuickPick;
+        }
+
+        assert.deepStrictEqual(presented, ["first", "second"]);
+        assert.strictEqual(vscode.__getCreatedTerminals().length, 1);
+        assert.ok(vscode.__getCreatedTerminals()[0]?.name.includes("second"));
+    });
 });

@@ -191,6 +191,39 @@ prompt: "process the instruction <instruction-id> by using the vector mcp"
 
 **Backward compatibility** — existing `agents.yaml` files that omit `prompt` continue to launch agents using the built-in default without any modification.
 
+### 8.8 Project action overrides
+
+The optional `.vector/actions.yaml` file selects an agent profile and governed prompt for extension actions. Its root must contain an `actions` mapping. Each action ID must be non-empty; each entry requires non-empty `profile` and `prompt` strings and may contain an `input` mapping. Other root or entry fields are rejected. The `profile` must exist in `.vector/agents.yaml`, and `prompt` must identify a governed prompt document. `input` values may be strings, numbers, booleans, or null; the extension converts them to text (null becomes an empty string). Nested values in configured `input` are invalid.
+
+The extension currently invokes these IDs:
+
+| ID              | Entry point                                                   | Generated variables                                                                               |
+| --------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `create-doc`    | Sidebar create-document command                               | `doc-type`: selected governed document type                                                       |
+| `vector-action` | `vector-agent-action` and `vector-agent-inline-action` blocks | `file-path`: path relative to the source `doc` directory, using `/`; `file-name`: source basename |
+
+Document actions also expose every top-level field in their parsed YAML block. Fields inside the block's `input` mapping are exposed by key as well. Structured block values are encoded as JSON text. Inline actions collect their form values, including the overlay prompt field, before resolving the override. For duplicate variable names, precedence is configured `input`, then action block or form values, then extension-generated variables. `profile` and `prompt` select the action behavior and cannot be interpolated as input variables. A configured input value can reference a runtime value, such as `document-type: "#{doc-type}"`.
+
+The governed prompt uses `#{variable}` placeholders. Substitution runs once; text inserted from a variable is not expanded again. A placeholder with no value fails the action. An absent `actions.yaml` or an unconfigured ID retains the existing entry point behavior. Malformed YAML or a malformed root prevents configured action resolution. Invalid entries are diagnosed independently, with the action ID, field, and `.vector/actions.yaml` location; other valid entries remain usable. Invoking an invalid configured ID fails instead of running the built-in action. Diagnostics omit rendered prompt text and runtime values.
+
+For example, save the following configuration as `.vector/actions.yaml`:
+
+```yaml
+actions:
+    create-doc:
+        profile: create-doc
+        prompt: prompts-00005-create-document
+        input:
+            document-type: "#{doc-type}"
+    vector-action:
+        profile: code
+        prompt: prompts-00011-run-configured-action
+        input:
+            source: governed-document
+```
+
+The sidebar then supplies `doc-type` to `prompts-00005-create-document`. A document action supplies its block fields and source path to `prompts-00011-run-configured-action`; an inline action also supplies its collected form values. Each configured profile presents its available agents for selection before launch.
+
 ## 9. Changelog
 
 ### 1.5.0

@@ -93,11 +93,11 @@ input:
   language: TypeScript
 ```
 
-- [ ] Test absent files, unknown IDs, invalid profiles and prompts, partially invalid configuration, malformed YAML, and failure of an invoked invalid entry.
-- [ ] Test variable precedence, duplicate keys, single-pass interpolation, unresolved placeholders, and extension-generated path metadata, including path normalization across supported platforms.
-- [ ] Test sidebar `doc-type`, block action YAML context, inline form values, agent selection, and built-in fallback for all three entry points.
-- [ ] Document the schema, recognized action IDs, variable precedence, runtime variables, diagnostics, and an end-to-end example.
-- [ ] Run the extension's relevant automated checks and address failures.
+- [x] Test absent files, unknown IDs, invalid profiles and prompts, partially invalid configuration, malformed YAML, and failure of an invoked invalid entry.
+- [x] Test variable precedence, duplicate keys, single-pass interpolation, unresolved placeholders, and extension-generated path metadata, including path normalization across supported platforms.
+- [x] Test sidebar `doc-type`, block action YAML context, inline form values, agent selection, and built-in fallback for all three entry points.
+- [x] Document the schema, recognized action IDs, variable precedence, runtime variables, diagnostics, and an end-to-end example.
+- [x] Run the extension's relevant automated checks and address failures.
 
 ### 3.4. Phase Z — Wrap-up
 
